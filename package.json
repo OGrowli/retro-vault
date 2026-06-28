@@ -1,0 +1,12 @@
+{
+  "name": "retro-vault",
+  "private": true,
+  "workspaces": ["packages/*"],
+  "scripts": {
+    "dev:api": "npm run dev -w packages/api",
+    "dev:web": "npm run dev -w packages/web",
+    "build": "npm run build -w packages/shared && npm run build -w packages/api && npm run build -w packages/web",
+    "start": "npm run start -w packages/api",
+    "import": "npm run import -w packages/api"
+  }
+}
