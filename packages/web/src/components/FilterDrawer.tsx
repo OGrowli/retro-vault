@@ -8,6 +8,9 @@ interface Props {
   onChange: (filter: GameFilter) => void
   onApply: () => void
   onRandom: () => void
+  onImport: () => void
+  importLoading: boolean
+  importMessage: string | null
   onClose: () => void
   systems: string[]
   genres: string[]
@@ -41,7 +44,7 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   )
 }
 
-export function FilterDrawer({ open, filter, onChange, onApply, onRandom, onClose, systems, genres, focusedRow }: Props) {
+export function FilterDrawer({ open, filter, onChange, onApply, onRandom, onImport, importLoading, importMessage, onClose, systems, genres, focusedRow }: Props) {
   const toggleSystem = (s: string) => {
     const cur = filter.systems ?? []
     onChange({ ...filter, systems: cur.includes(s) ? cur.filter(x => x !== s) : [...cur, s] })
@@ -196,6 +199,21 @@ export function FilterDrawer({ open, filter, onChange, onApply, onRandom, onClos
           >
             Pick Random Game
           </button>
+          <button
+            onClick={onImport}
+            disabled={importLoading}
+            className={[
+              'w-full py-3 rounded-lg font-bold text-white uppercase tracking-wide text-sm',
+              'bg-vault-surface border border-vault-muted hover:border-vault-accent transition-colors',
+              focusedRow === 10 ? 'ring-2 ring-white' : '',
+              importLoading ? 'opacity-50 cursor-not-allowed' : '',
+            ].join(' ')}
+          >
+            {importLoading ? 'Scanning Roms...' : 'Update Library'}
+          </button>
+          {importMessage && (
+            <p className="text-vault-accent text-xs text-center">{importMessage}</p>
+          )}
           <p className="text-vault-muted text-xs flex items-center justify-center gap-1.5">
             Start → filter  ·  <Glyph type="circle" /> Close
           </p>

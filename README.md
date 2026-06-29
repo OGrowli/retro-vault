@@ -12,17 +12,12 @@ PS5-style RetroPie frontend for Raspberry Pi 3B/3B+. Runs as a local Hono API + 
 ## Setup
 
 ```bash
-# Clone and install
 git clone <repo> retro-vault && cd retro-vault
 npm install
-
-# Build shared types + API
-npm run build -w packages/shared
-npm run build -w packages/api
-
-# Build web frontend
-npm run build -w packages/web
+npm run build   # builds shared types, API, then web frontend
 ```
+
+For first install on the Pi, prefer `npm run deploy` (see Deploying below) — it does the above plus sets up the systemd service and kiosk autostart in one step.
 
 ## Running
 
@@ -31,49 +26,36 @@ npm run build -w packages/web
 npm start
 ```
 
+## Deploying
+
+`scripts/deploy.sh` handles both the first install and later updates — pulls latest (if the tree is clean), runs `npm install` + `npm run build`, then either installs the startup service (first run) or restarts it (`retrovault-api`). Run it from the Pi inside the cloned repo:
+
+```bash
+npm run deploy              # build + restart
+npm run deploy -- --import  # also re-import games from EmulationStation gamelists
+```
+
+Web/frontend changes need a kiosk relaunch to show up — reboot the Pi, or `sudo pkill chromium-browser` if RetroPie's autostart will relaunch it.
+
 ## Kiosk Mode (Pi)
 
-Add to `/etc/rc.local` or an autostart script:
+Startup is automated by `scripts/install-startup.sh` (run automatically by `deploy.sh` on first install, or directly):
 
 ```bash
-# Start API in background
-cd /home/pi/retro-vault
-node packages/api/dist/index.js &
-
-# Wait for API to be ready
-sleep 3
-
-# Launch Chromium in kiosk mode
-DISPLAY=:0 chromium-browser \
-  --kiosk \
-  --disable-extensions \
-  --disable-gpu \
-  --js-flags="--max-old-space-size=256" \
-  --no-sandbox \
-  http://localhost:3000
+bash scripts/install-startup.sh
 ```
 
-Or create a systemd service:
+This:
+- Installs `scripts/retrovault-api.service` as a systemd unit (`retrovault-api`), enabled on boot, auto-restarts on failure.
+- Hooks `scripts/retrovault-kiosk.sh` into RetroPie's `/opt/retropie/configs/all/autostart.sh` — it waits for the API to respond on `:3000`, disables screen blanking/cursor, then launches Chromium in kiosk mode against `http://localhost:3000`.
 
-```ini
-# /etc/systemd/system/retrovault.service
-[Unit]
-Description=RetroVault API
-After=network.target
-
-[Service]
-User=pi
-WorkingDirectory=/home/pi/retro-vault
-ExecStart=/usr/bin/node packages/api/dist/index.js
-Restart=always
-
-[Install]
-WantedBy=multi-user.target
-```
+Useful commands:
 
 ```bash
-sudo systemctl enable retrovault
-sudo systemctl start retrovault
+sudo systemctl status retrovault-api   # check API status
+sudo systemctl restart retrovault-api  # restart API
+sudo journalctl -u retrovault-api -f   # tail API logs
+sudo systemctl disable retrovault-api  # uninstall autostart
 ```
 
 ## Importing Games

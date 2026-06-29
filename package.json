@@ -10,7 +10,8 @@
     "import": "npm run import -w packages/api",
     "seed": "tsx packages/api/src/seed.ts",
     "dev": "bash scripts/dev.sh",
-    "dev:win": "powershell -ExecutionPolicy Bypass -File scripts/dev.ps1"
+    "dev:win": "powershell -ExecutionPolicy Bypass -File scripts/dev.ps1",
+    "deploy": "bash scripts/deploy.sh"
   },
   "devDependencies": {
     "tsx": "^4.15.0"

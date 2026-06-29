@@ -31,6 +31,8 @@ export function Home({ user, onGameSelect, onSwitchUser }: Props) {
   const [bgOpacity, setBgOpacity] = useState(0.15)
   const [randomGame, setRandomGame] = useState<Game | null>(null)
   const [randomLoading, setRandomLoading] = useState(false)
+  const [importLoading, setImportLoading] = useState(false)
+  const [importMessage, setImportMessage] = useState<string | null>(null)
 
   const [rawHistory, setRawHistory] = useState<Array<Game & { duration_seconds: number }>>([])
 
@@ -87,18 +89,44 @@ export function Home({ user, onGameSelect, onSwitchUser }: Props) {
     }
   }, [filter, user.id])
 
+  const handleImport = useCallback(async () => {
+    setImportLoading(true)
+    setImportMessage(null)
+    try {
+      const result = await api.import.run()
+      setImportMessage(
+        result.errors.length
+          ? `Imported ${result.imported} · ${result.errors.length} error(s)`
+          : `Imported ${result.imported} game(s)`
+      )
+      const [games, sysList, genreList] = await Promise.all([
+        api.games.list(filter, user.id),
+        api.meta.systems(),
+        api.meta.genres(),
+      ])
+      setAllGames(games)
+      setSystems(sysList)
+      setGenres(genreList)
+    } catch {
+      setImportMessage('Import failed')
+    } finally {
+      setImportLoading(false)
+    }
+  }, [filter, user.id])
+
   const nav = useSpatialNav({
     recentCount: recent.length,
     favoritesCount: favorites.length,
     allGamesCount: allGames.length,
     gridCols: GRID_COLS,
-    filterDrawerItems: 10,
+    filterDrawerItems: 11,
     filterDrawerOpen: filterOpen,
     onToggleFilter: () => setFilterOpen(v => !v),
     onConfirm: (region, row, col) => {
       if (filterOpen) {
         if (row === 8) { void refreshGames(); setFilterOpen(false) }
         if (row === 9) { setFilterOpen(false); void handleRandom() }
+        if (row === 10) void handleImport()
         return
       }
       let game: Game | undefined
@@ -214,6 +242,9 @@ export function Home({ user, onGameSelect, onSwitchUser }: Props) {
         onChange={setFilter}
         onApply={() => { void refreshGames(); setFilterOpen(false) }}
         onRandom={() => { setFilterOpen(false); void handleRandom() }}
+        onImport={() => void handleImport()}
+        importLoading={importLoading}
+        importMessage={importMessage}
         onClose={() => setFilterOpen(false)}
         systems={systems}
         genres={genres}
