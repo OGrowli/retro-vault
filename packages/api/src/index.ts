@@ -22,7 +22,14 @@ app.route('/users', usersRouter)
 app.route('/meta', metaRouter)
 app.route('/import', importRouter)
 
-app.use('/media/*', serveStatic({ root: '/home/pi/.retrovault/media' }))
+const DATA_DIR = process.env['RETROVAULT_DATA_DIR'] ?? '/home/pi/.retrovault'
+app.use(
+  '/media/*',
+  serveStatic({
+    root: path.join(DATA_DIR, 'media'),
+    rewriteRequestPath: (p) => p.replace(/^\/media/, ''),
+  })
+)
 
 app.use('/*', serveStatic({ root: WEB_DIST }))
 

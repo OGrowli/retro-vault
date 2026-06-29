@@ -22,6 +22,18 @@ const AXIS_THRESHOLD = 0.5
 const INITIAL_DELAY = 400
 const REPEAT_RATE = 150
 
+const KEY_MAP: Record<string, GamepadAction> = {
+  ArrowUp: 'up',
+  ArrowDown: 'down',
+  ArrowLeft: 'left',
+  ArrowRight: 'right',
+  Enter: 'confirm',
+  Escape: 'back',
+  Backspace: 'back',
+  f: 'favorite',
+  Tab: 'filter',
+}
+
 interface PressState {
   pressed: boolean
   firstAt: number
@@ -67,6 +79,15 @@ export function useGamepad(
   }, [])
 
   useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (!enabledRef.current || e.repeat) return
+      const action = KEY_MAP[e.key]
+      if (!action) return
+      e.preventDefault()
+      onActionRef.current(action)
+    }
+    window.addEventListener('keydown', onKeyDown)
+
     const loop = (now: number) => {
       if (!enabledRef.current) {
         rafRef.current = requestAnimationFrame(loop)
@@ -106,6 +127,9 @@ export function useGamepad(
     }
 
     rafRef.current = requestAnimationFrame(loop)
-    return () => cancelAnimationFrame(rafRef.current)
+    return () => {
+      window.removeEventListener('keydown', onKeyDown)
+      cancelAnimationFrame(rafRef.current)
+    }
   }, [getButtonStates])
 }

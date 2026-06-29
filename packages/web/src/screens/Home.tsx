@@ -6,6 +6,8 @@ import { useSpatialNav } from '../hooks/useSpatialNav'
 import { Rail } from '../components/Rail'
 import { VirtualGrid, GRID_COLS } from '../components/VirtualGrid'
 import { FilterDrawer } from '../components/FilterDrawer'
+import { RandomGameModal } from '../components/RandomGameModal'
+import { Glyph } from '../components/Glyph'
 
 interface Props {
   user: User
@@ -27,6 +29,8 @@ export function Home({ user, onGameSelect, onSwitchUser }: Props) {
   const [bgGame, setBgGame] = useState<Game | null>(null)
   const [bgSrc, setBgSrc] = useState<string | null>(null)
   const [bgOpacity, setBgOpacity] = useState(0.15)
+  const [randomGame, setRandomGame] = useState<Game | null>(null)
+  const [randomLoading, setRandomLoading] = useState(false)
 
   const [rawHistory, setRawHistory] = useState<Array<Game & { duration_seconds: number }>>([])
 
@@ -74,11 +78,14 @@ export function Home({ user, onGameSelect, onSwitchUser }: Props) {
   }, [filter, user.id])
 
   const handleRandom = useCallback(async () => {
+    setRandomLoading(true)
     try {
       const game = await api.games.random(filter, user.id)
-      onGameSelect(game)
-    } catch {}
-  }, [filter, user.id, onGameSelect])
+      setRandomGame(game)
+    } catch {} finally {
+      setRandomLoading(false)
+    }
+  }, [filter, user.id])
 
   const nav = useSpatialNav({
     recentCount: recent.length,
@@ -91,7 +98,7 @@ export function Home({ user, onGameSelect, onSwitchUser }: Props) {
     onConfirm: (region, row, col) => {
       if (filterOpen) {
         if (row === 8) { void refreshGames(); setFilterOpen(false) }
-        if (row === 9) void handleRandom()
+        if (row === 9) { setFilterOpen(false); void handleRandom() }
         return
       }
       let game: Game | undefined
@@ -122,7 +129,7 @@ export function Home({ user, onGameSelect, onSwitchUser }: Props) {
     },
   })
 
-  useGamepad(nav.handleAction)
+  useGamepad(nav.handleAction, !randomGame)
 
   const recentIdx = nav.getIndex('recently-played')
   const favIdx = nav.getIndex('favorites')
@@ -206,16 +213,24 @@ export function Home({ user, onGameSelect, onSwitchUser }: Props) {
         filter={filter}
         onChange={setFilter}
         onApply={() => { void refreshGames(); setFilterOpen(false) }}
-        onRandom={() => void handleRandom()}
+        onRandom={() => { setFilterOpen(false); void handleRandom() }}
         onClose={() => setFilterOpen(false)}
         systems={systems}
         genres={genres}
         focusedRow={drawerIdx.row}
       />
 
+      <RandomGameModal
+        game={randomGame}
+        loading={randomLoading}
+        onClose={() => setRandomGame(null)}
+        onView={(game) => { setRandomGame(null); onGameSelect(game) }}
+        onAnother={() => void handleRandom()}
+      />
+
       <div className="absolute bottom-0 left-0 right-0 h-12 flex items-center px-[5%] bg-gradient-to-t from-vault-bg to-transparent pointer-events-none">
-        <p className="text-vault-muted text-xs uppercase tracking-wide">
-          ✕ Select  ·  □ Favorite  ·  ○ Back  ·  Start Filter  ·  D-Pad Navigate
+        <p className="text-vault-muted text-xs uppercase tracking-wide flex items-center gap-1.5 flex-wrap">
+          <Glyph type="cross" /> Select  ·  <Glyph type="square" /> Favorite  ·  <Glyph type="circle" /> Back  ·  Start Filter  ·  D-Pad Navigate
         </p>
       </div>
     </div>

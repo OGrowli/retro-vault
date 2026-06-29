@@ -7,35 +7,31 @@ $RootDir = Split-Path -Parent $PSScriptRoot
 $TestDataDir = "$env:TEMP\retrovault-test"
 $TestDb = "$TestDataDir\retrovault.db"
 
+# Ensure test data directory exists
+New-Item -ItemType Directory -Force -Path $TestDataDir | Out-Null
+
 $env:RETROVAULT_DATA_DIR = $TestDataDir
 $env:RETROVAULT_DB_PATH  = $TestDb
 
 Set-Location $RootDir
 
-function Stop-Tree {
-    param([int]$Pid)
-    & taskkill /T /F /PID $Pid | Out-Null
-}
-
-# ── 1. Seed ───────────────────────────────────────────────────────────────────
+# -- 1. Seed --
 Write-Host "==> Seeding test database at $TestDb..." -ForegroundColor Cyan
-& npx tsx packages/api/src/seed.ts
+& npm run seed
 if ($LASTEXITCODE -ne 0) { throw "Seed script failed (exit $LASTEXITCODE)" }
 
-# ── 2. API ────────────────────────────────────────────────────────────────────
+# -- 2. API --
 Write-Host ""
 Write-Host "==> Starting API (port 3000)..." -ForegroundColor Cyan
 
-$apiCmd = "set RETROVAULT_DATA_DIR=$TestDataDir && set RETROVAULT_DB_PATH=$TestDb && npx tsx packages/api/src/index.ts"
-$apiParams = @{
-    FilePath     = 'cmd.exe'
-    ArgumentList = '/c', $apiCmd
-    NoNewWindow  = $true
-    PassThru     = $true
+$apiJob = Start-Job -ScriptBlock {
+    Set-Location $using:RootDir
+    $env:RETROVAULT_DATA_DIR = $using:TestDataDir
+    $env:RETROVAULT_DB_PATH = $using:TestDb
+    & npm run dev:api
 }
-$apiProc = Start-Process @apiParams
 
-# ── 3. Wait for API ───────────────────────────────────────────────────────────
+# -- 3. Wait for API --
 Write-Host "==> Waiting for API..."
 $ready = $false
 for ($i = 0; $i -lt 40; $i++) {
@@ -49,20 +45,17 @@ for ($i = 0; $i -lt 40; $i++) {
     }
 }
 if (-not $ready) {
-    Write-Warning "API did not respond in time — web will start anyway"
+    Write-Warning "API did not respond in time - web will start anyway"
 }
 
-# ── 4. Web ────────────────────────────────────────────────────────────────────
+# -- 4. Web --
 Write-Host ""
 Write-Host "==> Starting web dev server (port 5173)..." -ForegroundColor Cyan
 
-$webParams = @{
-    FilePath     = 'cmd.exe'
-    ArgumentList = '/c', 'npm run dev -w packages/web'
-    NoNewWindow  = $true
-    PassThru     = $true
+$webJob = Start-Job -ScriptBlock {
+    Set-Location $using:RootDir
+    & npm run dev:web
 }
-$webProc = Start-Process @webParams
 
 Write-Host ""
 Write-Host "==========================================" -ForegroundColor Yellow
@@ -74,15 +67,31 @@ Write-Host "  Ctrl+C to stop both servers"              -ForegroundColor White
 Write-Host "==========================================" -ForegroundColor Yellow
 Write-Host ""
 
-# ── 5. Keep alive + cleanup ───────────────────────────────────────────────────
+# -- 5. Keep alive + cleanup --
 try {
-    while (-not $apiProc.HasExited -and -not $webProc.HasExited) {
+    while ($true) {
+        $apiState = Get-Job -Id $apiJob.Id | Select-Object -ExpandProperty State
+        $webState = Get-Job -Id $webJob.Id | Select-Object -ExpandProperty State
+        
+        if ($apiState -ne "Running") {
+            Write-Warning "API job exited (state: $apiState)"
+            break
+        }
+        if ($webState -ne "Running") {
+            Write-Warning "Web job exited (state: $webState)"
+            break
+        }
         Start-Sleep -Seconds 1
     }
 } finally {
     Write-Host ""
     Write-Host "Shutting down..." -ForegroundColor Cyan
-    Stop-Tree $apiProc.Id
-    Stop-Tree $webProc.Id
+    
+    Stop-Job -Job $apiJob -ErrorAction SilentlyContinue
+    Stop-Job -Job $webJob -ErrorAction SilentlyContinue
+    
+    Remove-Job -Job $apiJob -Force -ErrorAction SilentlyContinue
+    Remove-Job -Job $webJob -Force -ErrorAction SilentlyContinue
+    
     Write-Host "Done." -ForegroundColor Green
 }

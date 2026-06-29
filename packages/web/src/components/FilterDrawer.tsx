@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import type { GameFilter } from '@retro-vault/shared'
+import { Glyph } from './Glyph'
 
 interface Props {
   open: boolean
@@ -69,8 +70,8 @@ export function FilterDrawer({ open, filter, onChange, onApply, onRandom, onClos
       >
         <div className="p-6 border-b border-vault-surface flex items-center justify-between">
           <h2 className="text-white text-xl font-bold">Filters</h2>
-          <button onClick={onClose} className="text-vault-muted text-sm uppercase tracking-wide">
-            ○ Close
+          <button onClick={onClose} className="text-vault-muted text-sm uppercase tracking-wide flex items-center gap-1.5">
+            <Glyph type="circle" /> Close
           </button>
         </div>
 
@@ -195,8 +196,8 @@ export function FilterDrawer({ open, filter, onChange, onApply, onRandom, onClos
           >
             Pick Random Game
           </button>
-          <p className="text-vault-muted text-xs text-center">
-            Start → filter  ·  ○ Close
+          <p className="text-vault-muted text-xs flex items-center justify-center gap-1.5">
+            Start → filter  ·  <Glyph type="circle" /> Close
           </p>
         </div>
       </div>

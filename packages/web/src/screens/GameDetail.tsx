@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import type { Game, User } from '@retro-vault/shared'
 import { api } from '../api/client'
 import { useGamepad } from '../hooks/useGamepad'
+import { Glyph } from '../components/Glyph'
 
 interface Props {
   game: Game
@@ -156,26 +157,26 @@ export function GameDetail({ game, user, onBack, onLaunched }: Props) {
             onClick={() => void launch()}
             primary
           >
-            {launching ? 'Launching...' : '✕  Launch'}
+            {launching ? 'Launching...' : <><Glyph type="cross" /> Launch</>}
           </ActionButton>
 
           <ActionButton
             focused={focused === 'favorite'}
             onClick={() => void toggleFavorite()}
           >
-            {isFavorite ? '□  Unfavorite' : '□  Favorite'}
+            <Glyph type="square" /> {isFavorite ? 'Unfavorite' : 'Favorite'}
           </ActionButton>
 
           <ActionButton
             focused={focused === 'back'}
             onClick={onBack}
           >
-            ○  Back
+            <Glyph type="circle" /> Back
           </ActionButton>
         </div>
 
-        <p className="text-vault-muted text-xs mt-4 uppercase tracking-wide">
-          ✕ Launch  ·  □ Favorite  ·  ○ Back  ·  D-Pad Navigate
+        <p className="text-vault-muted text-xs mt-4 uppercase tracking-wide flex items-center gap-1.5 flex-wrap">
+          <Glyph type="cross" /> Launch  ·  <Glyph type="square" /> Favorite  ·  <Glyph type="circle" /> Back  ·  D-Pad Navigate
         </p>
       </div>
     </div>
@@ -201,6 +202,7 @@ function ActionButton({
       disabled={disabled}
       className={[
         'px-8 py-4 rounded-xl font-bold text-base uppercase tracking-wide transition-all duration-150',
+        'inline-flex items-center justify-center gap-2',
         'motion-reduce:transition-none',
         focused ? 'ring-2 ring-white scale-105 motion-reduce:scale-100' : '',
         primary

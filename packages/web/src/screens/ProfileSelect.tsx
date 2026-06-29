@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import type { User } from '@retro-vault/shared'
 import { api } from '../api/client'
 import { useGamepad } from '../hooks/useGamepad'
+import { Glyph } from '../components/Glyph'
 
 const COLORS = [
   '#0070D1', '#e74c3c', '#2ecc71', '#f39c12',
@@ -171,8 +172,8 @@ export function ProfileSelect({ onSelect }: Props) {
         </div>
       )}
 
-      <p className="absolute bottom-8 text-vault-muted text-xs uppercase tracking-widest">
-        ✕ Select  ·  D-Pad Navigate
+      <p className="absolute bottom-8 text-vault-muted text-xs uppercase tracking-widest flex items-center gap-1.5">
+        <Glyph type="cross" /> Select  ·  D-Pad Navigate
       </p>
     </div>
   )
