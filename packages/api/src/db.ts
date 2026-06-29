@@ -3,8 +3,8 @@ import fs from 'node:fs'
 import path from 'node:path'
 import type { GameFilter } from '@retro-vault/shared'
 
-const DATA_DIR = '/home/pi/.retrovault'
-const DB_PATH = path.join(DATA_DIR, 'retrovault.db')
+const DATA_DIR = process.env['RETROVAULT_DATA_DIR'] ?? '/home/pi/.retrovault'
+const DB_PATH = process.env['RETROVAULT_DB_PATH'] ?? path.join(DATA_DIR, 'retrovault.db')
 
 fs.mkdirSync(path.join(DATA_DIR, 'media'), { recursive: true })
 

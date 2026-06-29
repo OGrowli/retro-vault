@@ -1,0 +1,16 @@
+[Unit]
+Description=RetroVault API
+After=network.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/retro-vault
+ExecStart=/usr/bin/node packages/api/dist/index.js
+Restart=on-failure
+RestartSec=3
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

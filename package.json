@@ -7,6 +7,12 @@
     "dev:web": "npm run dev -w packages/web",
     "build": "npm run build -w packages/shared && npm run build -w packages/api && npm run build -w packages/web",
     "start": "npm run start -w packages/api",
-    "import": "npm run import -w packages/api"
+    "import": "npm run import -w packages/api",
+    "seed": "tsx packages/api/src/seed.ts",
+    "dev": "bash scripts/dev.sh",
+    "dev:win": "powershell -ExecutionPolicy Bypass -File scripts/dev.ps1"
+  },
+  "devDependencies": {
+    "tsx": "^4.15.0"
   }
 }
