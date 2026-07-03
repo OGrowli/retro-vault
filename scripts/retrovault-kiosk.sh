@@ -11,21 +11,5 @@ for i in $(seq 1 30); do
   sleep 1
 done
 
-# Hide cursor and disable screen blanking
-xset s off
-xset s noblank
-xset -dpms
-unclutter -idle 0 -root &
-
-exec chromium-browser \
-  --kiosk \
-  --disable-extensions \
-  --disable-gpu \
-  --js-flags="--max-old-space-size=256" \
-  --no-sandbox \
-  --disable-infobars \
-  --disable-session-crashed-bubble \
-  --disable-translate \
-  --noerrdialogs \
-  --check-for-update-interval=31536000 \
-  http://localhost:3000
+# Start X and launch Chromium inside it
+exec startx /home/pi/retro-vault/scripts/launch-chromium.sh -- -nocursor

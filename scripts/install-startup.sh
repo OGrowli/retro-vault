@@ -7,6 +7,15 @@ AUTOSTART_FILE="/opt/retropie/configs/all/autostart.sh"
 
 echo "==> Installing RetroVault startup..."
 
+# 0. Install X + kiosk dependencies
+echo "Installing X and kiosk packages..."
+sudo apt-get install -y \
+  xserver-xorg \
+  xinit \
+  x11-xserver-utils \
+  unclutter \
+  chromium-browser
+
 # 1. Install systemd service for the API
 echo "Installing API systemd service..."
 sudo cp "$INSTALL_DIR/scripts/retrovault-api.service" "$SERVICE_FILE"
@@ -14,8 +23,9 @@ sudo systemctl daemon-reload
 sudo systemctl enable retrovault-api
 sudo systemctl start retrovault-api
 
-# 2. Make kiosk script executable
+# 2. Make kiosk scripts executable
 chmod +x "$INSTALL_DIR/scripts/retrovault-kiosk.sh"
+chmod +x "$INSTALL_DIR/scripts/launch-chromium.sh"
 
 # 3. Hook into RetroPie autostart
 echo "Configuring RetroPie autostart..."
