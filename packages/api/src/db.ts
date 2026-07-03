@@ -1,4 +1,4 @@
-import Database from 'better-sqlite3'
+import Database, { type Database as DatabaseType } from 'better-sqlite3'
 import fs from 'node:fs'
 import path from 'node:path'
 import type { GameFilter } from '@retro-vault/shared'
@@ -8,7 +8,7 @@ const DB_PATH = process.env['RETROVAULT_DB_PATH'] ?? path.join(DATA_DIR, 'retrov
 
 fs.mkdirSync(path.join(DATA_DIR, 'media'), { recursive: true })
 
-export const db = new Database(DB_PATH)
+export const db: DatabaseType = new Database(DB_PATH)
 
 db.pragma('journal_mode = WAL')
 db.pragma('foreign_keys = ON')
