@@ -9,6 +9,6 @@ metaRouter.get('/systems', (c) => {
 })
 
 metaRouter.get('/genres', (c) => {
-  const rows = db.prepare("SELECT DISTINCT genre FROM games WHERE genre IS NOT NULL ORDER BY genre ASC").all()
+  const rows = db.prepare('SELECT DISTINCT genre FROM games WHERE genre IS NOT NULL ORDER BY genre ASC').all()
   return c.json(rows.map((r) => (r as Record<string, unknown>)['genre']))
 })

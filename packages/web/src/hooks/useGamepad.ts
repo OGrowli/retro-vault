@@ -2,7 +2,7 @@ import { useEffect, useRef, useCallback } from 'react'
 
 export type GamepadAction =
   | 'up' | 'down' | 'left' | 'right'
-  | 'confirm' | 'back' | 'favorite' | 'filter'
+  | 'confirm' | 'back' | 'favorite' | 'filter' | 'settings'
 
 const BTN = {
   CROSS: 0,
@@ -11,7 +11,8 @@ const BTN = {
   TRIANGLE: 3,
   L1: 4,
   R1: 5,
-  OPTIONS: 9,
+  SHARE: 8,    // → settings
+  OPTIONS: 9,  // → filter
   DPAD_UP: 12,
   DPAD_DOWN: 13,
   DPAD_LEFT: 14,
@@ -32,6 +33,7 @@ const KEY_MAP: Record<string, GamepadAction> = {
   Backspace: 'back',
   f: 'favorite',
   Tab: 'filter',
+  s: 'settings',
 }
 
 interface PressState {
@@ -40,6 +42,8 @@ interface PressState {
   lastRepeat: number
   fired: boolean
 }
+
+const ALL_ACTIONS: GamepadAction[] = ['up', 'down', 'left', 'right', 'confirm', 'back', 'favorite', 'filter', 'settings']
 
 export function useGamepad(
   onAction: (action: GamepadAction) => void,
@@ -66,6 +70,7 @@ export function useGamepad(
       if (pad.buttons[BTN.CROSS]?.pressed) active.set('confirm', true)
       if (pad.buttons[BTN.CIRCLE]?.pressed) active.set('back', true)
       if (pad.buttons[BTN.SQUARE]?.pressed) active.set('favorite', true)
+      if (pad.buttons[BTN.SHARE]?.pressed) active.set('settings', true)
       if (pad.buttons[BTN.OPTIONS]?.pressed) active.set('filter', true)
 
       const ax = pad.axes[0] ?? 0
@@ -97,7 +102,7 @@ export function useGamepad(
       const active = getButtonStates()
       const state = stateRef.current
 
-      for (const action of ['up', 'down', 'left', 'right', 'confirm', 'back', 'favorite', 'filter'] as GamepadAction[]) {
+      for (const action of ALL_ACTIONS) {
         const isPressed = active.get(action) ?? false
         let s = state.get(action)
 
@@ -109,11 +114,9 @@ export function useGamepad(
             s.fired = true
           } else {
             const held = now - s.firstAt
-            if (held >= INITIAL_DELAY) {
-              if (now - s.lastRepeat >= REPEAT_RATE) {
-                onActionRef.current(action)
-                s.lastRepeat = now
-              }
+            if (held >= INITIAL_DELAY && now - s.lastRepeat >= REPEAT_RATE) {
+              onActionRef.current(action)
+              s.lastRepeat = now
             }
           }
         } else {

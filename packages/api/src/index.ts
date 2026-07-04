@@ -6,9 +6,11 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { gamesRouter } from './routes/games.js'
+import { romsRouter } from './routes/roms.js'
 import { usersRouter } from './routes/users.js'
 import { metaRouter } from './routes/meta.js'
 import { importRouter } from './routes/import.js'
+import { scrapeRouter } from './routes/scrape.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const WEB_DIST = path.join(__dirname, '../../web/dist')
@@ -18,9 +20,11 @@ const app = new Hono()
 app.use('*', cors({ origin: '*' }))
 
 app.route('/games', gamesRouter)
+app.route('/roms', romsRouter)
 app.route('/users', usersRouter)
 app.route('/meta', metaRouter)
 app.route('/import', importRouter)
+app.route('/scrape', scrapeRouter)
 
 const DATA_DIR = process.env['RETROVAULT_DATA_DIR'] ?? '/home/pi/.retrovault'
 app.use(

@@ -13,6 +13,18 @@ export const db: DatabaseType = new Database(DB_PATH)
 db.pragma('journal_mode = WAL')
 db.pragma('foreign_keys = ON')
 
+// Migrate from schema v1 (single games table with rom_path) to v2
+const { user_version: schemaVersion } = db.prepare('PRAGMA user_version').get() as { user_version: number }
+if (schemaVersion < 2) {
+  db.exec(`
+    DROP TABLE IF EXISTS play_sessions;
+    DROP TABLE IF EXISTS favorites;
+    DROP TABLE IF EXISTS filter_presets;
+    DROP TABLE IF EXISTS roms;
+    DROP TABLE IF EXISTS games;
+  `)
+}
+
 db.exec(`
   CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -25,19 +37,29 @@ db.exec(`
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     system TEXT NOT NULL,
     name TEXT NOT NULL,
-    rom_path TEXT NOT NULL UNIQUE,
-    box_art_path TEXT,
     genre TEXT,
     year INTEGER,
     players INTEGER,
     description TEXT,
-    play_count INTEGER NOT NULL DEFAULT 0,
-    scraped_at TEXT
+    box_art_path TEXT,
+    scraped_at TEXT,
+    UNIQUE(name, system)
+  );
+
+  CREATE TABLE IF NOT EXISTS roms (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    game_id INTEGER NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+    system TEXT NOT NULL,
+    rom_path TEXT NOT NULL UNIQUE,
+    region TEXT,
+    revision TEXT,
+    full_name TEXT NOT NULL
   );
 
   CREATE TABLE IF NOT EXISTS play_sessions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    rom_id INTEGER NOT NULL REFERENCES roms(id) ON DELETE CASCADE,
     game_id INTEGER NOT NULL REFERENCES games(id) ON DELETE CASCADE,
     started_at TEXT NOT NULL DEFAULT (datetime('now')),
     duration_seconds INTEGER NOT NULL DEFAULT 0
@@ -57,10 +79,17 @@ db.exec(`
     filter_json TEXT NOT NULL
   );
 
+  CREATE INDEX IF NOT EXISTS idx_roms_game ON roms(game_id);
   CREATE INDEX IF NOT EXISTS idx_play_sessions_user ON play_sessions(user_id, started_at DESC);
+  CREATE INDEX IF NOT EXISTS idx_play_sessions_rom ON play_sessions(rom_id);
+  CREATE INDEX IF NOT EXISTS idx_play_sessions_game ON play_sessions(game_id);
   CREATE INDEX IF NOT EXISTS idx_favorites_user ON favorites(user_id);
   CREATE INDEX IF NOT EXISTS idx_games_system ON games(system);
 `)
+
+if (schemaVersion < 2) {
+  db.exec('PRAGMA user_version = 2')
+}
 
 export interface FilterClause {
   where: string
@@ -106,6 +135,10 @@ export function buildFilterClause(filter: GameFilter, userId?: number): FilterCl
     params.push(userId)
   }
 
+  if (filter.noMetadata) {
+    conditions.push(`g.scraped_at IS NULL`)
+  }
+
   return {
     where: conditions.length ? `WHERE ${conditions.join(' AND ')}` : '',
     params,
@@ -132,9 +165,13 @@ export function parseFilter(query: Record<string, string | string[]>): GameFilte
 
   if (query['favoritesOnly'] === 'true') filter.favoritesOnly = true
   if (query['neverPlayed'] === 'true') filter.neverPlayed = true
+  if (query['noMetadata'] === 'true') filter.noMetadata = true
 
   const q = query['query']
   if (q) filter.query = q as string
+
+  const userId = query['userId']
+  if (userId) filter.userId = userId as string
 
   return filter
 }

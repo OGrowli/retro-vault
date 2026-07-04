@@ -5,7 +5,9 @@ export type GameFilter = {
   yearRange?: [number, number]
   favoritesOnly?: boolean
   neverPlayed?: boolean
+  noMetadata?: boolean
   query?: string
+  userId?: string
 }
 
 export interface User {
@@ -19,19 +21,31 @@ export interface Game {
   id: number
   system: string
   name: string
-  rom_path: string
-  box_art_path: string | null
   genre: string | null
   year: number | null
   players: number | null
   description: string | null
-  play_count: number
+  box_art_path: string | null
   scraped_at: string | null
+  rom_count?: number
+}
+
+export interface Rom {
+  id: number
+  game_id: number
+  system: string
+  rom_path: string
+  region: string | null
+  revision: string | null
+  full_name: string
+  play_count?: number
+  last_played?: string | null
 }
 
 export interface PlaySession {
   id: number
   user_id: number
+  rom_id: number
   game_id: number
   started_at: string
   duration_seconds: number
@@ -50,7 +64,40 @@ export interface FilterPreset {
   filter_json: string
 }
 
-export interface GameWithSession extends Game {
-  last_played?: string
-  session_duration?: number
+export interface GameWithRoms extends Game {
+  roms: Rom[]
+  total_play_count: number
+  last_played: string | null
+}
+
+export interface HistoryEntry {
+  session_id: number
+  started_at: string
+  duration_seconds: number
+  rom_id: number
+  rom_full_name: string
+  rom_region: string | null
+  rom_revision: string | null
+  id: number
+  name: string
+  system: string
+  genre: string | null
+  year: number | null
+  players: number | null
+  description: string | null
+  box_art_path: string | null
+  scraped_at: string | null
+}
+
+export interface SessionWithRom {
+  id: number
+  started_at: string
+  duration_seconds: number
+  user_id: number
+  rom_id: number
+  rom_full_name: string
+  rom_region: string | null
+  rom_revision: string | null
+  username: string
+  avatar_color: string
 }

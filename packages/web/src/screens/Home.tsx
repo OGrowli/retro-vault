@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import type { Game, User, GameFilter } from '@retro-vault/shared'
+import type { Game, User, GameFilter, HistoryEntry } from '@retro-vault/shared'
 import { api } from '../api/client'
 import { useGamepad } from '../hooks/useGamepad'
 import { useSpatialNav } from '../hooks/useSpatialNav'
@@ -8,21 +8,23 @@ import { VirtualGrid, GRID_COLS } from '../components/VirtualGrid'
 import { FilterDrawer } from '../components/FilterDrawer'
 import { RandomGameModal } from '../components/RandomGameModal'
 import { Glyph } from '../components/Glyph'
+import type { GamepadAction } from '../hooks/useGamepad'
 
 interface Props {
   user: User
+  systems: string[]
+  genres: string[]
   onGameSelect: (game: Game) => void
   onSwitchUser: () => void
+  onSettings: () => void
 }
 
 const CONTINUE_THRESHOLD = 5 * 60
 
-export function Home({ user, onGameSelect, onSwitchUser }: Props) {
+export function Home({ user, systems, genres, onGameSelect, onSwitchUser, onSettings }: Props) {
   const [recent, setRecent] = useState<Game[]>([])
   const [favorites, setFavorites] = useState<Game[]>([])
   const [allGames, setAllGames] = useState<Game[]>([])
-  const [systems, setSystems] = useState<string[]>([])
-  const [genres, setGenres] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<GameFilter>({})
   const [filterOpen, setFilterOpen] = useState(false)
@@ -33,31 +35,28 @@ export function Home({ user, onGameSelect, onSwitchUser }: Props) {
   const [randomLoading, setRandomLoading] = useState(false)
   const [importLoading, setImportLoading] = useState(false)
   const [importMessage, setImportMessage] = useState<string | null>(null)
-
-  const [rawHistory, setRawHistory] = useState<Array<Game & { duration_seconds: number }>>([])
-
+  const [rawHistory, setRawHistory] = useState<HistoryEntry[]>([])
 
   useEffect(() => {
     Promise.all([
       api.users.history(user.id),
       api.users.favorites(user.id),
       api.games.list(filter, user.id),
-      api.meta.systems(),
-      api.meta.genres(),
-    ]).then(([history, favs, games, sysList, genreList]) => {
+    ]).then(([history, favs, games]) => {
       const recentGames = history
         .filter((h, i, arr) => arr.findIndex(x => x.id === h.id) === i)
         .slice(0, 8)
-        .map(h => ({ ...h } as Game))
+        .map(h => ({
+          id: h.id, name: h.name, system: h.system, genre: h.genre,
+          year: h.year, players: h.players, description: h.description,
+          box_art_path: h.box_art_path, scraped_at: h.scraped_at,
+        } as Game))
 
       setRecent(recentGames)
-      setRawHistory(history.slice(0, 8) as Array<Game & { duration_seconds: number }>)
+      setRawHistory(history.slice(0, 40))
       setFavorites(favs)
       setAllGames(games)
-      setSystems(sysList)
-      setGenres(genreList)
       setLoading(false)
-
       if (recentGames[0]) setBgGame(recentGames[0])
     }).catch(() => setLoading(false))
   }, [user.id])
@@ -94,19 +93,10 @@ export function Home({ user, onGameSelect, onSwitchUser }: Props) {
     setImportMessage(null)
     try {
       const result = await api.import.run()
-      setImportMessage(
-        result.errors.length
-          ? `Imported ${result.imported} · ${result.errors.length} error(s)`
-          : `Imported ${result.imported} game(s)`
-      )
-      const [games, sysList, genreList] = await Promise.all([
-        api.games.list(filter, user.id),
-        api.meta.systems(),
-        api.meta.genres(),
-      ])
+      const { games_created, games_updated, roms_created } = result
+      setImportMessage(`+${games_created} games  +${games_updated} updated  +${roms_created} ROMs`)
+      const [games] = await Promise.all([api.games.list(filter, user.id)])
       setAllGames(games)
-      setSystems(sysList)
-      setGenres(genreList)
     } catch {
       setImportMessage('Import failed')
     } finally {
@@ -122,6 +112,7 @@ export function Home({ user, onGameSelect, onSwitchUser }: Props) {
     filterDrawerItems: 11,
     filterDrawerOpen: filterOpen,
     onToggleFilter: () => setFilterOpen(v => !v),
+    onSettings,
     onConfirm: (region, row, col) => {
       if (filterOpen) {
         if (row === 8) { void refreshGames(); setFilterOpen(false) }
@@ -142,22 +133,23 @@ export function Home({ user, onGameSelect, onSwitchUser }: Props) {
       if (region === 'favorites') game = favorites[col]
       if (region === 'all-games') game = allGames[row * GRID_COLS + col]
       if (!game) return
-      api.users.favorites(user.id).then(favs => {
-        const isFav = favs.some(f => f.id === game!.id)
-        if (isFav) {
-          api.users.removeFavorite(user.id, game!.id).then(() =>
-            setFavorites(prev => prev.filter(f => f.id !== game!.id))
-          ).catch(() => {})
+      const g = game
+      api.games.favorite(g.id, user.id).then(({ favorited }) => {
+        if (favorited) {
+          setFavorites(prev => prev.some(f => f.id === g.id) ? prev : [...prev, g])
         } else {
-          api.users.addFavorite(user.id, game!.id).then(() =>
-            setFavorites(prev => [...prev, game!])
-          ).catch(() => {})
+          setFavorites(prev => prev.filter(f => f.id !== g.id))
         }
       }).catch(() => {})
     },
   })
 
-  useGamepad(nav.handleAction, !randomGame)
+  const handleAction = useCallback((action: GamepadAction) => {
+    if (action === 'settings') { onSettings(); return }
+    nav.handleAction(action)
+  }, [nav, onSettings])
+
+  useGamepad(handleAction, !randomGame)
 
   const recentIdx = nav.getIndex('recently-played')
   const favIdx = nav.getIndex('favorites')
@@ -166,10 +158,9 @@ export function Home({ user, onGameSelect, onSwitchUser }: Props) {
 
   const getContinueLabel = useCallback((game: Game) => {
     const entry = rawHistory.find(r => r.id === game.id)
-    if (entry !== undefined && entry.duration_seconds < CONTINUE_THRESHOLD) {
-      return 'Continue'
-    }
-    return undefined
+    if (!entry) return undefined
+    if (entry.duration_seconds < CONTINUE_THRESHOLD) return 'Continue'
+    return entry.rom_region ?? undefined
   }, [rawHistory])
 
   return (
@@ -261,7 +252,7 @@ export function Home({ user, onGameSelect, onSwitchUser }: Props) {
 
       <div className="absolute bottom-0 left-0 right-0 h-12 flex items-center px-[5%] bg-gradient-to-t from-vault-bg to-transparent pointer-events-none">
         <p className="text-vault-muted text-xs uppercase tracking-wide flex items-center gap-1.5 flex-wrap">
-          <Glyph type="cross" /> Select  ·  <Glyph type="square" /> Favorite  ·  <Glyph type="circle" /> Back  ·  Start Filter  ·  D-Pad Navigate
+          <Glyph type="cross" /> Select  ·  <Glyph type="square" /> Favorite  ·  <Glyph type="circle" /> Back  ·  Start Filter  ·  Options Settings
         </p>
       </div>
     </div>

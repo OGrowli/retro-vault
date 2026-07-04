@@ -1,15 +1,26 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import type { User, Game } from '@retro-vault/shared'
+import { api } from './api/client'
 import { ProfileSelect } from './screens/ProfileSelect'
 import { Home } from './screens/Home'
 import { GameDetail } from './screens/GameDetail'
+import { Settings } from './screens/Settings'
 
-type Screen = 'profile-select' | 'home' | 'game-detail'
+type Screen = 'profile-select' | 'home' | 'game-detail' | 'settings'
 
 export function App() {
   const [screen, setScreen] = useState<Screen>('profile-select')
   const [currentUser, setCurrentUser] = useState<User | null>(null)
   const [selectedGame, setSelectedGame] = useState<Game | null>(null)
+  const [systems, setSystems] = useState<string[]>([])
+  const [genres, setGenres] = useState<string[]>([])
+
+  useEffect(() => {
+    Promise.all([api.meta.systems(), api.meta.genres()]).then(([s, g]) => {
+      setSystems(s)
+      setGenres(g)
+    }).catch(() => {})
+  }, [])
 
   const handleProfileSelect = (user: User) => {
     setCurrentUser(user)
@@ -34,8 +45,11 @@ export function App() {
       {screen === 'home' && currentUser && (
         <Home
           user={currentUser}
+          systems={systems}
+          genres={genres}
           onGameSelect={handleGameSelect}
           onSwitchUser={() => setScreen('profile-select')}
+          onSettings={() => setScreen('settings')}
         />
       )}
       {screen === 'game-detail' && currentUser && selectedGame && (
@@ -43,7 +57,12 @@ export function App() {
           game={selectedGame}
           user={currentUser}
           onBack={handleBack}
-          onLaunched={handleBack}
+        />
+      )}
+      {screen === 'settings' && (
+        <Settings
+          systems={systems}
+          onBack={() => setScreen('home')}
         />
       )}
     </>

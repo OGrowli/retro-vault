@@ -17,8 +17,6 @@ interface Props {
   focusedRow: number
 }
 
-export const AVATAR_COLORS = ['#0070D1', '#e74c3c', '#2ecc71', '#f39c12', '#9b59b6', '#1abc9c', '#e67e22', '#34495e']
-
 function Toggle({ active, onToggle, label }: { active: boolean; onToggle: () => void; label: string }) {
   return (
     <button
@@ -44,7 +42,10 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   )
 }
 
-export function FilterDrawer({ open, filter, onChange, onApply, onRandom, onImport, importLoading, importMessage, onClose, systems, genres, focusedRow }: Props) {
+export function FilterDrawer({
+  open, filter, onChange, onApply, onRandom, onImport,
+  importLoading, importMessage, onClose, systems, genres, focusedRow,
+}: Props) {
   const toggleSystem = (s: string) => {
     const cur = filter.systems ?? []
     onChange({ ...filter, systems: cur.includes(s) ? cur.filter(x => x !== s) : [...cur, s] })
@@ -57,12 +58,7 @@ export function FilterDrawer({ open, filter, onChange, onApply, onRandom, onImpo
 
   return (
     <>
-      {open && (
-        <div
-          className="fixed inset-0 bg-black/60 z-40"
-          onClick={onClose}
-        />
-      )}
+      {open && <div className="fixed inset-0 bg-black/60 z-40" onClick={onClose} />}
       <div
         className={[
           'fixed top-0 left-0 h-full w-80 bg-vault-card z-50 flex flex-col',
@@ -83,12 +79,7 @@ export function FilterDrawer({ open, filter, onChange, onApply, onRandom, onImpo
             <Section title="System">
               <div className="flex flex-wrap gap-2">
                 {systems.map(s => (
-                  <Toggle
-                    key={s}
-                    label={s}
-                    active={(filter.systems ?? []).includes(s)}
-                    onToggle={() => toggleSystem(s)}
-                  />
+                  <Toggle key={s} label={s} active={(filter.systems ?? []).includes(s)} onToggle={() => toggleSystem(s)} />
                 ))}
               </div>
             </Section>
@@ -98,12 +89,7 @@ export function FilterDrawer({ open, filter, onChange, onApply, onRandom, onImpo
             <Section title="Genre">
               <div className="flex flex-wrap gap-2">
                 {genres.map(g => (
-                  <Toggle
-                    key={g}
-                    label={g}
-                    active={(filter.genres ?? []).includes(g)}
-                    onToggle={() => toggleGenre(g)}
-                  />
+                  <Toggle key={g} label={g} active={(filter.genres ?? []).includes(g)} onToggle={() => toggleGenre(g)} />
                 ))}
               </div>
             </Section>
@@ -111,7 +97,7 @@ export function FilterDrawer({ open, filter, onChange, onApply, onRandom, onImpo
 
           <Section title="Players">
             <div className="flex gap-2">
-              {[1, 2, 3, 4].map(n => (
+              {[1, 2, 4].map(n => (
                 <Toggle
                   key={n}
                   label={String(n)}
@@ -153,7 +139,7 @@ export function FilterDrawer({ open, filter, onChange, onApply, onRandom, onImpo
           </Section>
 
           <Section title="Options">
-            <div className="space-y-2">
+            <div className="flex flex-wrap gap-2">
               <Toggle
                 label="Favorites Only"
                 active={filter.favoritesOnly ?? false}
@@ -163,6 +149,11 @@ export function FilterDrawer({ open, filter, onChange, onApply, onRandom, onImpo
                 label="Never Played"
                 active={filter.neverPlayed ?? false}
                 onToggle={() => onChange({ ...filter, neverPlayed: !filter.neverPlayed })}
+              />
+              <Toggle
+                label="No Metadata"
+                active={filter.noMetadata ?? false}
+                onToggle={() => onChange({ ...filter, noMetadata: !filter.noMetadata })}
               />
             </div>
           </Section>
@@ -182,8 +173,7 @@ export function FilterDrawer({ open, filter, onChange, onApply, onRandom, onImpo
           <button
             onClick={onApply}
             className={[
-              'w-full py-3 rounded-lg font-bold text-white uppercase tracking-wide text-sm',
-              'bg-vault-accent hover:bg-vault-accent-bright transition-colors',
+              'w-full py-3 rounded-lg font-bold text-white uppercase tracking-wide text-sm bg-vault-accent',
               focusedRow === 8 ? 'ring-2 ring-white' : '',
             ].join(' ')}
           >
@@ -192,8 +182,7 @@ export function FilterDrawer({ open, filter, onChange, onApply, onRandom, onImpo
           <button
             onClick={onRandom}
             className={[
-              'w-full py-3 rounded-lg font-bold text-white uppercase tracking-wide text-sm',
-              'bg-vault-surface border border-vault-muted hover:border-vault-accent transition-colors',
+              'w-full py-3 rounded-lg font-bold text-white uppercase tracking-wide text-sm bg-vault-surface border border-vault-muted',
               focusedRow === 9 ? 'ring-2 ring-white' : '',
             ].join(' ')}
           >
@@ -203,23 +192,19 @@ export function FilterDrawer({ open, filter, onChange, onApply, onRandom, onImpo
             onClick={onImport}
             disabled={importLoading}
             className={[
-              'w-full py-3 rounded-lg font-bold text-white uppercase tracking-wide text-sm',
-              'bg-vault-surface border border-vault-muted hover:border-vault-accent transition-colors',
+              'w-full py-3 rounded-lg font-bold text-white uppercase tracking-wide text-sm bg-vault-surface border border-vault-muted',
               focusedRow === 10 ? 'ring-2 ring-white' : '',
               importLoading ? 'opacity-50 cursor-not-allowed' : '',
             ].join(' ')}
           >
-            {importLoading ? 'Scanning Roms...' : 'Update Library'}
+            {importLoading ? 'Scanning ROMs...' : 'Update Library'}
           </button>
-          {importMessage && (
-            <p className="text-vault-accent text-xs text-center">{importMessage}</p>
-          )}
+          {importMessage && <p className="text-vault-accent text-xs text-center">{importMessage}</p>}
           <p className="text-vault-muted text-xs flex items-center justify-center gap-1.5">
-            Start → filter  ·  <Glyph type="circle" /> Close
+            Start → Filter  ·  <Glyph type="circle" /> Close
           </p>
         </div>
       </div>
     </>
   )
 }
-

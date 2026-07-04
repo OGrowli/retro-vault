@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import type { Game, User } from '@retro-vault/shared'
+import { useState, useEffect, useCallback } from 'react'
+import type { Game, GameWithRoms, Rom, User } from '@retro-vault/shared'
 import { api } from '../api/client'
 import { useGamepad } from '../hooks/useGamepad'
 import { Glyph } from '../components/Glyph'
@@ -8,74 +8,239 @@ interface Props {
   game: Game
   user: User
   onBack: () => void
-  onLaunched?: () => void
 }
 
-type ActionFocus = 'launch' | 'favorite' | 'back'
+type ActionFocus = 'favorite' | 'scrape' | 'back'
+const ACTIONS: ActionFocus[] = ['favorite', 'scrape', 'back']
 
-export function GameDetail({ game, user, onBack, onLaunched }: Props) {
+const REGION_FLAGS: Record<string, string> = {
+  USA: '🇺🇸',
+  Europe: '🇪🇺',
+  Japan: '🇯🇵',
+  World: '🌍',
+  Australia: '🇦🇺',
+  Spain: '🇪🇸',
+  France: '🇫🇷',
+  Germany: '🇩🇪',
+}
+
+function regionFlag(region: string | null): string {
+  if (!region) return '🌐'
+  return REGION_FLAGS[region] ?? '🌐'
+}
+
+function RomRow({
+  rom,
+  focused,
+  launching,
+}: {
+  rom: Rom
+  focused: boolean
+  launching: boolean
+}) {
+  const lastPlayed = rom.last_played
+    ? new Date(rom.last_played).toLocaleDateString()
+    : null
+
+  return (
+    <div
+      data-focusable="true"
+      className={[
+        'flex items-center gap-4 px-4 py-3 rounded-xl transition-all duration-150',
+        'motion-reduce:transition-none',
+        focused
+          ? 'bg-vault-surface ring-2 ring-vault-accent scale-[1.02] motion-reduce:scale-100'
+          : 'bg-vault-card',
+      ].join(' ')}
+    >
+      <span className="text-2xl flex-shrink-0">{regionFlag(rom.region)}</span>
+      <div className="flex-1 min-w-0">
+        <p className="text-white text-sm font-semibold truncate">{rom.full_name}</p>
+        <p className="text-vault-muted text-xs mt-0.5 uppercase tracking-wide">
+          {[rom.region, rom.revision].filter(Boolean).join(' · ') || 'No region info'}
+        </p>
+      </div>
+      <div className="text-right flex-shrink-0">
+        <p className="text-vault-muted text-xs">{rom.play_count ?? 0}× played</p>
+        {lastPlayed && <p className="text-vault-muted text-xs mt-0.5">{lastPlayed}</p>}
+      </div>
+      {focused && (
+        <div className="flex-shrink-0">
+          {launching ? (
+            <span className="text-vault-muted text-xs uppercase tracking-wide">Launching…</span>
+          ) : (
+            <span className="text-vault-accent text-xs font-bold uppercase tracking-wide flex items-center gap-1">
+              <Glyph type="cross" /> Launch
+            </span>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+interface ScrapeModalProps {
+  gameId: number
+  onDone: (updatedGame: Game) => void
+  onClose: () => void
+}
+
+function ScrapeModal({ gameId, onDone, onClose }: ScrapeModalProps) {
+  const [username, setUsername] = useState('')
+  const [password, setPassword] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const handleScrape = async () => {
+    if (loading) return
+    setLoading(true)
+    setError(null)
+    try {
+      const updated = await api.games.scrape(gameId, username, password)
+      onDone(updated)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Scrape failed')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center">
+      <div className="bg-vault-card rounded-2xl p-8 w-96 space-y-5">
+        <h2 className="text-white text-xl font-bold">Scrape Metadata</h2>
+        <p className="text-vault-muted text-sm">Enter ScreenScraper credentials. Leave blank for anonymous (rate-limited).</p>
+
+        <div>
+          <label className="text-vault-muted text-xs uppercase tracking-wide block mb-2">SS Username</label>
+          <input
+            autoFocus
+            type="text"
+            value={username}
+            onChange={e => setUsername(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') void handleScrape(); if (e.key === 'Escape') onClose() }}
+            className="w-full bg-vault-surface border border-vault-muted rounded-lg px-4 py-3 text-white text-sm focus:outline-none focus:border-vault-accent"
+            placeholder="Username (optional)"
+          />
+        </div>
+        <div>
+          <label className="text-vault-muted text-xs uppercase tracking-wide block mb-2">SS Password</label>
+          <input
+            type="password"
+            value={password}
+            onChange={e => setPassword(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') void handleScrape(); if (e.key === 'Escape') onClose() }}
+            className="w-full bg-vault-surface border border-vault-muted rounded-lg px-4 py-3 text-white text-sm focus:outline-none focus:border-vault-accent"
+            placeholder="Password (optional)"
+          />
+        </div>
+
+        {error && <p className="text-red-400 text-sm">{error}</p>}
+
+        <div className="flex gap-3">
+          <button
+            onClick={() => void handleScrape()}
+            disabled={loading}
+            className="flex-1 py-3 bg-vault-accent text-white font-bold rounded-lg uppercase tracking-wide text-sm disabled:opacity-50"
+          >
+            {loading ? 'Scraping…' : 'Scrape'}
+          </button>
+          <button
+            onClick={onClose}
+            className="flex-1 py-3 bg-vault-surface text-vault-muted font-bold rounded-lg uppercase tracking-wide text-sm border border-vault-muted"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export function GameDetail({ game: initialGame, user, onBack }: Props) {
+  const [detail, setDetail] = useState<GameWithRoms | null>(null)
+  const [game, setGame] = useState<Game>(initialGame)
   const [isFavorite, setIsFavorite] = useState(false)
-  const [launching, setLaunching] = useState(false)
-  const [focused, setFocused] = useState<ActionFocus>('launch')
-  const actions: ActionFocus[] = ['launch', 'favorite', 'back']
+  const [focusSection, setFocusSection] = useState<'versions' | 'actions'>('versions')
+  const [versionIdx, setVersionIdx] = useState(0)
+  const [actionIdx, setActionIdx] = useState(0)
+  const [launching, setLaunching] = useState<number | null>(null)
+  const [scrapeOpen, setScrapeOpen] = useState(false)
 
   useEffect(() => {
+    api.games.get(game.id).then(d => {
+      setDetail(d)
+      if (d.roms.length === 1) setVersionIdx(0)
+    }).catch(() => {})
+
     api.users.favorites(user.id).then(favs => {
       setIsFavorite(favs.some(f => f.id === game.id))
     }).catch(() => {})
   }, [game.id, user.id])
 
-  const launch = async () => {
-    if (launching) return
-    setLaunching(true)
+  const roms = detail?.roms ?? []
+  const singleRom = roms.length === 1
+
+  const launch = useCallback(async (rom: Rom) => {
+    if (launching !== null) return
+    setLaunching(rom.id)
     try {
-      await api.games.launch(game.id)
+      await api.roms.launch(rom.id)
       const startedAt = new Date().toISOString()
       setTimeout(() => {
-        api.games.logSession(game.id, user.id, 0, startedAt).catch(() => {})
+        api.roms.logSession(rom.id, user.id, 0, startedAt).catch(() => {})
       }, 5000)
-      onLaunched?.()
     } catch {
-      setLaunching(false)
+      setLaunching(null)
     }
-  }
+  }, [launching, user.id])
 
-  const toggleFavorite = async () => {
+  const toggleFavorite = useCallback(async () => {
     try {
-      if (isFavorite) {
-        await api.users.removeFavorite(user.id, game.id)
-        setIsFavorite(false)
-      } else {
-        await api.users.addFavorite(user.id, game.id)
-        setIsFavorite(true)
-      }
+      const result = await api.games.favorite(game.id, user.id)
+      setIsFavorite(result.favorited)
     } catch {}
-  }
+  }, [game.id, user.id])
 
   useGamepad((action) => {
-    if (action === 'back') { onBack(); return }
-    if (action === 'left') setFocused(f => {
-      const i = actions.indexOf(f)
-      return actions[Math.max(0, i - 1)]
-    })
-    if (action === 'right') setFocused(f => {
-      const i = actions.indexOf(f)
-      return actions[Math.min(actions.length - 1, i + 1)]
-    })
-    if (action === 'confirm') {
-      if (focused === 'launch') void launch()
-      if (focused === 'favorite') void toggleFavorite()
-      if (focused === 'back') onBack()
-    }
-    if (action === 'favorite') void toggleFavorite()
-  })
+    if (scrapeOpen) return
 
-  const lastPlayed = game.scraped_at
-    ? new Date(game.scraped_at).toLocaleDateString()
+    if (action === 'back') { onBack(); return }
+    if (action === 'favorite') { void toggleFavorite(); return }
+
+    if (focusSection === 'versions') {
+      if (action === 'up') {
+        if (versionIdx === 0) setFocusSection('actions')
+        else setVersionIdx(i => i - 1)
+      }
+      if (action === 'down') {
+        if (versionIdx < roms.length - 1) setVersionIdx(i => i + 1)
+        else setFocusSection('actions')
+      }
+      if (action === 'confirm' && roms[versionIdx]) {
+        void launch(roms[versionIdx])
+      }
+    }
+
+    if (focusSection === 'actions') {
+      if (action === 'left') setActionIdx(i => Math.max(0, i - 1))
+      if (action === 'right') setActionIdx(i => Math.min(ACTIONS.length - 1, i + 1))
+      if (action === 'up') setFocusSection('versions')
+      if (action === 'confirm') {
+        const act = ACTIONS[actionIdx]
+        if (act === 'favorite') void toggleFavorite()
+        if (act === 'scrape') setScrapeOpen(true)
+        if (act === 'back') onBack()
+      }
+    }
+  }, !scrapeOpen)
+
+  const lastPlayedDate = detail?.last_played
+    ? new Date(detail.last_played).toLocaleDateString()
     : null
 
   return (
-    <div className="fixed inset-0 bg-vault-bg flex flex-col">
+    <div className="fixed inset-0 bg-vault-bg flex flex-col overflow-hidden">
       {game.box_art_path && (
         <div
           className="absolute inset-0 pointer-events-none"
@@ -85,133 +250,162 @@ export function GameDetail({ game, user, onBack, onLaunched }: Props) {
             backgroundPosition: 'center',
             filter: 'blur(60px)',
             opacity: 0.08,
+            transform: 'scale(1.1)',
           }}
         />
       )}
 
-      <div className="relative flex-1 flex items-center px-[5%] gap-16 pt-[5%]">
+      <div className="relative flex-1 flex gap-12 px-[5%] pt-[5%] overflow-hidden">
+        {/* Box art */}
         <div className="flex-shrink-0">
           {game.box_art_path ? (
             <img
               src={game.box_art_path}
               alt={game.name}
-              className="w-72 h-96 object-cover rounded-2xl shadow-2xl"
+              className="w-60 h-80 object-cover rounded-2xl shadow-2xl"
             />
           ) : (
-            <div className="w-72 h-96 bg-vault-card rounded-2xl flex items-center justify-center">
-              <span className="text-vault-muted text-sm uppercase tracking-widest">{game.system}</span>
+            <div className="w-60 h-80 bg-vault-card rounded-2xl flex flex-col items-center justify-center gap-2">
+              <span className="text-vault-muted text-xs uppercase tracking-widest">{game.system}</span>
+              <span className="text-vault-muted text-xs">No art</span>
+            </div>
+          )}
+          {game.scraped_at && (
+            <div className="mt-3 flex items-center justify-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-vault-accent inline-block" />
+              <span className="text-vault-accent text-xs uppercase tracking-wide">Scraped</span>
             </div>
           )}
         </div>
 
-        <div className="flex-1 space-y-4">
+        {/* Right column */}
+        <div className="flex-1 min-w-0 flex flex-col gap-4 overflow-hidden">
+          {/* Metadata */}
           <div>
             <p className="text-vault-accent text-sm font-semibold uppercase tracking-widest mb-1">{game.system}</p>
-            <h1 className="text-white text-5xl font-bold leading-tight">{game.name}</h1>
+            <h1 className="text-white text-4xl font-bold leading-tight">{game.name}</h1>
           </div>
 
-          <div className="grid grid-cols-3 gap-4 py-4 border-y border-vault-surface">
+          <div className="grid grid-cols-4 gap-3 py-3 border-y border-vault-surface">
             {game.genre && (
               <div>
                 <p className="text-vault-muted text-xs uppercase tracking-wide">Genre</p>
-                <p className="text-white text-base font-medium mt-0.5">{game.genre}</p>
+                <p className="text-white text-sm font-medium mt-0.5">{game.genre}</p>
               </div>
             )}
             {game.year && (
               <div>
                 <p className="text-vault-muted text-xs uppercase tracking-wide">Year</p>
-                <p className="text-white text-base font-medium mt-0.5">{game.year}</p>
+                <p className="text-white text-sm font-medium mt-0.5">{game.year}</p>
               </div>
             )}
             {game.players && (
               <div>
                 <p className="text-vault-muted text-xs uppercase tracking-wide">Players</p>
-                <p className="text-white text-base font-medium mt-0.5">{game.players}</p>
+                <p className="text-white text-sm font-medium mt-0.5">{game.players}</p>
               </div>
             )}
             <div>
-              <p className="text-vault-muted text-xs uppercase tracking-wide">Play Count</p>
-              <p className="text-white text-base font-medium mt-0.5">{game.play_count}</p>
+              <p className="text-vault-muted text-xs uppercase tracking-wide">Played</p>
+              <p className="text-white text-sm font-medium mt-0.5">{detail?.total_play_count ?? 0}×</p>
             </div>
-            {lastPlayed && (
+            {lastPlayedDate && (
               <div>
                 <p className="text-vault-muted text-xs uppercase tracking-wide">Last Played</p>
-                <p className="text-white text-base font-medium mt-0.5">{lastPlayed}</p>
+                <p className="text-white text-sm font-medium mt-0.5">{lastPlayedDate}</p>
               </div>
             )}
           </div>
 
           {game.description && (
-            <p className="text-vault-muted text-base leading-relaxed line-clamp-4 max-w-xl">
-              {game.description}
-            </p>
+            <p className="text-vault-muted text-sm leading-relaxed line-clamp-3">{game.description}</p>
           )}
+
+          {/* Versions section */}
+          <div className="flex-1 overflow-hidden">
+            {detail === null ? (
+              <div className="space-y-2">
+                {[0, 1].map(i => (
+                  <div key={i} className="h-14 bg-vault-card rounded-xl animate-pulse" />
+                ))}
+              </div>
+            ) : roms.length === 0 ? (
+              <p className="text-vault-muted text-sm">No ROMs found for this game.</p>
+            ) : (
+              <div>
+                {!singleRom && (
+                  <p className="text-vault-muted text-xs uppercase tracking-widest mb-2">
+                    Versions — {roms.length} ROM{roms.length !== 1 ? 's' : ''}
+                  </p>
+                )}
+                <div className="space-y-2 overflow-y-auto" style={{ maxHeight: '280px', scrollbarWidth: 'none' }}>
+                  {roms.map((rom, i) => (
+                    <RomRow
+                      key={rom.id}
+                      rom={rom}
+                      focused={focusSection === 'versions' && versionIdx === i}
+                      launching={launching === rom.id}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
-      <div className="relative px-[5%] pb-[5%] pt-6 border-t border-vault-surface">
-        <div className="flex items-center gap-6">
-          <ActionButton
-            focused={focused === 'launch'}
-            disabled={launching}
-            onClick={() => void launch()}
-            primary
-          >
-            {launching ? 'Launching...' : <><Glyph type="cross" /> Launch</>}
-          </ActionButton>
-
-          <ActionButton
-            focused={focused === 'favorite'}
-            onClick={() => void toggleFavorite()}
-          >
-            <Glyph type="square" /> {isFavorite ? 'Unfavorite' : 'Favorite'}
-          </ActionButton>
-
-          <ActionButton
-            focused={focused === 'back'}
-            onClick={onBack}
-          >
-            <Glyph type="circle" /> Back
-          </ActionButton>
+      {/* Action row */}
+      <div className="relative px-[5%] pb-[5%] pt-5 border-t border-vault-surface">
+        <div className="flex items-center gap-4 mb-3">
+          {ACTIONS.map((act, i) => {
+            const focused = focusSection === 'actions' && actionIdx === i
+            const label = act === 'favorite'
+              ? (isFavorite ? 'Unfavorite' : 'Favorite')
+              : act === 'scrape' ? 'Scrape Metadata'
+              : 'Back'
+            const glyph = act === 'favorite' ? 'square' : act === 'scrape' ? 'triangle' : 'circle'
+            return (
+              <button
+                key={act}
+                onClick={() => {
+                  if (act === 'favorite') void toggleFavorite()
+                  if (act === 'scrape') setScrapeOpen(true)
+                  if (act === 'back') onBack()
+                }}
+                className={[
+                  'px-6 py-3 rounded-xl font-bold text-sm uppercase tracking-wide transition-all duration-150',
+                  'inline-flex items-center gap-2 motion-reduce:transition-none',
+                  act === 'back'
+                    ? 'bg-vault-surface text-white border border-vault-muted'
+                    : act === 'scrape'
+                    ? 'bg-vault-surface text-white border border-vault-muted'
+                    : isFavorite
+                    ? 'bg-vault-accent text-white'
+                    : 'bg-vault-surface text-white border border-vault-muted',
+                  focused ? 'ring-2 ring-white scale-105 motion-reduce:scale-100' : '',
+                ].join(' ')}
+              >
+                <Glyph type={glyph as 'square' | 'triangle' | 'circle'} /> {label}
+              </button>
+            )
+          })}
         </div>
-
-        <p className="text-vault-muted text-xs mt-4 uppercase tracking-wide flex items-center gap-1.5 flex-wrap">
-          <Glyph type="cross" /> Launch  ·  <Glyph type="square" /> Favorite  ·  <Glyph type="circle" /> Back  ·  D-Pad Navigate
+        <p className="text-vault-muted text-xs uppercase tracking-wide flex items-center gap-1.5 flex-wrap">
+          <Glyph type="cross" /> Launch  ·  <Glyph type="square" /> Favorite  ·  <Glyph type="triangle" /> Scrape  ·  <Glyph type="circle" /> Back  ·  D-Pad Navigate
         </p>
       </div>
-    </div>
-  )
-}
 
-function ActionButton({
-  children,
-  focused,
-  onClick,
-  primary,
-  disabled,
-}: {
-  children: React.ReactNode
-  focused: boolean
-  onClick: () => void
-  primary?: boolean
-  disabled?: boolean
-}) {
-  return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      className={[
-        'px-8 py-4 rounded-xl font-bold text-base uppercase tracking-wide transition-all duration-150',
-        'inline-flex items-center justify-center gap-2',
-        'motion-reduce:transition-none',
-        focused ? 'ring-2 ring-white scale-105 motion-reduce:scale-100' : '',
-        primary
-          ? 'bg-vault-accent text-white'
-          : 'bg-vault-surface text-white border border-vault-muted',
-        disabled ? 'opacity-50 cursor-not-allowed' : '',
-      ].join(' ')}
-    >
-      {children}
-    </button>
+      {scrapeOpen && (
+        <ScrapeModal
+          gameId={game.id}
+          onDone={(updated) => {
+            setGame(updated)
+            setScrapeOpen(false)
+            api.games.get(updated.id).then(setDetail).catch(() => {})
+          }}
+          onClose={() => setScrapeOpen(false)}
+        />
+      )}
+    </div>
   )
 }

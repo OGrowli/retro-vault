@@ -1,7 +1,15 @@
 import { useState, useCallback, useRef } from 'react'
 import type { GamepadAction } from './useGamepad'
 
-export type Region = 'profile-select' | 'recently-played' | 'favorites' | 'all-games' | 'filter-drawer' | 'game-detail'
+export type Region =
+  | 'profile-select'
+  | 'recently-played'
+  | 'favorites'
+  | 'all-games'
+  | 'filter-drawer'
+  | 'game-detail'
+  | 'versions-list'
+  | 'settings'
 
 interface RegionState {
   row: number
@@ -19,18 +27,23 @@ interface UseSpatialNavOptions {
   filterDrawerOpen: boolean
   onToggleFilter?: () => void
   onFavorite?: (region: Region, row: number, col: number) => void
+  onSettings?: () => void
+}
+
+const DEFAULT_INDICES: Record<Region, RegionState> = {
+  'profile-select':  { row: 0, col: 0 },
+  'recently-played': { row: 0, col: 0 },
+  'favorites':       { row: 0, col: 0 },
+  'all-games':       { row: 0, col: 0 },
+  'filter-drawer':   { row: 0, col: 0 },
+  'game-detail':     { row: 0, col: 0 },
+  'versions-list':   { row: 0, col: 0 },
+  'settings':        { row: 0, col: 0 },
 }
 
 export function useSpatialNav(opts: UseSpatialNavOptions) {
   const [region, setRegion] = useState<Region>('recently-played')
-  const [indices, setIndices] = useState<Record<Region, RegionState>>({
-    'profile-select': { row: 0, col: 0 },
-    'recently-played': { row: 0, col: 0 },
-    'favorites': { row: 0, col: 0 },
-    'all-games': { row: 0, col: 0 },
-    'filter-drawer': { row: 0, col: 0 },
-    'game-detail': { row: 0, col: 0 },
-  })
+  const [indices, setIndices] = useState<Record<Region, RegionState>>(DEFAULT_INDICES)
 
   const optsRef = useRef(opts)
   optsRef.current = opts
@@ -40,14 +53,16 @@ export function useSpatialNav(opts: UseSpatialNavOptions) {
   const getIndex = useCallback((r: Region) => indices[r], [indices])
 
   const updateIndex = useCallback((r: Region, update: Partial<RegionState>) => {
-    setIndices(prev => ({
-      ...prev,
-      [r]: { ...prev[r], ...update },
-    }))
+    setIndices(prev => ({ ...prev, [r]: { ...prev[r], ...update } }))
   }, [])
 
   const handleAction = useCallback((action: GamepadAction) => {
     const o = optsRef.current
+
+    if (action === 'settings') {
+      o.onSettings?.()
+      return
+    }
 
     if (action === 'filter') {
       o.onToggleFilter?.()
@@ -63,10 +78,7 @@ export function useSpatialNav(opts: UseSpatialNavOptions) {
       return
     }
 
-    if (action === 'back') {
-      o.onBack?.()
-      return
-    }
+    if (action === 'back') { o.onBack?.(); return }
 
     if (action === 'favorite') {
       const cur = indices[region]
@@ -84,10 +96,7 @@ export function useSpatialNav(opts: UseSpatialNavOptions) {
       const cur = indices['recently-played']
       if (action === 'left') updateIndex('recently-played', { col: clamp(cur.col - 1, 0, o.recentCount - 1) })
       if (action === 'right') updateIndex('recently-played', { col: clamp(cur.col + 1, 0, o.recentCount - 1) })
-      if (action === 'down') {
-        if (o.favoritesCount > 0) setRegion('favorites')
-        else setRegion('all-games')
-      }
+      if (action === 'down') setRegion(o.favoritesCount > 0 ? 'favorites' : 'all-games')
     }
 
     if (region === 'favorites') {
@@ -105,20 +114,15 @@ export function useSpatialNav(opts: UseSpatialNavOptions) {
       if (action === 'right') updateIndex('all-games', { col: clamp(cur.col + 1, 0, o.gridCols - 1) })
       if (action === 'down') updateIndex('all-games', { row: clamp(cur.row + 1, 0, totalRows - 1) })
       if (action === 'up') {
-        if (cur.row === 0) {
-          if (o.favoritesCount > 0) setRegion('favorites')
-          else setRegion('recently-played')
-        } else {
-          updateIndex('all-games', { row: cur.row - 1 })
-        }
+        if (cur.row === 0) setRegion(o.favoritesCount > 0 ? 'favorites' : 'recently-played')
+        else updateIndex('all-games', { row: cur.row - 1 })
       }
     }
 
     if (region === 'profile-select') {
       const cur = indices['profile-select']
-      const cols = 4
-      if (action === 'left') updateIndex('profile-select', { col: clamp(cur.col - 1, 0, cols - 1) })
-      if (action === 'right') updateIndex('profile-select', { col: clamp(cur.col + 1, 0, cols - 1) })
+      if (action === 'left') updateIndex('profile-select', { col: clamp(cur.col - 1, 0, 3) })
+      if (action === 'right') updateIndex('profile-select', { col: clamp(cur.col + 1, 0, 3) })
       if (action === 'up') updateIndex('profile-select', { row: clamp(cur.row - 1, 0, 4) })
       if (action === 'down') updateIndex('profile-select', { row: clamp(cur.row + 1, 0, 4) })
     }

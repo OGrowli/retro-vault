@@ -1,136 +1,130 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import { XMLParser } from 'fast-xml-parser'
-import sharp from 'sharp'
 import { db } from './db.js'
 
-const ES_GAMELISTS_DIR = '/home/pi/.emulationstation/gamelists'
-const MEDIA_DIR = '/home/pi/.retrovault/media'
-const MAX_IMAGE_SIZE = 300
-const JPEG_QUALITY = 75
+const ROMS_DIR = '/home/pi/RetroPie/roms'
 
-interface ESGame {
-  path: string
-  name: string
-  desc?: string
-  image?: string
-  thumbnail?: string
-  genre?: string
-  releasedate?: string
-  players?: string | number
+const EXCLUDE_EXTENSIONS = new Set([
+  '.txt', '.xml', '.sh', '.cfg', '.srm', '.state', '.png', '.jpg',
+  '.gif', '.bmp', '.mp3', '.ogg', '.db', '.dat', '.nfo', '.cue',
+])
+
+const REGION_MAP: Record<string, string> = {
+  USA: 'USA', U: 'USA', UE: 'USA', 'USA, Europe': 'USA',
+  Europe: 'Europe', E: 'Europe', EU: 'Europe',
+  Japan: 'Japan', J: 'Japan', JU: 'Japan', 'Japan, USA': 'Japan',
+  World: 'World', W: 'World',
+  Australia: 'Australia', A: 'Australia',
+  Spain: 'Spain', S: 'Spain',
+  France: 'France', F: 'France',
+  Germany: 'Germany', G: 'Germany',
 }
 
-interface ESGameList {
-  gameList: {
-    game: ESGame | ESGame[]
+export interface ParsedRom {
+  base_name: string
+  region: string | null
+  revision: string | null
+  full_name: string
+}
+
+export function parseRomFilename(filename: string): ParsedRom {
+  const full_name = path.parse(filename).name
+
+  const tags: string[] = []
+  const tagRegex = /\(([^)]+)\)/g
+  let match
+  while ((match = tagRegex.exec(full_name)) !== null) {
+    tags.push(match[1])
   }
-}
 
-async function resizeBoxArt(srcPath: string, destPath: string): Promise<void> {
-  fs.mkdirSync(path.dirname(destPath), { recursive: true })
-  await sharp(srcPath)
-    .resize(MAX_IMAGE_SIZE, MAX_IMAGE_SIZE, { fit: 'inside', withoutEnlargement: true })
-    .jpeg({ quality: JPEG_QUALITY })
-    .toFile(destPath)
-}
+  const base_name = full_name.replace(/\s*\([^)]*\)/g, '').trim() || full_name
 
-function parseYear(releasedate?: string): number | null {
-  if (!releasedate) return null
-  const m = releasedate.match(/^(\d{4})/)
-  return m ? parseInt(m[1], 10) : null
+  let region: string | null = null
+  for (const tag of tags) {
+    const norm = REGION_MAP[tag] ?? REGION_MAP[tag.split(',')[0]?.trim() ?? '']
+    if (norm) { region = norm; break }
+  }
+
+  let revision: string | null = null
+  for (const tag of tags) {
+    if (/^Rev\s*[\dA-Z]/i.test(tag)) { revision = tag; break }
+    if (/^(Beta|Proto|Sample|Demo|Hack|Unl|Pirate)/i.test(tag)) { revision = tag; break }
+  }
+
+  return { base_name, region, revision, full_name }
 }
 
 const upsertGame = db.prepare(`
-  INSERT INTO games (system, name, rom_path, box_art_path, genre, year, players, description, scraped_at)
-  VALUES (@system, @name, @rom_path, @box_art_path, @genre, @year, @players, @description, datetime('now'))
-  ON CONFLICT(rom_path) DO UPDATE SET
-    name = excluded.name,
-    box_art_path = excluded.box_art_path,
-    genre = excluded.genre,
-    year = excluded.year,
-    players = excluded.players,
-    description = excluded.description,
-    scraped_at = excluded.scraped_at
+  INSERT INTO games (name, system)
+  VALUES (@name, @system)
+  ON CONFLICT(name, system) DO NOTHING
 `)
 
-export async function runImport(): Promise<{ imported: number; errors: string[] }> {
-  const parser = new XMLParser({ ignoreAttributes: false, parseTagValue: true })
-  let imported = 0
-  const errors: string[] = []
+const findGame = db.prepare(`SELECT id FROM games WHERE name = ? AND system = ?`)
 
-  if (!fs.existsSync(ES_GAMELISTS_DIR)) {
-    throw new Error(`EmulationStation gamelists not found at ${ES_GAMELISTS_DIR}`)
-  }
+const upsertRom = db.prepare(`
+  INSERT INTO roms (game_id, system, rom_path, region, revision, full_name)
+  VALUES (@game_id, @system, @rom_path, @region, @revision, @full_name)
+  ON CONFLICT(rom_path) DO NOTHING
+`)
 
-  const systems = fs.readdirSync(ES_GAMELISTS_DIR, { withFileTypes: true })
-    .filter(d => d.isDirectory())
-    .map(d => d.name)
-
-  for (const system of systems) {
-    const xmlPath = path.join(ES_GAMELISTS_DIR, system, 'gamelist.xml')
-    if (!fs.existsSync(xmlPath)) continue
-
-    let parsed: ESGameList
-    try {
-      const xml = fs.readFileSync(xmlPath, 'utf-8')
-      parsed = parser.parse(xml) as ESGameList
-    } catch (e) {
-      errors.push(`${system}: failed to parse XML: ${e}`)
-      continue
-    }
-
-    const rawGames = parsed?.gameList?.game
-    if (!rawGames) continue
-    const games = Array.isArray(rawGames) ? rawGames : [rawGames]
-
-    for (const g of games) {
-      try {
-        const romPath = g.path.startsWith('./')
-          ? path.join(`/home/pi/RetroPie/roms/${system}`, g.path.slice(2))
-          : g.path
-
-        let boxArtPath: string | null = null
-        const imageSrc = g.image || g.thumbnail
-        if (imageSrc) {
-          const resolved = imageSrc.startsWith('./')
-            ? path.join(path.dirname(xmlPath), imageSrc.slice(2))
-            : imageSrc
-
-          if (fs.existsSync(resolved)) {
-            const destName = `${system}_${path.basename(romPath, path.extname(romPath))}.jpg`
-            const destPath = path.join(MEDIA_DIR, system, destName)
-            await resizeBoxArt(resolved, destPath)
-            boxArtPath = `/media/${system}/${destName}`
-          }
-        }
-
-        upsertGame.run({
-          system,
-          name: g.name,
-          rom_path: romPath,
-          box_art_path: boxArtPath,
-          genre: g.genre ?? null,
-          year: parseYear(g.releasedate?.toString()),
-          players: g.players ? parseInt(g.players.toString(), 10) : null,
-          description: g.desc ?? null,
-        })
-
-        imported++
-      } catch (e) {
-        errors.push(`${system}/${g.name}: ${e}`)
-      }
-    }
-  }
-
-  return { imported, errors }
+export interface ImportResult {
+  games_created: number
+  games_updated: number
+  roms_created: number
+  roms_skipped: number
 }
 
-if (process.argv[1]?.endsWith('importer.ts') || process.argv[1]?.endsWith('importer.js')) {
-  runImport().then(({ imported, errors }) => {
-    console.log(`Imported ${imported} games`)
-    if (errors.length) console.error('Errors:\n' + errors.join('\n'))
-  }).catch(e => {
-    console.error(e)
-    process.exit(1)
+export function runImport(): ImportResult {
+  if (!fs.existsSync(ROMS_DIR)) {
+    throw new Error(`ROMs directory not found: ${ROMS_DIR}`)
+  }
+
+  const result: ImportResult = { games_created: 0, games_updated: 0, roms_created: 0, roms_skipped: 0 }
+  const gamesWithNewRoms = new Set<number>()
+
+  const systems = fs.readdirSync(ROMS_DIR, { withFileTypes: true })
+    .filter(d => d.isDirectory() && !d.name.startsWith('.'))
+    .map(d => d.name)
+
+  const doImport = db.transaction(() => {
+    for (const system of systems) {
+      const systemDir = path.join(ROMS_DIR, system)
+      let files: string[]
+      try {
+        files = fs.readdirSync(systemDir)
+      } catch { continue }
+
+      for (const filename of files) {
+        if (filename.startsWith('.')) continue
+        const ext = path.extname(filename).toLowerCase()
+        if (EXCLUDE_EXTENSIONS.has(ext)) continue
+
+        const rom_path = path.join(systemDir, filename)
+        try {
+          if (!fs.statSync(rom_path).isFile()) continue
+        } catch { continue }
+
+        const { base_name, region, revision, full_name } = parseRomFilename(filename)
+
+        const gameInsert = upsertGame.run({ name: base_name, system })
+        if (gameInsert.changes > 0) result.games_created++
+
+        const game = findGame.get(base_name, system) as { id: number } | undefined
+        if (!game) continue
+
+        const romInsert = upsertRom.run({ game_id: game.id, system, rom_path, region, revision, full_name })
+        if (romInsert.changes > 0) {
+          result.roms_created++
+          if (gameInsert.changes === 0) gamesWithNewRoms.add(game.id)
+        } else {
+          result.roms_skipped++
+        }
+      }
+    }
   })
+
+  doImport()
+  result.games_updated = gamesWithNewRoms.size
+  return result
 }
