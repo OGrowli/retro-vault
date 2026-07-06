@@ -6,7 +6,6 @@ set -euo pipefail
 #   bash scripts/deploy.sh --import   # also re-import games from EmulationStation gamelists
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SERVICE_FILE="/etc/systemd/system/retrovault-api.service"
 
 cd "$REPO_DIR"
 echo "==> RetroVault deploy ($REPO_DIR)"
@@ -26,13 +25,8 @@ npm install
 echo "==> Building shared + api + web..."
 npm run build
 
-if [ ! -f "$SERVICE_FILE" ]; then
-  echo "==> First-time setup: installing startup service + RetroPie autostart hook..."
-  bash scripts/install-startup.sh
-else
-  echo "==> Restarting API service..."
-  sudo systemctl restart retrovault-api
-fi
+echo "==> Updating startup service + autostart..."
+bash scripts/install-startup.sh
 
 if [ "${1:-}" = "--import" ]; then
   echo "==> Importing games from EmulationStation gamelists..."

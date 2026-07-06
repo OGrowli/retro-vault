@@ -4,7 +4,10 @@ xset s noblank
 xset -dpms
 unclutter -idle 0 -root &
 
-exec chromium-browser \
+CHROMIUM="chromium-browser"
+command -v chromium-browser > /dev/null 2>&1 || CHROMIUM="chromium"
+
+exec "$CHROMIUM" \
   --kiosk \
   --disable-extensions \
   --disable-gpu \
