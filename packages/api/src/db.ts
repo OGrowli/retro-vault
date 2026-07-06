@@ -138,6 +138,11 @@ db.exec(`
     filter_json TEXT NOT NULL
   );
 
+  CREATE TABLE IF NOT EXISTS settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+  );
+
   CREATE INDEX IF NOT EXISTS idx_roms_game ON roms(game_id);
   CREATE INDEX IF NOT EXISTS idx_play_sessions_user ON play_sessions(user_id, started_at DESC);
   CREATE INDEX IF NOT EXISTS idx_play_sessions_rom ON play_sessions(rom_id);
@@ -148,6 +153,18 @@ db.exec(`
 
 if (schemaVersion < 2) {
   db.exec('PRAGMA user_version = 2')
+}
+
+export function getSetting(key: string): string | null {
+  const row = db.prepare('SELECT value FROM settings WHERE key = ?').get(key) as { value: string } | undefined
+  return row?.value ?? null
+}
+
+export function setSetting(key: string, value: string): void {
+  db.prepare(`
+    INSERT INTO settings (key, value) VALUES (?, ?)
+    ON CONFLICT(key) DO UPDATE SET value = excluded.value
+  `).run(key, value)
 }
 
 export interface FilterClause {

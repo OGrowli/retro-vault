@@ -124,7 +124,7 @@ function ScrapeModal({ gameId, onDone, onClose }: ScrapeModalProps) {
     <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center px-4">
       <div className="bg-vault-card rounded-2xl p-6 w-full max-w-[480px] max-h-[90vh] overflow-y-auto space-y-4" style={{ scrollbarWidth: 'none' }}>
         <h2 className="text-white text-xl font-bold">Scrape Metadata</h2>
-        <p className="text-vault-muted text-sm">Enter ScreenScraper credentials. Leave blank for anonymous (rate-limited).</p>
+        <p className="text-vault-muted text-sm">Enter ScreenScraper credentials for full metadata. Without dev credentials on the server, box art is fetched free from libretro thumbnails.</p>
 
         <div className="space-y-2">
           <div

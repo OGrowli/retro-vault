@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { api } from '../api/client'
 import type { ScrapeProgress } from '../api/client'
 import { useGamepad } from '../hooks/useGamepad'
@@ -10,8 +10,17 @@ interface Props {
   onBack: () => void
 }
 
-const FOCUS_ITEMS = ['username', 'password', 'scrape-all', 'scrape-system', 'back'] as const
+const FOCUS_ITEMS = ['dev-id', 'dev-password', 'username', 'password', 'save-creds', 'scrape-all', 'scrape-system', 'back'] as const
 type FocusItem = (typeof FOCUS_ITEMS)[number]
+
+type CredField = 'dev-id' | 'dev-password' | 'username' | 'password'
+
+const CRED_LABELS: Record<CredField, string> = {
+  'dev-id': 'Dev ID',
+  'dev-password': 'Dev Password',
+  'username': 'Username',
+  'password': 'Password',
+}
 
 function parseSseChunks(text: string): ScrapeProgress[] {
   const events: ScrapeProgress[] = []
@@ -47,6 +56,8 @@ async function streamScrape(
 }
 
 export function Settings({ systems, onBack }: Props) {
+  const [devId, setDevId] = useState('')
+  const [devPassword, setDevPassword] = useState('')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [selectedSystem, setSelectedSystem] = useState(systems[0] ?? '')
@@ -54,10 +65,40 @@ export function Settings({ systems, onBack }: Props) {
   const [progress, setProgress] = useState<ScrapeProgress | null>(null)
   const [running, setRunning] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [vkField, setVkField] = useState<'username' | 'password' | null>(null)
+  const [saveMsg, setSaveMsg] = useState<string | null>(null)
+  const [vkField, setVkField] = useState<CredField | null>(null)
   const abortRef = useRef<AbortController | null>(null)
 
   const focusIdx = FOCUS_ITEMS.indexOf(focused)
+
+  useEffect(() => {
+    api.settings.get().then(s => {
+      setDevId(s.ss_dev_id ?? '')
+      setDevPassword(s.ss_dev_password ?? '')
+      setUsername(s.ss_user ?? '')
+      setPassword(s.ss_user_password ?? '')
+    }).catch(() => {})
+  }, [])
+
+  const saveCreds = useCallback(async () => {
+    setSaveMsg(null)
+    try {
+      await api.settings.save({
+        ss_dev_id: devId,
+        ss_dev_password: devPassword,
+        ss_user: username,
+        ss_user_password: password,
+      })
+      setSaveMsg('Credentials saved')
+    } catch (e) {
+      setSaveMsg(e instanceof Error ? e.message : 'Save failed')
+    }
+  }, [devId, devPassword, username, password])
+
+  const credValue = (f: CredField) =>
+    f === 'dev-id' ? devId : f === 'dev-password' ? devPassword : f === 'username' ? username : password
+  const credSetter = (f: CredField) =>
+    f === 'dev-id' ? setDevId : f === 'dev-password' ? setDevPassword : f === 'username' ? setUsername : setPassword
 
   const cancel = useCallback(() => {
     abortRef.current?.abort()
@@ -118,8 +159,11 @@ export function Settings({ systems, onBack }: Props) {
       return
     }
     if (action === 'confirm') {
-      if (focused === 'username') { setVkField('username'); return }
-      if (focused === 'password') { setVkField('password'); return }
+      if (focused === 'dev-id' || focused === 'dev-password' || focused === 'username' || focused === 'password') {
+        setVkField(focused)
+        return
+      }
+      if (focused === 'save-creds') void saveCreds()
       if (focused === 'scrape-all') void scrapeAll()
       if (focused === 'scrape-system') void scrapeSystem()
       if (focused === 'back') onBack()
@@ -137,8 +181,40 @@ export function Settings({ systems, onBack }: Props) {
       <div className="flex-1 overflow-y-auto px-[5%] py-8 space-y-8" style={{ scrollbarWidth: 'none' }}>
         {/* ScreenScraper credentials */}
         <section>
-          <h2 className="text-vault-muted text-xs uppercase tracking-widest mb-4">ScreenScraper Credentials</h2>
+          <h2 className="text-vault-muted text-xs uppercase tracking-widest mb-1.5">ScreenScraper Credentials</h2>
+          <p className="text-vault-muted text-xs mb-4 max-w-sm">
+            Dev credentials enable full metadata scraping (register at screenscraper.fr and request API access).
+            Without them, box art comes free from libretro thumbnails.
+          </p>
           <div className="space-y-3 max-w-sm">
+            <div>
+              <label className="text-vault-muted text-xs uppercase tracking-wide block mb-1.5">Dev ID</label>
+              <input
+                type="text"
+                value={devId}
+                onChange={e => setDevId(e.target.value)}
+                onFocus={() => setFocused('dev-id')}
+                className={[
+                  'w-full bg-vault-surface border rounded-lg px-4 py-3 text-white text-sm focus:outline-none',
+                  isFocused('dev-id') ? 'border-vault-accent ring-1 ring-vault-accent' : 'border-vault-muted',
+                ].join(' ')}
+                placeholder="ScreenScraper dev ID"
+              />
+            </div>
+            <div>
+              <label className="text-vault-muted text-xs uppercase tracking-wide block mb-1.5">Dev Password</label>
+              <input
+                type="password"
+                value={devPassword}
+                onChange={e => setDevPassword(e.target.value)}
+                onFocus={() => setFocused('dev-password')}
+                className={[
+                  'w-full bg-vault-surface border rounded-lg px-4 py-3 text-white text-sm focus:outline-none',
+                  isFocused('dev-password') ? 'border-vault-accent ring-1 ring-vault-accent' : 'border-vault-muted',
+                ].join(' ')}
+                placeholder="ScreenScraper dev password"
+              />
+            </div>
             <div>
               <label className="text-vault-muted text-xs uppercase tracking-wide block mb-1.5">Username</label>
               <input
@@ -150,7 +226,7 @@ export function Settings({ systems, onBack }: Props) {
                   'w-full bg-vault-surface border rounded-lg px-4 py-3 text-white text-sm focus:outline-none',
                   isFocused('username') ? 'border-vault-accent ring-1 ring-vault-accent' : 'border-vault-muted',
                 ].join(' ')}
-                placeholder="Leave blank for anonymous"
+                placeholder="Optional — raises rate limit"
               />
             </div>
             <div>
@@ -164,9 +240,20 @@ export function Settings({ systems, onBack }: Props) {
                   'w-full bg-vault-surface border rounded-lg px-4 py-3 text-white text-sm focus:outline-none',
                   isFocused('password') ? 'border-vault-accent ring-1 ring-vault-accent' : 'border-vault-muted',
                 ].join(' ')}
-                placeholder="Leave blank for anonymous"
+                placeholder="Optional — raises rate limit"
               />
             </div>
+            <button
+              onClick={() => void saveCreds()}
+              className={[
+                'w-full py-3 rounded-xl font-bold text-white uppercase tracking-wide text-sm',
+                'bg-vault-surface border border-vault-muted transition-all duration-150 motion-reduce:transition-none',
+                isFocused('save-creds') ? 'ring-2 ring-white border-vault-accent scale-105 motion-reduce:scale-100' : '',
+              ].join(' ')}
+            >
+              Save Credentials
+            </button>
+            {saveMsg && <p className="text-vault-accent text-sm">{saveMsg}</p>}
           </div>
         </section>
 
@@ -278,16 +365,17 @@ export function Settings({ systems, onBack }: Props) {
       {vkField && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 px-4">
           <div className="bg-vault-card rounded-2xl p-6 w-full max-w-[480px] max-h-[90vh] overflow-y-auto space-y-4" style={{ scrollbarWidth: 'none' }}>
-            <h2 className="text-white text-lg font-bold">
-              {vkField === 'username' ? 'SS Username' : 'SS Password'}
-            </h2>
+            <h2 className="text-white text-lg font-bold">SS {CRED_LABELS[vkField]}</h2>
             <VirtualKeyboard
-              value={vkField === 'username' ? username : password}
-              onChange={vkField === 'username' ? setUsername : setPassword}
-              masked={vkField === 'password'}
+              value={credValue(vkField)}
+              onChange={credSetter(vkField)}
+              masked={vkField === 'dev-password' || vkField === 'password'}
               onDone={() => {
-                if (vkField === 'username') setVkField('password')
-                else setVkField(null)
+                // Advance to the next field, PS5-style; last field closes
+                const order: CredField[] = ['dev-id', 'dev-password', 'username', 'password']
+                const next = order[order.indexOf(vkField) + 1]
+                setVkField(next ?? null)
+                if (next) setFocused(next)
               }}
               onCancel={() => setVkField(null)}
               enabled={!!vkField}

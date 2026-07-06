@@ -77,6 +77,7 @@ sudo systemctl restart retrovault-api || sudo systemctl start retrovault-api
 # 3. Make kiosk scripts executable
 chmod +x "$INSTALL_DIR/scripts/retrovault-kiosk.sh"
 chmod +x "$INSTALL_DIR/scripts/launch-chromium.sh"
+chmod +x "$INSTALL_DIR/scripts/launch-game.sh"
 
 # 4. Configure console autologin for tty1 (idempotent)
 echo "Configuring console autologin..."

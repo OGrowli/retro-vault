@@ -1,13 +1,16 @@
 import { Hono } from 'hono'
 import { spawn } from 'node:child_process'
 import fs from 'node:fs'
+import path from 'node:path'
 import { db } from '../db.js'
 import { getSystemConfig } from '../systems.config.js'
 
 export const romsRouter = new Hono()
 
-// RetroPie's launcher — handles per-system emulator choice, video mode, and configs
-const RUNCOMMAND = '/opt/retropie/supplementary/runcommand/runcommand.sh'
+// Wrapper that frees the display (stops the kiosk), runs the game on the
+// console, and restores the kiosk on exit. Resolved from the service's
+// WorkingDirectory (repo root). Logs to ~/.retrovault/launch.log
+const LAUNCH_WRAPPER = path.resolve('scripts/launch-game.sh')
 
 // systemd services don't have /opt/retropie/... on PATH, so resolve explicitly
 function resolveRetroarch(): string | null {
@@ -52,10 +55,14 @@ romsRouter.post('/:id/launch', (c) => {
   let cmd: string
   let args: string[]
 
-  if (fs.existsSync(RUNCOMMAND)) {
+  if (process.platform === 'linux' && fs.existsSync(LAUNCH_WRAPPER)) {
+    const sysConfig = getSystemConfig(rom.system)
     cmd = 'bash'
-    args = [RUNCOMMAND, '0', '_SYS_', rom.system, rom.rom_path]
+    args = [LAUNCH_WRAPPER, rom.system, rom.rom_path]
+    // Core path lets the wrapper fall back to direct retroarch on non-RetroPie setups
+    if (sysConfig && fs.existsSync(sysConfig.corePath)) args.push(sysConfig.corePath)
   } else {
+    // Dev machines / no wrapper: direct retroarch
     const sysConfig = getSystemConfig(rom.system)
     if (!sysConfig) return c.json({ error: `No core configured for system: ${rom.system}` }, 422)
 
@@ -69,10 +76,6 @@ romsRouter.post('/:id/launch', (c) => {
 
     cmd = retroarch
     args = ['-L', sysConfig.corePath, rom.rom_path]
-    const allCfg = '/opt/retropie/configs/all/retroarch.cfg'
-    const sysCfg = `/opt/retropie/configs/${rom.system}/retroarch.cfg`
-    if (fs.existsSync(allCfg)) args.push('--config', allCfg)
-    if (fs.existsSync(sysCfg)) args.push('--appendconfig', sysCfg)
   }
 
   return new Promise<Response>((resolve) => {
@@ -80,13 +83,26 @@ romsRouter.post('/:id/launch', (c) => {
       detached: true,
       stdio: 'ignore',
     })
+    let settled = false
+    const settle = (r: Response) => {
+      if (!settled) { settled = true; resolve(r) }
+    }
     child.on('error', (err) => {
-      resolve(c.json({ error: `Launch failed: ${err.message}` }, 500))
+      settle(c.json({ error: `Launch failed: ${err.message}` }, 500))
     })
-    child.on('spawn', () => {
+    // The wrapper runs for the whole game session — an exit within the first
+    // few seconds means the launch itself failed.
+    child.on('exit', (code) => {
+      if (code !== 0) {
+        settle(c.json({ error: `Launcher exited with code ${code} — check ~/.retrovault/launch.log on the Pi` }, 500))
+      } else {
+        settle(c.json({ launched: true }))
+      }
+    })
+    setTimeout(() => {
       child.unref()
-      resolve(c.json({ launched: true, pid: child.pid }))
-    })
+      settle(c.json({ launched: true, pid: child.pid }))
+    }, 3000)
   })
 })
 

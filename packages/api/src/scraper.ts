@@ -2,7 +2,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import sharp from 'sharp'
-import { db } from './db.js'
+import { db, getSetting } from './db.js'
 
 const DATA_DIR = process.env['RETROVAULT_DATA_DIR'] ?? path.join(os.homedir(), '.retrovault')
 const MEDIA_DIR = path.join(DATA_DIR, 'media')
@@ -34,6 +34,31 @@ export const SCREENSCRAPER_SYSTEM_IDS: Record<string, number> = {
   psx: 57,
 }
 
+// libretro thumbnail repo names — https://thumbnails.libretro.com (free, no API key)
+const LIBRETRO_THUMB_SYSTEMS: Record<string, string> = {
+  nes: 'Nintendo - Nintendo Entertainment System',
+  snes: 'Nintendo - Super Nintendo Entertainment System',
+  n64: 'Nintendo - Nintendo 64',
+  gb: 'Nintendo - Game Boy',
+  gbc: 'Nintendo - Game Boy Color',
+  gba: 'Nintendo - Game Boy Advance',
+  fds: 'Nintendo - Family Computer Disk System',
+  megadrive: 'Sega - Mega Drive - Genesis',
+  genesis: 'Sega - Mega Drive - Genesis',
+  mastersystem: 'Sega - Master System - Mark III',
+  gamegear: 'Sega - Game Gear',
+  'sg-1000': 'Sega - SG-1000',
+  psx: 'Sony - PlayStation',
+  pcengine: 'NEC - PC Engine - TurboGrafx 16',
+  neogeo: 'SNK - Neo Geo',
+  ngp: 'SNK - Neo Geo Pocket',
+  ngpc: 'SNK - Neo Geo Pocket Color',
+  arcade: 'FBNeo - Arcade Games',
+  fba: 'FBNeo - Arcade Games',
+  fbneo: 'FBNeo - Arcade Games',
+  'mame-libretro': 'MAME',
+}
+
 interface SSGameRow {
   id: number
   name: string
@@ -45,6 +70,63 @@ interface SSGameRow {
 type ScrapeSuccess = { success: true; name: string }
 type ScrapeFailure = { success: false; error: string }
 type ScrapeResult = ScrapeSuccess | ScrapeFailure
+
+async function saveBoxArt(buf: Buffer, system: string, gameId: number): Promise<string> {
+  const dir = path.join(MEDIA_DIR, system)
+  fs.mkdirSync(dir, { recursive: true })
+  const dest = path.join(dir, `${gameId}.jpg`)
+  await sharp(buf)
+    .resize(300, 300, { fit: 'inside', withoutEnlargement: true })
+    .jpeg({ quality: 75 })
+    .toFile(dest)
+  return `/media/${system}/${gameId}.jpg`
+}
+
+// libretro thumbnails replace these characters with underscores in filenames
+function libretroSanitize(name: string): string {
+  return name.replace(/[&*/:`<>?\\|"]/g, '_')
+}
+
+async function scrapeLibretroThumb(game: SSGameRow): Promise<ScrapeResult> {
+  const repo = LIBRETRO_THUMB_SYSTEMS[game.system.toLowerCase()]
+  if (!repo) {
+    return { success: false, error: `No libretro thumbnail repo for system: ${game.system}` }
+  }
+
+  // No-Intro naming: the ROM filename is usually the best match, then gamelist names
+  const candidates = [...new Set([
+    path.parse(game.rom_path).name,
+    game.full_name,
+    game.name,
+  ])].filter(Boolean)
+
+  for (const cand of candidates) {
+    const url = `https://thumbnails.libretro.com/${encodeURIComponent(repo)}/Named_Boxarts/${encodeURIComponent(libretroSanitize(cand))}.png`
+    let res: Response
+    try {
+      res = await fetch(url)
+    } catch (e) {
+      return { success: false, error: `Network error: ${e}` }
+    }
+    if (!res.ok) continue
+
+    try {
+      const buf = Buffer.from(await res.arrayBuffer())
+      const boxArtPath = await saveBoxArt(buf, game.system, game.id)
+      db.prepare(`
+        UPDATE games SET box_art_path = ?, scraped_at = datetime('now') WHERE id = ?
+      `).run(boxArtPath, game.id)
+      return { success: true, name: game.name }
+    } catch (e) {
+      return { success: false, error: `Failed to save box art: ${e}` }
+    }
+  }
+
+  return {
+    success: false,
+    error: `No libretro box art found for "${candidates[0]}" — filename must follow No-Intro naming`,
+  }
+}
 
 async function fetchSS(params: URLSearchParams): Promise<Response> {
   const url = `https://www.screenscraper.fr/api2/jeuInfos.php?${params}`
@@ -68,23 +150,28 @@ export async function scrapeGame(gameId: number, username: string, password: str
 
   if (!game) return { success: false, error: 'Game not found or has no ROMs' }
 
-  if (!DEV_ID || !DEV_PASS) {
-    return {
-      success: false,
-      error: 'ScreenScraper dev credentials missing — set SCREENSCRAPER_DEV_ID and SCREENSCRAPER_DEV_PASSWORD in ~/.retrovault/env and restart the API',
-    }
+  // Credentials: saved settings first, env vars as fallback
+  const devId = getSetting('ss_dev_id') || DEV_ID
+  const devPass = getSetting('ss_dev_password') || DEV_PASS
+  const ssUser = username || getSetting('ss_user') || ''
+  const ssPass = password || getSetting('ss_user_password') || ''
+
+  // No ScreenScraper dev credentials → free fallback: box art from libretro thumbnails.
+  // (Full metadata — genre/year/description — still needs SS dev creds.)
+  if (!devId || !devPass) {
+    return scrapeLibretroThumb(game)
   }
 
   const systemId = SCREENSCRAPER_SYSTEM_IDS[game.system.toLowerCase()]
   if (!systemId) return { success: false, error: `No ScreenScraper ID for system: ${game.system}` }
 
   const params = new URLSearchParams({
-    devid: DEV_ID,
-    devpassword: DEV_PASS,
+    devid: devId,
+    devpassword: devPass,
     softname: 'retrovault',
     output: 'json',
-    ssid: username,
-    sspassword: password,
+    ssid: ssUser,
+    sspassword: ssPass,
     systemeid: String(systemId),
     romnom: path.basename(game.rom_path),
   })
@@ -165,14 +252,7 @@ export async function scrapeGame(gameId: number, username: string, password: str
         const imgRes = await fetch(art.url)
         if (imgRes.ok) {
           const buf = Buffer.from(await imgRes.arrayBuffer())
-          const dir = path.join(MEDIA_DIR, game.system)
-          fs.mkdirSync(dir, { recursive: true })
-          const dest = path.join(dir, `${game.id}.jpg`)
-          await sharp(buf)
-            .resize(300, 300, { fit: 'inside', withoutEnlargement: true })
-            .jpeg({ quality: 75 })
-            .toFile(dest)
-          boxArtPath = `/media/${game.system}/${game.id}.jpg`
+          boxArtPath = await saveBoxArt(buf, game.system, game.id)
         }
       } catch { /* box art is optional */ }
     }

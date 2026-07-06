@@ -12,6 +12,7 @@ import { usersRouter } from './routes/users.js'
 import { metaRouter } from './routes/meta.js'
 import { importRouter } from './routes/import.js'
 import { scrapeRouter } from './routes/scrape.js'
+import { settingsRouter } from './routes/settings.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const WEB_DIST = path.join(__dirname, '../../web/dist')
@@ -26,6 +27,7 @@ app.route('/users', usersRouter)
 app.route('/meta', metaRouter)
 app.route('/import', importRouter)
 app.route('/scrape', scrapeRouter)
+app.route('/settings', settingsRouter)
 
 const DATA_DIR = process.env['RETROVAULT_DATA_DIR'] ?? path.join(os.homedir(), '.retrovault')
 app.use(

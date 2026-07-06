@@ -101,6 +101,11 @@ export const api = {
     genres: () => get<string[]>('/meta/genres'),
   },
 
+  settings: {
+    get: () => get<Record<string, string>>('/settings'),
+    save: (s: Record<string, string>) => post<{ saved: boolean }>('/settings', s),
+  },
+
   import: {
     run: () => post<ImportResult>('/import'),
   },
