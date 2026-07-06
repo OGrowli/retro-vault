@@ -8,6 +8,14 @@ import { Settings } from './screens/Settings'
 
 type Screen = 'profile-select' | 'home' | 'game-detail' | 'settings'
 
+// Navigation hierarchy: back always goes to the screen's parent.
+const SCREEN_PARENT: Record<Screen, Screen | null> = {
+  'profile-select': null,
+  'home': 'profile-select',
+  'game-detail': 'home',
+  'settings': 'home',
+}
+
 export function App() {
   const [screen, setScreen] = useState<Screen>('profile-select')
   const [currentUser, setCurrentUser] = useState<User | null>(null)
@@ -34,10 +42,14 @@ export function App() {
     setScreen('game-detail')
   }
 
-  const handleBack = () => {
-    setSelectedGame(null)
-    setScreen('home')
-  }
+  const goBack = useCallback(() => {
+    setScreen(s => {
+      const parent = SCREEN_PARENT[s]
+      if (!parent) return s
+      if (s === 'game-detail') setSelectedGame(null)
+      return parent
+    })
+  }, [])
 
   return (
     <>
@@ -50,7 +62,7 @@ export function App() {
           systems={systems}
           genres={genres}
           onGameSelect={handleGameSelect}
-          onSwitchUser={() => setScreen('profile-select')}
+          onSwitchUser={goBack}
           onSettings={() => setScreen('settings')}
           onLibraryChange={refreshMeta}
           inputActive={screen === 'home'}
@@ -60,13 +72,13 @@ export function App() {
         <GameDetail
           game={selectedGame}
           user={currentUser}
-          onBack={handleBack}
+          onBack={goBack}
         />
       )}
       {screen === 'settings' && (
         <Settings
           systems={systems}
-          onBack={() => setScreen('home')}
+          onBack={goBack}
         />
       )}
     </>

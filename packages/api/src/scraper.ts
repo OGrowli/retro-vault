@@ -68,6 +68,13 @@ export async function scrapeGame(gameId: number, username: string, password: str
 
   if (!game) return { success: false, error: 'Game not found or has no ROMs' }
 
+  if (!DEV_ID || !DEV_PASS) {
+    return {
+      success: false,
+      error: 'ScreenScraper dev credentials missing — set SCREENSCRAPER_DEV_ID and SCREENSCRAPER_DEV_PASSWORD in ~/.retrovault/env and restart the API',
+    }
+  }
+
   const systemId = SCREENSCRAPER_SYSTEM_IDS[game.system.toLowerCase()]
   if (!systemId) return { success: false, error: `No ScreenScraper ID for system: ${game.system}` }
 
@@ -89,7 +96,11 @@ export async function scrapeGame(gameId: number, username: string, password: str
     return { success: false, error: `Network error: ${e}` }
   }
 
-  if (!res.ok) return { success: false, error: `ScreenScraper ${res.status}` }
+  if (!res.ok) {
+    // ScreenScraper returns plain-text reasons (bad dev creds, closed API, bad ssid…)
+    const text = (await res.text().catch(() => '')).trim().slice(0, 200)
+    return { success: false, error: `ScreenScraper ${res.status}${text ? `: ${text}` : ''}` }
+  }
 
   let raw: unknown
   try {

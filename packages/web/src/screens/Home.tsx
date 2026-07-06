@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import type { Game, User, GameFilter, HistoryEntry } from '@retro-vault/shared'
 import { api } from '../api/client'
 import { useGamepad } from '../hooks/useGamepad'
@@ -6,6 +6,7 @@ import { useSpatialNav } from '../hooks/useSpatialNav'
 import { Rail } from '../components/Rail'
 import { VirtualGrid, GRID_COLS } from '../components/VirtualGrid'
 import { FilterDrawer } from '../components/FilterDrawer'
+import type { DrawerRowKind } from '../components/FilterDrawer'
 import { RandomGameModal } from '../components/RandomGameModal'
 import { VirtualKeyboard } from '../components/VirtualKeyboard'
 import { Glyph } from '../components/Glyph'
@@ -125,6 +126,49 @@ export function Home({ user, systems, genres, onGameSelect, onSwitchUser, onSett
     }
   }, [filter, user.id, onLibraryChange])
 
+  // Drawer nav rows: chip sections first (only when non-empty), then search + action buttons.
+  // Must mirror FilterDrawer's render order.
+  const drawerRows = useMemo(() => {
+    const rows: { kind: DrawerRowKind; count: number }[] = []
+    if (systems.length > 0) rows.push({ kind: 'systems', count: systems.length })
+    if (genres.length > 0) rows.push({ kind: 'genres', count: genres.length })
+    rows.push({ kind: 'players', count: 3 })
+    rows.push({ kind: 'options', count: 3 })
+    rows.push({ kind: 'search', count: 1 })
+    rows.push({ kind: 'apply', count: 1 })
+    rows.push({ kind: 'random', count: 1 })
+    rows.push({ kind: 'import', count: 1 })
+    return rows
+  }, [systems, genres])
+
+  const toggleDrawerChip = (kind: DrawerRowKind, col: number) => {
+    if (kind === 'systems') {
+      const s = systems[col]
+      if (!s) return
+      setFilter(f => {
+        const cur = f.systems ?? []
+        return { ...f, systems: cur.includes(s) ? cur.filter(x => x !== s) : [...cur, s] }
+      })
+    }
+    if (kind === 'genres') {
+      const g = genres[col]
+      if (!g) return
+      setFilter(f => {
+        const cur = f.genres ?? []
+        return { ...f, genres: cur.includes(g) ? cur.filter(x => x !== g) : [...cur, g] }
+      })
+    }
+    if (kind === 'players') {
+      const p = [1, 2, 4][col]
+      setFilter(f => ({ ...f, players: f.players === p ? undefined : p }))
+    }
+    if (kind === 'options') {
+      if (col === 0) setFilter(f => ({ ...f, favoritesOnly: !f.favoritesOnly }))
+      if (col === 1) setFilter(f => ({ ...f, neverPlayed: !f.neverPlayed }))
+      if (col === 2) setFilter(f => ({ ...f, noMetadata: !f.noMetadata }))
+    }
+  }
+
   function applyFilters() {
     void refreshGames()
     nav.resetIndex('all-games')
@@ -136,16 +180,21 @@ export function Home({ user, systems, genres, onGameSelect, onSwitchUser, onSett
     favoritesCount: favorites.length,
     allGamesCount: allGames.length,
     gridCols: GRID_COLS,
-    filterDrawerItems: 4,
+    filterDrawerRowCounts: drawerRows.map(r => r.count),
     filterDrawerOpen: filterOpen,
     onToggleFilter: () => setFilterOpen(v => !v),
     onSettings,
     onConfirm: (region, row, col) => {
       if (filterOpen) {
-        if (row === 0) setSearchVkOpen(true)
-        if (row === 1) applyFilters()
-        if (row === 2) { setFilterOpen(false); void handleRandom() }
-        if (row === 3) void handleImport()
+        const rowDef = drawerRows[row]
+        if (!rowDef) return
+        switch (rowDef.kind) {
+          case 'search': setSearchVkOpen(true); break
+          case 'apply': applyFilters(); break
+          case 'random': setFilterOpen(false); void handleRandom(); break
+          case 'import': void handleImport(); break
+          default: toggleDrawerChip(rowDef.kind, col)
+        }
         return
       }
       let game: Game | undefined
@@ -294,7 +343,9 @@ export function Home({ user, systems, genres, onGameSelect, onSwitchUser, onSett
         onClose={() => setFilterOpen(false)}
         systems={systems}
         genres={genres}
-        focusedRow={drawerIdx.row}
+        focus={filterOpen && drawerRows[drawerIdx.row]
+          ? { kind: drawerRows[drawerIdx.row].kind, col: drawerIdx.col }
+          : null}
       />
 
       <RandomGameModal

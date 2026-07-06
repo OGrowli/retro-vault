@@ -1,9 +1,27 @@
 import { Hono } from 'hono'
 import { spawn } from 'node:child_process'
+import fs from 'node:fs'
 import { db } from '../db.js'
 import { getSystemConfig } from '../systems.config.js'
 
 export const romsRouter = new Hono()
+
+// RetroPie's launcher — handles per-system emulator choice, video mode, and configs
+const RUNCOMMAND = '/opt/retropie/supplementary/runcommand/runcommand.sh'
+
+// systemd services don't have /opt/retropie/... on PATH, so resolve explicitly
+function resolveRetroarch(): string | null {
+  const candidates = [
+    process.env['RETROVAULT_RETROARCH'],
+    '/opt/retropie/emulators/retroarch/bin/retroarch',
+    '/usr/local/bin/retroarch',
+    '/usr/bin/retroarch',
+  ]
+  for (const c of candidates) {
+    if (c && fs.existsSync(c)) return c
+  }
+  return null
+}
 
 romsRouter.get('/:id', (c) => {
   const id = parseInt(c.req.param('id'), 10)
@@ -27,16 +45,43 @@ romsRouter.post('/:id/launch', (c) => {
   } | undefined
   if (!rom) return c.json({ error: 'ROM not found' }, 404)
 
-  const sysConfig = getSystemConfig(rom.system)
-  if (!sysConfig) return c.json({ error: `No core configured for system: ${rom.system}` }, 422)
+  if (!fs.existsSync(rom.rom_path)) {
+    return c.json({ error: `ROM file not found: ${rom.rom_path}` }, 422)
+  }
+
+  let cmd: string
+  let args: string[]
+
+  if (fs.existsSync(RUNCOMMAND)) {
+    cmd = 'bash'
+    args = [RUNCOMMAND, '0', '_SYS_', rom.system, rom.rom_path]
+  } else {
+    const sysConfig = getSystemConfig(rom.system)
+    if (!sysConfig) return c.json({ error: `No core configured for system: ${rom.system}` }, 422)
+
+    const retroarch = resolveRetroarch()
+    if (!retroarch) {
+      return c.json({ error: 'retroarch binary not found — set RETROVAULT_RETROARCH to its full path' }, 500)
+    }
+    if (!fs.existsSync(sysConfig.corePath)) {
+      return c.json({ error: `Libretro core not installed: ${sysConfig.corePath}` }, 422)
+    }
+
+    cmd = retroarch
+    args = ['-L', sysConfig.corePath, rom.rom_path]
+    const allCfg = '/opt/retropie/configs/all/retroarch.cfg'
+    const sysCfg = `/opt/retropie/configs/${rom.system}/retroarch.cfg`
+    if (fs.existsSync(allCfg)) args.push('--config', allCfg)
+    if (fs.existsSync(sysCfg)) args.push('--appendconfig', sysCfg)
+  }
 
   return new Promise<Response>((resolve) => {
-    const child = spawn('retroarch', ['-L', sysConfig.corePath, rom.rom_path], {
+    const child = spawn(cmd, args, {
       detached: true,
       stdio: 'ignore',
     })
     child.on('error', (err) => {
-      resolve(c.json({ error: `RetroArch launch failed: ${err.message}` }, 500))
+      resolve(c.json({ error: `Launch failed: ${err.message}` }, 500))
     })
     child.on('spawn', () => {
       child.unref()

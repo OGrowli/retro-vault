@@ -41,6 +41,8 @@ interface PressState {
   firstAt: number
   lastRepeat: number
   fired: boolean
+  /** Held since before this hook was enabled — never fire until released */
+  swallowed?: boolean
 }
 
 const ALL_ACTIONS: GamepadAction[] = ['up', 'down', 'left', 'right', 'confirm', 'back', 'favorite', 'filter', 'settings']
@@ -56,6 +58,9 @@ export function useGamepad(
   const rafRef = useRef<number>(0)
   const enabledRef = useRef(enabled)
   enabledRef.current = enabled
+  // True on mount and whenever the hook is disabled: buttons still held when we
+  // (re-)enable belong to the previous screen/modal and must not fire here.
+  const needsSwallowRef = useRef(true)
 
   const getButtonStates = useCallback((): Map<string, boolean> => {
     const active = new Map<string, boolean>()
@@ -97,12 +102,25 @@ export function useGamepad(
 
     const loop = (now: number) => {
       if (!enabledRef.current) {
+        needsSwallowRef.current = true
         rafRef.current = requestAnimationFrame(loop)
         return
       }
 
       const active = getButtonStates()
       const state = stateRef.current
+
+      if (needsSwallowRef.current) {
+        needsSwallowRef.current = false
+        state.clear()
+        for (const action of ALL_ACTIONS) {
+          if (active.get(action)) {
+            state.set(action, { pressed: true, firstAt: now, lastRepeat: now, fired: true, swallowed: true })
+          }
+        }
+        rafRef.current = requestAnimationFrame(loop)
+        return
+      }
 
       for (const action of ALL_ACTIONS) {
         const isPressed = active.get(action) ?? false
@@ -114,7 +132,7 @@ export function useGamepad(
             state.set(action, s)
             onActionRef.current(action)
             s.fired = true
-          } else {
+          } else if (!s.swallowed) {
             const held = now - s.firstAt
             if (held >= INITIAL_DELAY && now - s.lastRepeat >= REPEAT_RATE) {
               onActionRef.current(action)

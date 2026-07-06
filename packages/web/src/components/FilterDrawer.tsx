@@ -1,6 +1,16 @@
+import { useEffect, useRef } from 'react'
 import type { ReactNode } from 'react'
 import type { GameFilter } from '@retro-vault/shared'
 import { Glyph } from './Glyph'
+
+export type DrawerRowKind =
+  | 'systems' | 'genres' | 'players' | 'options'
+  | 'search' | 'apply' | 'random' | 'import'
+
+export interface DrawerFocus {
+  kind: DrawerRowKind
+  col: number
+}
 
 interface Props {
   open: boolean
@@ -14,18 +24,25 @@ interface Props {
   onClose: () => void
   systems: string[]
   genres: string[]
-  focusedRow: number
+  focus: DrawerFocus | null
 }
 
-function Toggle({ active, onToggle, label }: { active: boolean; onToggle: () => void; label: string }) {
+function Toggle({ active, focused, onToggle, label }: {
+  active: boolean
+  focused?: boolean
+  onToggle: () => void
+  label: string
+}) {
   return (
     <button
       onClick={onToggle}
+      data-drawer-focused={focused ? 'true' : undefined}
       className={[
         'px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wide transition-colors',
         active
           ? 'bg-vault-accent text-white'
           : 'bg-vault-surface text-vault-muted border border-vault-muted',
+        focused ? 'ring-2 ring-white' : '',
       ].join(' ')}
     >
       {label}
@@ -44,8 +61,10 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 
 export function FilterDrawer({
   open, filter, onChange, onApply, onRandom, onImport,
-  importLoading, importMessage, onClose, systems, genres, focusedRow,
+  importLoading, importMessage, onClose, systems, genres, focus,
 }: Props) {
+  const scrollRef = useRef<HTMLDivElement>(null)
+
   const toggleSystem = (s: string) => {
     const cur = filter.systems ?? []
     onChange({ ...filter, systems: cur.includes(s) ? cur.filter(x => x !== s) : [...cur, s] })
@@ -55,6 +74,16 @@ export function FilterDrawer({
     const cur = filter.genres ?? []
     onChange({ ...filter, genres: cur.includes(g) ? cur.filter(x => x !== g) : [...cur, g] })
   }
+
+  // Keep the controller-focused chip visible in the scrollable area
+  useEffect(() => {
+    if (!focus) return
+    const el = scrollRef.current?.querySelector('[data-drawer-focused="true"]')
+    el?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+  }, [focus])
+
+  const isFocused = (kind: DrawerRowKind, col?: number) =>
+    focus?.kind === kind && (col === undefined || focus.col === col)
 
   return (
     <>
@@ -74,12 +103,18 @@ export function FilterDrawer({
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+        <div ref={scrollRef} className="flex-1 overflow-y-auto p-6 space-y-6">
           {systems.length > 0 && (
             <Section title="System">
               <div className="flex flex-wrap gap-2">
-                {systems.map(s => (
-                  <Toggle key={s} label={s} active={(filter.systems ?? []).includes(s)} onToggle={() => toggleSystem(s)} />
+                {systems.map((s, i) => (
+                  <Toggle
+                    key={s}
+                    label={s}
+                    active={(filter.systems ?? []).includes(s)}
+                    focused={isFocused('systems', i)}
+                    onToggle={() => toggleSystem(s)}
+                  />
                 ))}
               </div>
             </Section>
@@ -88,8 +123,14 @@ export function FilterDrawer({
           {genres.length > 0 && (
             <Section title="Genre">
               <div className="flex flex-wrap gap-2">
-                {genres.map(g => (
-                  <Toggle key={g} label={g} active={(filter.genres ?? []).includes(g)} onToggle={() => toggleGenre(g)} />
+                {genres.map((g, i) => (
+                  <Toggle
+                    key={g}
+                    label={g}
+                    active={(filter.genres ?? []).includes(g)}
+                    focused={isFocused('genres', i)}
+                    onToggle={() => toggleGenre(g)}
+                  />
                 ))}
               </div>
             </Section>
@@ -97,11 +138,12 @@ export function FilterDrawer({
 
           <Section title="Players">
             <div className="flex gap-2">
-              {[1, 2, 4].map(n => (
+              {[1, 2, 4].map((n, i) => (
                 <Toggle
                   key={n}
                   label={String(n)}
                   active={filter.players === n}
+                  focused={isFocused('players', i)}
                   onToggle={() => onChange({ ...filter, players: filter.players === n ? undefined : n })}
                 />
               ))}
@@ -143,16 +185,19 @@ export function FilterDrawer({
               <Toggle
                 label="Favorites Only"
                 active={filter.favoritesOnly ?? false}
+                focused={isFocused('options', 0)}
                 onToggle={() => onChange({ ...filter, favoritesOnly: !filter.favoritesOnly })}
               />
               <Toggle
                 label="Never Played"
                 active={filter.neverPlayed ?? false}
+                focused={isFocused('options', 1)}
                 onToggle={() => onChange({ ...filter, neverPlayed: !filter.neverPlayed })}
               />
               <Toggle
                 label="No Metadata"
                 active={filter.noMetadata ?? false}
+                focused={isFocused('options', 2)}
                 onToggle={() => onChange({ ...filter, noMetadata: !filter.noMetadata })}
               />
             </div>
@@ -164,9 +209,10 @@ export function FilterDrawer({
               placeholder="Game name..."
               value={filter.query ?? ''}
               onChange={e => onChange({ ...filter, query: e.target.value || undefined })}
+              data-drawer-focused={isFocused('search') ? 'true' : undefined}
               className={[
                 'w-full bg-vault-surface border rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-vault-accent',
-                focusedRow === 0 ? 'border-vault-accent ring-1 ring-vault-accent' : 'border-vault-muted',
+                isFocused('search') ? 'border-vault-accent ring-1 ring-vault-accent' : 'border-vault-muted',
               ].join(' ')}
             />
           </Section>
@@ -177,7 +223,7 @@ export function FilterDrawer({
             onClick={onApply}
             className={[
               'w-full py-3 rounded-lg font-bold text-white uppercase tracking-wide text-sm bg-vault-accent',
-              focusedRow === 1 ? 'ring-2 ring-white' : '',
+              isFocused('apply') ? 'ring-2 ring-white' : '',
             ].join(' ')}
           >
             Apply Filters
@@ -186,7 +232,7 @@ export function FilterDrawer({
             onClick={onRandom}
             className={[
               'w-full py-3 rounded-lg font-bold text-white uppercase tracking-wide text-sm bg-vault-surface border border-vault-muted',
-              focusedRow === 2 ? 'ring-2 ring-white' : '',
+              isFocused('random') ? 'ring-2 ring-white' : '',
             ].join(' ')}
           >
             Pick Random Game
@@ -196,7 +242,7 @@ export function FilterDrawer({
             disabled={importLoading}
             className={[
               'w-full py-3 rounded-lg font-bold text-white uppercase tracking-wide text-sm bg-vault-surface border border-vault-muted',
-              focusedRow === 3 ? 'ring-2 ring-white' : '',
+              isFocused('import') ? 'ring-2 ring-white' : '',
               importLoading ? 'opacity-50 cursor-not-allowed' : '',
             ].join(' ')}
           >
@@ -204,7 +250,7 @@ export function FilterDrawer({
           </button>
           {importMessage && <p className="text-vault-accent text-xs text-center">{importMessage}</p>}
           <p className="text-vault-muted text-xs flex items-center justify-center gap-1.5">
-            Start → Filter  ·  <Glyph type="circle" /> Close
+            <Glyph type="cross" /> Toggle  ·  Start Filter  ·  <Glyph type="circle" /> Close
           </p>
         </div>
       </div>

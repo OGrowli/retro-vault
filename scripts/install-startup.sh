@@ -34,7 +34,20 @@ if [ -z "$NODE_BIN" ]; then
 fi
 echo "Node.js: $NODE_BIN"
 
-# 2. Write systemd service with the correct node path
+# 2. Env file for API secrets (ScreenScraper creds etc.) — loaded by the service
+ENV_FILE="/home/pi/.retrovault/env"
+if [ ! -f "$ENV_FILE" ]; then
+  echo "Creating $ENV_FILE (fill in ScreenScraper dev credentials to enable scraping)..."
+  mkdir -p /home/pi/.retrovault
+  cat > "$ENV_FILE" << 'EOF'
+# RetroVault API environment — loaded by the systemd service.
+# Register at screenscraper.fr and request dev API access, then uncomment:
+#SCREENSCRAPER_DEV_ID=yourdevid
+#SCREENSCRAPER_DEV_PASSWORD=yourdevpassword
+EOF
+fi
+
+# 3. Write systemd service with the correct node path
 echo "Installing API systemd service..."
 sudo tee "$SERVICE_FILE" > /dev/null << EOF
 [Unit]
@@ -46,6 +59,7 @@ Type=simple
 User=pi
 WorkingDirectory=$INSTALL_DIR
 Environment=NODE_ENV=production
+EnvironmentFile=-$ENV_FILE
 ExecStart=$NODE_BIN $INSTALL_DIR/packages/api/dist/index.js
 Restart=on-failure
 RestartSec=3

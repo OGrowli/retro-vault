@@ -21,7 +21,8 @@ interface UseSpatialNavOptions {
   favoritesCount: number
   allGamesCount: number
   gridCols: number
-  filterDrawerItems: number
+  /** Column count per drawer row; row order defined by the drawer layout */
+  filterDrawerRowCounts: number[]
   onConfirm?: (region: Region, row: number, col: number) => void
   onBack?: () => void
   filterDrawerOpen: boolean
@@ -48,10 +49,10 @@ export function useSpatialNav(opts: UseSpatialNavOptions) {
   const optsRef = useRef(opts)
   optsRef.current = opts
 
-  // When filter drawer opens, jump focus to the Apply button (row 1; row 0 is search)
+  // When filter drawer opens, start focus on the first chip row
   useEffect(() => {
     if (opts.filterDrawerOpen) {
-      setIndices(prev => ({ ...prev, 'filter-drawer': { row: 1, col: 0 } }))
+      setIndices(prev => ({ ...prev, 'filter-drawer': { row: 0, col: 0 } }))
     }
   }, [opts.filterDrawerOpen])
 
@@ -82,8 +83,14 @@ export function useSpatialNav(opts: UseSpatialNavOptions) {
 
     if (o.filterDrawerOpen) {
       const cur = indices['filter-drawer']
-      if (action === 'up') updateIndex('filter-drawer', { row: clamp(cur.row - 1, 0, o.filterDrawerItems - 1) })
-      if (action === 'down') updateIndex('filter-drawer', { row: clamp(cur.row + 1, 0, o.filterDrawerItems - 1) })
+      const counts = o.filterDrawerRowCounts
+      const colMax = (r: number) => Math.max(0, (counts[r] ?? 1) - 1)
+      if (action === 'up' || action === 'down') {
+        const newRow = clamp(cur.row + (action === 'down' ? 1 : -1), 0, counts.length - 1)
+        updateIndex('filter-drawer', { row: newRow, col: clamp(cur.col, 0, colMax(newRow)) })
+      }
+      if (action === 'left') updateIndex('filter-drawer', { col: clamp(cur.col - 1, 0, colMax(cur.row)) })
+      if (action === 'right') updateIndex('filter-drawer', { col: clamp(cur.col + 1, 0, colMax(cur.row)) })
       if (action === 'back') o.onToggleFilter?.()
       if (action === 'confirm') o.onConfirm?.('filter-drawer', cur.row, cur.col)
       return
