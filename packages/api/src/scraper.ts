@@ -1,9 +1,10 @@
 import fs from 'node:fs'
+import os from 'node:os'
 import path from 'node:path'
 import sharp from 'sharp'
 import { db } from './db.js'
 
-const DATA_DIR = process.env['RETROVAULT_DATA_DIR'] ?? '/home/pi/.retrovault'
+const DATA_DIR = process.env['RETROVAULT_DATA_DIR'] ?? path.join(os.homedir(), '.retrovault')
 const MEDIA_DIR = path.join(DATA_DIR, 'media')
 const DEV_ID = process.env['SCREENSCRAPER_DEV_ID'] ?? ''
 const DEV_PASS = process.env['SCREENSCRAPER_DEV_PASSWORD'] ?? ''

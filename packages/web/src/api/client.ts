@@ -17,9 +17,17 @@ function filterToParams(filter: GameFilter, userId?: number): string {
   return p.toString()
 }
 
+async function extractError(res: Response): Promise<string> {
+  try {
+    const data = await res.clone().json() as Record<string, unknown>
+    if (typeof data.error === 'string') return data.error
+  } catch { /* fall through */ }
+  return `${res.status} ${res.statusText}`
+}
+
 async function get<T>(url: string): Promise<T> {
   const res = await fetch(url, { signal: AbortSignal.timeout(10_000) })
-  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
+  if (!res.ok) throw new Error(await extractError(res))
   return res.json() as Promise<T>
 }
 
@@ -30,7 +38,7 @@ async function post<T>(url: string, body?: unknown): Promise<T> {
     body: body ? JSON.stringify(body) : undefined,
     signal: AbortSignal.timeout(30_000),
   })
-  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
+  if (!res.ok) throw new Error(await extractError(res))
   return res.json() as Promise<T>
 }
 

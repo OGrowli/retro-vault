@@ -30,13 +30,19 @@ romsRouter.post('/:id/launch', (c) => {
   const sysConfig = getSystemConfig(rom.system)
   if (!sysConfig) return c.json({ error: `No core configured for system: ${rom.system}` }, 422)
 
-  const child = spawn('retroarch', ['-L', sysConfig.corePath, rom.rom_path], {
-    detached: true,
-    stdio: 'ignore',
+  return new Promise<Response>((resolve) => {
+    const child = spawn('retroarch', ['-L', sysConfig.corePath, rom.rom_path], {
+      detached: true,
+      stdio: 'ignore',
+    })
+    child.on('error', (err) => {
+      resolve(c.json({ error: `RetroArch launch failed: ${err.message}` }, 500))
+    })
+    child.on('spawn', () => {
+      child.unref()
+      resolve(c.json({ launched: true, pid: child.pid }))
+    })
   })
-  child.unref()
-
-  return c.json({ launched: true, pid: child.pid })
 })
 
 romsRouter.post('/:id/session', async (c) => {

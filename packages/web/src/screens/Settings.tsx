@@ -3,6 +3,7 @@ import { api } from '../api/client'
 import type { ScrapeProgress } from '../api/client'
 import { useGamepad } from '../hooks/useGamepad'
 import { Glyph } from '../components/Glyph'
+import { VirtualKeyboard } from '../components/VirtualKeyboard'
 
 interface Props {
   systems: string[]
@@ -53,6 +54,7 @@ export function Settings({ systems, onBack }: Props) {
   const [progress, setProgress] = useState<ScrapeProgress | null>(null)
   const [running, setRunning] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [vkField, setVkField] = useState<'username' | 'password' | null>(null)
   const abortRef = useRef<AbortController | null>(null)
 
   const focusIdx = FOCUS_ITEMS.indexOf(focused)
@@ -108,11 +110,13 @@ export function Settings({ systems, onBack }: Props) {
     if (action === 'up') setFocused(FOCUS_ITEMS[Math.max(0, focusIdx - 1)])
     if (action === 'down') setFocused(FOCUS_ITEMS[Math.min(FOCUS_ITEMS.length - 1, focusIdx + 1)])
     if (action === 'confirm') {
+      if (focused === 'username') { setVkField('username'); return }
+      if (focused === 'password') { setVkField('password'); return }
       if (focused === 'scrape-all') void scrapeAll()
       if (focused === 'scrape-system') void scrapeSystem()
       if (focused === 'back') onBack()
     }
-  }, !running)
+  }, !running && !vkField)
 
   const isFocused = (item: FocusItem) => focused === item
 
@@ -263,6 +267,26 @@ export function Settings({ systems, onBack }: Props) {
           <Glyph type="circle" /> Back  ·  D-Pad Navigate  ·  <Glyph type="cross" /> Select
         </p>
       </div>
+      {vkField && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 px-4">
+          <div className="bg-vault-card rounded-2xl p-6 w-full max-w-[480px] max-h-[90vh] overflow-y-auto space-y-4" style={{ scrollbarWidth: 'none' }}>
+            <h2 className="text-white text-lg font-bold">
+              {vkField === 'username' ? 'SS Username' : 'SS Password'}
+            </h2>
+            <VirtualKeyboard
+              value={vkField === 'username' ? username : password}
+              onChange={vkField === 'username' ? setUsername : setPassword}
+              masked={vkField === 'password'}
+              onDone={() => {
+                if (vkField === 'username') setVkField('password')
+                else setVkField(null)
+              }}
+              onCancel={() => setVkField(null)}
+              enabled={!!vkField}
+            />
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -86,6 +86,8 @@ export function useGamepad(
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (!enabledRef.current || e.repeat) return
+      const target = e.target as HTMLElement
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') return
       const action = KEY_MAP[e.key]
       if (!action) return
       e.preventDefault()

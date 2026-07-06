@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import type { GamepadAction } from './useGamepad'
 
 export type Region =
@@ -47,6 +47,13 @@ export function useSpatialNav(opts: UseSpatialNavOptions) {
 
   const optsRef = useRef(opts)
   optsRef.current = opts
+
+  // When filter drawer opens, jump focus to the Apply button (row 8)
+  useEffect(() => {
+    if (opts.filterDrawerOpen) {
+      setIndices(prev => ({ ...prev, 'filter-drawer': { row: 8, col: 0 } }))
+    }
+  }, [opts.filterDrawerOpen])
 
   const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v))
 

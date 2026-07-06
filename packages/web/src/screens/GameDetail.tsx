@@ -3,6 +3,7 @@ import type { Game, GameWithRoms, Rom, User } from '@retro-vault/shared'
 import { api } from '../api/client'
 import { useGamepad } from '../hooks/useGamepad'
 import { Glyph } from '../components/Glyph'
+import { VirtualKeyboard } from '../components/VirtualKeyboard'
 
 interface Props {
   game: Game
@@ -88,6 +89,7 @@ interface ScrapeModalProps {
 function ScrapeModal({ gameId, onDone, onClose }: ScrapeModalProps) {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
+  const [activeField, setActiveField] = useState<'username' | 'password'>('username')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -105,51 +107,88 @@ function ScrapeModal({ gameId, onDone, onClose }: ScrapeModalProps) {
     }
   }
 
+  const handleVkDone = () => {
+    if (activeField === 'username') setActiveField('password')
+    else void handleScrape()
+  }
+
+  const handleVkCancel = () => {
+    if (activeField === 'password') setActiveField('username')
+    else onClose()
+  }
+
   return (
-    <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center">
-      <div className="bg-vault-card rounded-2xl p-8 w-96 space-y-5">
+    <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center px-4">
+      <div className="bg-vault-card rounded-2xl p-6 w-full max-w-[480px] max-h-[90vh] overflow-y-auto space-y-4" style={{ scrollbarWidth: 'none' }}>
         <h2 className="text-white text-xl font-bold">Scrape Metadata</h2>
         <p className="text-vault-muted text-sm">Enter ScreenScraper credentials. Leave blank for anonymous (rate-limited).</p>
 
-        <div>
-          <label className="text-vault-muted text-xs uppercase tracking-wide block mb-2">SS Username</label>
-          <input
-            autoFocus
-            type="text"
-            value={username}
-            onChange={e => setUsername(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') void handleScrape(); if (e.key === 'Escape') onClose() }}
-            className="w-full bg-vault-surface border border-vault-muted rounded-lg px-4 py-3 text-white text-sm focus:outline-none focus:border-vault-accent"
-            placeholder="Username (optional)"
-          />
+        <div className="space-y-2">
+          <div
+            className={`rounded-lg border overflow-hidden cursor-pointer ${activeField === 'username' ? 'border-vault-accent' : 'border-vault-muted'}`}
+            onClick={() => setActiveField('username')}
+          >
+            <label className="block text-vault-muted text-xs uppercase tracking-wide px-3 pt-2 pointer-events-none">SS Username</label>
+            <input
+              autoFocus
+              type="text"
+              value={username}
+              onChange={e => setUsername(e.target.value)}
+              onFocus={() => setActiveField('username')}
+              onKeyDown={e => {
+                if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); handleVkDone() }
+                if (e.key === 'Escape') handleVkCancel()
+              }}
+              className="w-full bg-transparent px-3 pb-2 pt-0 text-white text-sm focus:outline-none font-mono placeholder:text-vault-muted"
+              placeholder="Username (optional)"
+            />
+          </div>
+
+          <div
+            className={`rounded-lg border overflow-hidden cursor-pointer ${activeField === 'password' ? 'border-vault-accent' : 'border-vault-muted'}`}
+            onClick={() => setActiveField('password')}
+          >
+            <label className="block text-vault-muted text-xs uppercase tracking-wide px-3 pt-2 pointer-events-none">SS Password</label>
+            <input
+              type="password"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              onFocus={() => setActiveField('password')}
+              onKeyDown={e => {
+                if (e.key === 'Enter') { e.preventDefault(); void handleScrape() }
+                if (e.key === 'Escape') handleVkCancel()
+              }}
+              className="w-full bg-transparent px-3 pb-2 pt-0 text-white text-sm focus:outline-none font-mono placeholder:text-vault-muted"
+              placeholder="Password (optional)"
+            />
+          </div>
         </div>
-        <div>
-          <label className="text-vault-muted text-xs uppercase tracking-wide block mb-2">SS Password</label>
-          <input
-            type="password"
-            value={password}
-            onChange={e => setPassword(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') void handleScrape(); if (e.key === 'Escape') onClose() }}
-            className="w-full bg-vault-surface border border-vault-muted rounded-lg px-4 py-3 text-white text-sm focus:outline-none focus:border-vault-accent"
-            placeholder="Password (optional)"
-          />
-        </div>
+
+        <VirtualKeyboard
+          value={activeField === 'username' ? username : password}
+          onChange={activeField === 'username' ? setUsername : setPassword}
+          masked={activeField === 'password'}
+          onDone={handleVkDone}
+          onCancel={handleVkCancel}
+          enabled={!loading}
+        />
 
         {error && <p className="text-red-400 text-sm">{error}</p>}
 
         <div className="flex gap-3">
           <button
-            onClick={() => void handleScrape()}
+            onClick={handleVkDone}
             disabled={loading}
-            className="flex-1 py-3 bg-vault-accent text-white font-bold rounded-lg uppercase tracking-wide text-sm disabled:opacity-50"
+            className="flex-1 py-2.5 bg-vault-accent text-white font-bold rounded-lg uppercase tracking-wide text-sm disabled:opacity-50"
           >
-            {loading ? 'Scraping…' : 'Scrape'}
+            {loading ? 'Scraping…' : activeField === 'username' ? 'Next →' : 'Scrape'}
           </button>
           <button
-            onClick={onClose}
-            className="flex-1 py-3 bg-vault-surface text-vault-muted font-bold rounded-lg uppercase tracking-wide text-sm border border-vault-muted"
+            onClick={handleVkCancel}
+            disabled={loading}
+            className="px-5 py-2.5 bg-vault-surface text-vault-muted font-bold rounded-lg uppercase tracking-wide text-sm border border-vault-muted disabled:opacity-50"
           >
-            Cancel
+            {activeField === 'password' ? '← Back' : 'Cancel'}
           </button>
         </div>
       </div>
@@ -165,6 +204,7 @@ export function GameDetail({ game: initialGame, user, onBack }: Props) {
   const [versionIdx, setVersionIdx] = useState(0)
   const [actionIdx, setActionIdx] = useState(0)
   const [launching, setLaunching] = useState<number | null>(null)
+  const [launchError, setLaunchError] = useState<string | null>(null)
   const [scrapeOpen, setScrapeOpen] = useState(false)
 
   useEffect(() => {
@@ -184,13 +224,15 @@ export function GameDetail({ game: initialGame, user, onBack }: Props) {
   const launch = useCallback(async (rom: Rom) => {
     if (launching !== null) return
     setLaunching(rom.id)
+    setLaunchError(null)
     try {
       await api.roms.launch(rom.id)
       const startedAt = new Date().toISOString()
       setTimeout(() => {
         api.roms.logSession(rom.id, user.id, 0, startedAt).catch(() => {})
       }, 5000)
-    } catch {
+    } catch (e) {
+      setLaunchError(e instanceof Error ? e.message : 'Launch failed')
       setLaunching(null)
     }
   }, [launching, user.id])
@@ -327,6 +369,10 @@ export function GameDetail({ game: initialGame, user, onBack }: Props) {
 
           {game.description && (
             <p className="text-vault-muted text-sm leading-relaxed line-clamp-3">{game.description}</p>
+          )}
+
+          {launchError && (
+            <p className="text-red-400 text-sm px-1">{launchError}</p>
           )}
 
           {/* Versions section */}

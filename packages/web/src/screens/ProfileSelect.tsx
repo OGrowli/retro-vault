@@ -3,6 +3,7 @@ import type { User } from '@retro-vault/shared'
 import { api } from '../api/client'
 import { useGamepad } from '../hooks/useGamepad'
 import { Glyph } from '../components/Glyph'
+import { VirtualKeyboard } from '../components/VirtualKeyboard'
 
 const COLORS = [
   '#0070D1', '#e74c3c', '#2ecc71', '#f39c12',
@@ -33,8 +34,6 @@ export function ProfileSelect({ onSelect }: Props) {
   const items = [...users, { id: -1, username: '+ New Profile', avatar_color: '#444', created_at: '' }]
 
   useGamepad((action) => {
-    if (creating) return
-
     if (action === 'left') setFocusedIndex(i => Math.max(0, i - 1))
     if (action === 'right') setFocusedIndex(i => Math.min(items.length - 1, i + 1))
     if (action === 'up') setFocusedIndex(i => Math.max(0, i - 4))
@@ -48,7 +47,7 @@ export function ProfileSelect({ onSelect }: Props) {
         onSelect(item as User)
       }
     }
-  })
+  }, !creating)
 
   const handleCreate = async () => {
     if (!newName.trim()) return
@@ -119,8 +118,8 @@ export function ProfileSelect({ onSelect }: Props) {
       )}
 
       {creating && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
-          <div className="bg-vault-card rounded-2xl p-8 w-96 space-y-6">
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 px-4">
+          <div className="bg-vault-card rounded-2xl p-6 w-full max-w-[480px] max-h-[90vh] overflow-y-auto space-y-4" style={{ scrollbarWidth: 'none' }}>
             <h2 className="text-white text-xl font-bold">New Profile</h2>
 
             <div>
@@ -134,7 +133,7 @@ export function ProfileSelect({ onSelect }: Props) {
                   if (e.key === 'Enter') void handleCreate()
                   if (e.key === 'Escape') setCreating(false)
                 }}
-                className="w-full bg-vault-surface border border-vault-muted rounded-lg px-4 py-3 text-white text-sm focus:outline-none focus:border-vault-accent"
+                className="w-full bg-vault-surface border border-vault-muted rounded-lg px-4 py-3 text-white text-sm focus:outline-none focus:border-vault-accent font-mono"
                 placeholder="Enter username..."
                 maxLength={24}
               />
@@ -154,20 +153,14 @@ export function ProfileSelect({ onSelect }: Props) {
               </div>
             </div>
 
-            <div className="flex gap-3">
-              <button
-                onClick={() => void handleCreate()}
-                className="flex-1 py-3 bg-vault-accent text-white font-bold rounded-lg uppercase tracking-wide text-sm"
-              >
-                Create
-              </button>
-              <button
-                onClick={() => setCreating(false)}
-                className="flex-1 py-3 bg-vault-surface text-vault-muted font-bold rounded-lg uppercase tracking-wide text-sm border border-vault-muted"
-              >
-                Cancel
-              </button>
-            </div>
+            <VirtualKeyboard
+              value={newName}
+              onChange={setNewName}
+              onDone={() => void handleCreate()}
+              onCancel={() => setCreating(false)}
+              enabled={creating}
+              maxLength={24}
+            />
           </div>
         </div>
       )}
