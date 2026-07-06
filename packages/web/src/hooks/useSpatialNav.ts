@@ -48,12 +48,16 @@ export function useSpatialNav(opts: UseSpatialNavOptions) {
   const optsRef = useRef(opts)
   optsRef.current = opts
 
-  // When filter drawer opens, jump focus to the Apply button (row 8)
+  // When filter drawer opens, jump focus to the Apply button (row 1; row 0 is search)
   useEffect(() => {
     if (opts.filterDrawerOpen) {
-      setIndices(prev => ({ ...prev, 'filter-drawer': { row: 8, col: 0 } }))
+      setIndices(prev => ({ ...prev, 'filter-drawer': { row: 1, col: 0 } }))
     }
   }, [opts.filterDrawerOpen])
+
+  const resetIndex = useCallback((r: Region) => {
+    setIndices(prev => ({ ...prev, [r]: { row: 0, col: 0 } }))
+  }, [])
 
   const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v))
 
@@ -135,5 +139,5 @@ export function useSpatialNav(opts: UseSpatialNavOptions) {
     }
   }, [region, indices, updateIndex])
 
-  return { region, setRegion, getIndex, handleAction }
+  return { region, setRegion, getIndex, handleAction, resetIndex }
 }

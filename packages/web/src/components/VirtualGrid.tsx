@@ -16,12 +16,14 @@ interface Props {
   focusedCol: number
   isActiveRegion: boolean
   onFocusGame?: (game: Game) => void
+  onSelectGame?: (game: Game) => void
 }
 
-export function VirtualGrid({ games, loading, focusedRow, focusedCol, isActiveRegion, onFocusGame }: Props) {
+export function VirtualGrid({ games, loading, focusedRow, focusedCol, isActiveRegion, onFocusGame, onSelectGame }: Props) {
   const totalRows = Math.ceil(games.length / COLS)
   const windowStartRef = useRef(0)
   const containerRef = useRef<HTMLDivElement>(null)
+  const focusedCardRef = useRef<HTMLDivElement>(null)
 
   const windowStart = useMemo(() => {
     const ws = windowStartRef.current
@@ -42,6 +44,7 @@ export function VirtualGrid({ games, loading, focusedRow, focusedCol, isActiveRe
     if (!isActiveRegion || !containerRef.current) return
     const focusedGame = games[focusedRow * COLS + focusedCol]
     if (focusedGame) onFocusGame?.(focusedGame)
+    focusedCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
   }, [focusedRow, focusedCol, isActiveRegion, games, onFocusGame])
 
   const paddingTop = windowStart * (CARD_HEIGHT + GAP)
@@ -56,7 +59,9 @@ export function VirtualGrid({ games, loading, focusedRow, focusedCol, isActiveRe
       const game = games[idx]
       const focused = isActiveRegion && focusedRow === row && focusedCol === col
       rowItems.push(
-        <GameCard key={game.id} game={game} focused={focused} />
+        <div key={game.id} ref={focused ? focusedCardRef : null}>
+          <GameCard game={game} focused={focused} onClick={onSelectGame} />
+        </div>
       )
     }
     renderedRows.push(
@@ -74,6 +79,10 @@ export function VirtualGrid({ games, loading, focusedRow, focusedCol, isActiveRe
           <div className="flex gap-4 flex-wrap">
             {Array.from({ length: COLS * 2 }, (_, i) => <SkeletonCard key={i} />)}
           </div>
+        ) : games.length === 0 ? (
+          <p className="text-vault-muted text-sm py-8 text-center">
+            No games match the current filters.
+          </p>
         ) : (
           <div style={{ paddingTop, paddingBottom }}>
             <div className="flex flex-col gap-4">

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import type { Game, User, GameFilter, HistoryEntry } from '@retro-vault/shared'
 import { api } from '../api/client'
 import { useGamepad } from '../hooks/useGamepad'
@@ -7,6 +7,7 @@ import { Rail } from '../components/Rail'
 import { VirtualGrid, GRID_COLS } from '../components/VirtualGrid'
 import { FilterDrawer } from '../components/FilterDrawer'
 import { RandomGameModal } from '../components/RandomGameModal'
+import { VirtualKeyboard } from '../components/VirtualKeyboard'
 import { Glyph } from '../components/Glyph'
 import type { GamepadAction } from '../hooks/useGamepad'
 
@@ -17,11 +18,13 @@ interface Props {
   onGameSelect: (game: Game) => void
   onSwitchUser: () => void
   onSettings: () => void
+  onLibraryChange?: () => void
+  inputActive?: boolean
 }
 
 const CONTINUE_THRESHOLD = 5 * 60
 
-export function Home({ user, systems, genres, onGameSelect, onSwitchUser, onSettings }: Props) {
+export function Home({ user, systems, genres, onGameSelect, onSwitchUser, onSettings, onLibraryChange, inputActive = true }: Props) {
   const [recent, setRecent] = useState<Game[]>([])
   const [favorites, setFavorites] = useState<Game[]>([])
   const [allGames, setAllGames] = useState<Game[]>([])
@@ -36,6 +39,17 @@ export function Home({ user, systems, genres, onGameSelect, onSwitchUser, onSett
   const [importLoading, setImportLoading] = useState(false)
   const [importMessage, setImportMessage] = useState<string | null>(null)
   const [rawHistory, setRawHistory] = useState<HistoryEntry[]>([])
+  const [searchVkOpen, setSearchVkOpen] = useState(false)
+
+  const historyToRecent = (history: HistoryEntry[]): Game[] =>
+    history
+      .filter((h, i, arr) => arr.findIndex(x => x.id === h.id) === i)
+      .slice(0, 8)
+      .map(h => ({
+        id: h.id, name: h.name, system: h.system, genre: h.genre,
+        year: h.year, players: h.players, description: h.description,
+        box_art_path: h.box_art_path, scraped_at: h.scraped_at,
+      } as Game))
 
   useEffect(() => {
     Promise.all([
@@ -43,15 +57,7 @@ export function Home({ user, systems, genres, onGameSelect, onSwitchUser, onSett
       api.users.favorites(user.id),
       api.games.list(filter, user.id),
     ]).then(([history, favs, games]) => {
-      const recentGames = history
-        .filter((h, i, arr) => arr.findIndex(x => x.id === h.id) === i)
-        .slice(0, 8)
-        .map(h => ({
-          id: h.id, name: h.name, system: h.system, genre: h.genre,
-          year: h.year, players: h.players, description: h.description,
-          box_art_path: h.box_art_path, scraped_at: h.scraped_at,
-        } as Game))
-
+      const recentGames = historyToRecent(history)
       setRecent(recentGames)
       setRawHistory(history.slice(0, 40))
       setFavorites(favs)
@@ -60,6 +66,20 @@ export function Home({ user, systems, genres, onGameSelect, onSwitchUser, onSett
       if (recentGames[0]) setBgGame(recentGames[0])
     }).catch(() => setLoading(false))
   }, [user.id])
+
+  // Quiet refresh of recent/favorites when returning from GameDetail (Home stays mounted)
+  const prevActiveRef = useRef(inputActive)
+  useEffect(() => {
+    if (inputActive && !prevActiveRef.current) {
+      Promise.all([api.users.history(user.id), api.users.favorites(user.id)])
+        .then(([history, favs]) => {
+          setRecent(historyToRecent(history))
+          setRawHistory(history.slice(0, 40))
+          setFavorites(favs)
+        }).catch(() => {})
+    }
+    prevActiveRef.current = inputActive
+  }, [inputActive, user.id])
 
   useEffect(() => {
     if (!bgGame?.box_art_path) return
@@ -97,27 +117,35 @@ export function Home({ user, systems, genres, onGameSelect, onSwitchUser, onSett
       setImportMessage(`+${games_created} games  +${games_updated} updated  +${roms_created} ROMs`)
       const [games] = await Promise.all([api.games.list(filter, user.id)])
       setAllGames(games)
-    } catch {
-      setImportMessage('Import failed')
+      onLibraryChange?.()
+    } catch (e) {
+      setImportMessage(e instanceof Error ? e.message : 'Import failed')
     } finally {
       setImportLoading(false)
     }
-  }, [filter, user.id])
+  }, [filter, user.id, onLibraryChange])
+
+  function applyFilters() {
+    void refreshGames()
+    nav.resetIndex('all-games')
+    setFilterOpen(false)
+  }
 
   const nav = useSpatialNav({
     recentCount: recent.length,
     favoritesCount: favorites.length,
     allGamesCount: allGames.length,
     gridCols: GRID_COLS,
-    filterDrawerItems: 11,
+    filterDrawerItems: 4,
     filterDrawerOpen: filterOpen,
     onToggleFilter: () => setFilterOpen(v => !v),
     onSettings,
     onConfirm: (region, row, col) => {
       if (filterOpen) {
-        if (row === 8) { void refreshGames(); setFilterOpen(false) }
-        if (row === 9) { setFilterOpen(false); void handleRandom() }
-        if (row === 10) void handleImport()
+        if (row === 0) setSearchVkOpen(true)
+        if (row === 1) applyFilters()
+        if (row === 2) { setFilterOpen(false); void handleRandom() }
+        if (row === 3) void handleImport()
         return
       }
       let game: Game | undefined
@@ -149,7 +177,7 @@ export function Home({ user, systems, genres, onGameSelect, onSwitchUser, onSett
     nav.handleAction(action)
   }, [nav, onSettings])
 
-  useGamepad(handleAction, !randomGame)
+  useGamepad(handleAction, inputActive && !randomGame && !randomLoading && !searchVkOpen)
 
   const recentIdx = nav.getIndex('recently-played')
   const favIdx = nav.getIndex('favorites')
@@ -181,13 +209,37 @@ export function Home({ user, systems, genres, onGameSelect, onSwitchUser, onSett
         <header className="px-[5%] pt-[3%] pb-2 flex items-center justify-between">
           <h1 className="text-white text-2xl font-bold tracking-tight">RetroVault</h1>
           <div className="flex items-center gap-3">
-            <div
-              className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold"
-              style={{ background: user.avatar_color }}
+            <button
+              onClick={() => setFilterOpen(true)}
+              className="px-3 py-1.5 rounded-lg text-vault-muted hover:text-white text-xs font-semibold uppercase tracking-wide border border-vault-muted hover:border-vault-accent transition-colors"
+              title="Filters (Start / Tab)"
             >
-              {user.username.charAt(0).toUpperCase()}
-            </div>
-            <span className="text-white text-sm font-medium">{user.username}</span>
+              Filters
+            </button>
+            <button
+              onClick={onSettings}
+              className="p-2 rounded-lg text-vault-muted hover:text-white transition-colors"
+              title="Settings (Share / S)"
+              aria-label="Settings"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="3" />
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+              </svg>
+            </button>
+            <button
+              onClick={onSwitchUser}
+              className="flex items-center gap-2.5 rounded-lg px-2 py-1 hover:bg-vault-surface transition-colors"
+              title="Switch profile"
+            >
+              <div
+                className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold"
+                style={{ background: user.avatar_color }}
+              >
+                {user.username.charAt(0).toUpperCase()}
+              </div>
+              <span className="text-white text-sm font-medium">{user.username}</span>
+            </button>
           </div>
         </header>
 
@@ -201,6 +253,7 @@ export function Home({ user, systems, genres, onGameSelect, onSwitchUser, onSett
           size="lg"
           getContinueLabel={getContinueLabel}
           onFocusGame={setBgGame}
+          onSelectGame={onGameSelect}
         />
 
         {(favorites.length > 0 || loading) && (
@@ -212,6 +265,7 @@ export function Home({ user, systems, genres, onGameSelect, onSwitchUser, onSett
             isActiveRegion={nav.region === 'favorites' && !filterOpen}
             skeletonCount={6}
             onFocusGame={setBgGame}
+            onSelectGame={onGameSelect}
           />
         )}
 
@@ -222,6 +276,7 @@ export function Home({ user, systems, genres, onGameSelect, onSwitchUser, onSett
           focusedCol={gridIdx.col}
           isActiveRegion={nav.region === 'all-games' && !filterOpen}
           onFocusGame={setBgGame}
+          onSelectGame={onGameSelect}
         />
 
         <div className="h-16" />
@@ -231,7 +286,7 @@ export function Home({ user, systems, genres, onGameSelect, onSwitchUser, onSett
         open={filterOpen}
         filter={filter}
         onChange={setFilter}
-        onApply={() => { void refreshGames(); setFilterOpen(false) }}
+        onApply={applyFilters}
         onRandom={() => { setFilterOpen(false); void handleRandom() }}
         onImport={() => void handleImport()}
         importLoading={importLoading}
@@ -249,6 +304,21 @@ export function Home({ user, systems, genres, onGameSelect, onSwitchUser, onSett
         onView={(game) => { setRandomGame(null); onGameSelect(game) }}
         onAnother={() => void handleRandom()}
       />
+
+      {searchVkOpen && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[60] px-4">
+          <div className="bg-vault-card rounded-2xl p-6 w-full max-w-[480px] space-y-4">
+            <h2 className="text-white text-lg font-bold">Search Games</h2>
+            <VirtualKeyboard
+              value={filter.query ?? ''}
+              onChange={(v) => setFilter(f => ({ ...f, query: v || undefined }))}
+              onDone={() => { setSearchVkOpen(false); applyFilters() }}
+              onCancel={() => setSearchVkOpen(false)}
+              enabled={searchVkOpen}
+            />
+          </div>
+        </div>
+      )}
 
       <div className="absolute bottom-0 left-0 right-0 h-12 flex items-center px-[5%] bg-gradient-to-t from-vault-bg to-transparent pointer-events-none">
         <p className="text-vault-muted text-xs uppercase tracking-wide flex items-center gap-1.5 flex-wrap">

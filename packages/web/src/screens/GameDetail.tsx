@@ -34,10 +34,12 @@ function RomRow({
   rom,
   focused,
   launching,
+  onLaunch,
 }: {
   rom: Rom
   focused: boolean
   launching: boolean
+  onLaunch: (rom: Rom) => void
 }) {
   const lastPlayed = rom.last_played
     ? new Date(rom.last_played).toLocaleDateString()
@@ -46,12 +48,13 @@ function RomRow({
   return (
     <div
       data-focusable="true"
+      onClick={() => onLaunch(rom)}
       className={[
-        'flex items-center gap-4 px-4 py-3 rounded-xl transition-all duration-150',
+        'flex items-center gap-4 px-4 py-3 rounded-xl transition-all duration-150 cursor-pointer',
         'motion-reduce:transition-none',
         focused
           ? 'bg-vault-surface ring-2 ring-vault-accent scale-[1.02] motion-reduce:scale-100'
-          : 'bg-vault-card',
+          : 'bg-vault-card hover:bg-vault-surface',
       ].join(' ')}
     >
       <span className="text-2xl flex-shrink-0">{regionFlag(rom.region)}</span>
@@ -231,6 +234,8 @@ export function GameDetail({ game: initialGame, user, onBack }: Props) {
       setTimeout(() => {
         api.roms.logSession(rom.id, user.id, 0, startedAt).catch(() => {})
       }, 5000)
+      // RetroArch takes over the display; clear the spinner in case it exits
+      setTimeout(() => setLaunching(null), 10_000)
     } catch (e) {
       setLaunchError(e instanceof Error ? e.message : 'Launch failed')
       setLaunching(null)
@@ -399,6 +404,7 @@ export function GameDetail({ game: initialGame, user, onBack }: Props) {
                       rom={rom}
                       focused={focusSection === 'versions' && versionIdx === i}
                       launching={launching === rom.id}
+                      onLaunch={(r) => void launch(r)}
                     />
                   ))}
                 </div>

@@ -6,15 +6,17 @@ interface Props {
   focused: boolean
   label?: string
   size?: 'sm' | 'lg'
+  onClick?: (game: Game) => void
 }
 
-export function GameCard({ game, focused, label, size = 'sm' }: Props) {
+export function GameCard({ game, focused, label, size = 'sm', onClick }: Props) {
   const [imgLoaded, setImgLoaded] = useState(false)
   const isLg = size === 'lg'
 
   return (
     <div
       data-focusable="true"
+      onClick={() => onClick?.(game)}
       className={[
         'relative flex-shrink-0 rounded-xl overflow-hidden cursor-pointer',
         'transition-transform duration-150 motion-reduce:transition-none',

@@ -43,8 +43,8 @@ async function post<T>(url: string, body?: unknown): Promise<T> {
 }
 
 async function del<T>(url: string): Promise<T> {
-  const res = await fetch(url, { method: 'DELETE' })
-  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
+  const res = await fetch(url, { method: 'DELETE', signal: AbortSignal.timeout(10_000) })
+  if (!res.ok) throw new Error(await extractError(res))
   return res.json() as Promise<T>
 }
 

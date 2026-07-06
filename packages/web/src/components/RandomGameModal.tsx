@@ -32,7 +32,17 @@ export function RandomGameModal({ game, loading, onClose, onView, onAnother }: P
     }
   }, !!game)
 
-  if (!game) return null
+  if (!game) {
+    if (!loading) return null
+    return (
+      <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center">
+        <div className="bg-vault-card rounded-2xl px-10 py-8 flex flex-col items-center gap-4" style={{ boxShadow: '0 24px 64px rgba(0,0,0,0.6)' }}>
+          <div className="w-8 h-8 border-2 border-vault-muted border-t-vault-accent rounded-full animate-spin" />
+          <p className="text-vault-muted text-sm uppercase tracking-wide">Picking a game…</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <>

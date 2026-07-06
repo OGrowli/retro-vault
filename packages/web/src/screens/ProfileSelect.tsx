@@ -23,6 +23,7 @@ export function ProfileSelect({ onSelect }: Props) {
   const [newColor, setNewColor] = useState(COLORS[0])
   const [colorIdx, setColorIdx] = useState(0)
   const [loading, setLoading] = useState(true)
+  const [createError, setCreateError] = useState<string | null>(null)
 
   useEffect(() => {
     api.users.list().then(u => {
@@ -51,14 +52,15 @@ export function ProfileSelect({ onSelect }: Props) {
 
   const handleCreate = async () => {
     if (!newName.trim()) return
+    setCreateError(null)
     try {
       const user = await api.users.create(newName.trim(), newColor)
       setUsers(prev => [...prev, user])
       setCreating(false)
       setNewName('')
       onSelect(user)
-    } catch {
-      // username taken — could show error
+    } catch (e) {
+      setCreateError(e instanceof Error ? e.message : 'Could not create profile')
     }
   }
 
@@ -87,6 +89,7 @@ export function ProfileSelect({ onSelect }: Props) {
               <div
                 key={item.id}
                 className="flex flex-col items-center gap-3 cursor-pointer"
+                onMouseEnter={() => setFocusedIndex(i)}
                 onClick={() => {
                   if (isNew) setCreating(true)
                   else onSelect(item as User)
@@ -153,11 +156,13 @@ export function ProfileSelect({ onSelect }: Props) {
               </div>
             </div>
 
+            {createError && <p className="text-red-400 text-sm">{createError}</p>}
+
             <VirtualKeyboard
               value={newName}
               onChange={setNewName}
               onDone={() => void handleCreate()}
-              onCancel={() => setCreating(false)}
+              onCancel={() => { setCreating(false); setCreateError(null) }}
               enabled={creating}
               maxLength={24}
             />

@@ -11,6 +11,7 @@ interface Props {
   isActiveRegion: boolean
   skeletonCount?: number
   onFocusGame?: (game: Game) => void
+  onSelectGame?: (game: Game) => void
   getContinueLabel?: (game: Game) => string | undefined
   size?: 'sm' | 'lg'
 }
@@ -23,6 +24,7 @@ export function Rail({
   isActiveRegion,
   skeletonCount = 6,
   onFocusGame,
+  onSelectGame,
   getContinueLabel,
   size = 'sm',
 }: Props) {
@@ -42,7 +44,7 @@ export function Rail({
       <h2 className="text-white text-lg font-semibold mb-3 tracking-wide">{title}</h2>
       <div
         ref={containerRef}
-        className="flex gap-4 overflow-x-hidden"
+        className="flex gap-4 overflow-x-auto pb-1"
         style={{ scrollbarWidth: 'none' }}
       >
         {loading
@@ -60,6 +62,7 @@ export function Rail({
                     focused={focused}
                     label={label}
                     size={size}
+                    onClick={onSelectGame}
                   />
                 </div>
               )

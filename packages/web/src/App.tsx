@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import type { User, Game } from '@retro-vault/shared'
 import { api } from './api/client'
 import { ProfileSelect } from './screens/ProfileSelect'
@@ -15,12 +15,14 @@ export function App() {
   const [systems, setSystems] = useState<string[]>([])
   const [genres, setGenres] = useState<string[]>([])
 
-  useEffect(() => {
+  const refreshMeta = useCallback(() => {
     Promise.all([api.meta.systems(), api.meta.genres()]).then(([s, g]) => {
       setSystems(s)
       setGenres(g)
     }).catch(() => {})
   }, [])
+
+  useEffect(() => { refreshMeta() }, [refreshMeta])
 
   const handleProfileSelect = (user: User) => {
     setCurrentUser(user)
@@ -42,7 +44,7 @@ export function App() {
       {screen === 'profile-select' && (
         <ProfileSelect onSelect={handleProfileSelect} />
       )}
-      {screen === 'home' && currentUser && (
+      {(screen === 'home' || screen === 'game-detail') && currentUser && (
         <Home
           user={currentUser}
           systems={systems}
@@ -50,6 +52,8 @@ export function App() {
           onGameSelect={handleGameSelect}
           onSwitchUser={() => setScreen('profile-select')}
           onSettings={() => setScreen('settings')}
+          onLibraryChange={refreshMeta}
+          inputActive={screen === 'home'}
         />
       )}
       {screen === 'game-detail' && currentUser && selectedGame && (

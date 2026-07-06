@@ -164,7 +164,10 @@ export function FilterDrawer({
               placeholder="Game name..."
               value={filter.query ?? ''}
               onChange={e => onChange({ ...filter, query: e.target.value || undefined })}
-              className="w-full bg-vault-surface border border-vault-muted rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-vault-accent"
+              className={[
+                'w-full bg-vault-surface border rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-vault-accent',
+                focusedRow === 0 ? 'border-vault-accent ring-1 ring-vault-accent' : 'border-vault-muted',
+              ].join(' ')}
             />
           </Section>
         </div>
@@ -174,7 +177,7 @@ export function FilterDrawer({
             onClick={onApply}
             className={[
               'w-full py-3 rounded-lg font-bold text-white uppercase tracking-wide text-sm bg-vault-accent',
-              focusedRow === 8 ? 'ring-2 ring-white' : '',
+              focusedRow === 1 ? 'ring-2 ring-white' : '',
             ].join(' ')}
           >
             Apply Filters
@@ -183,7 +186,7 @@ export function FilterDrawer({
             onClick={onRandom}
             className={[
               'w-full py-3 rounded-lg font-bold text-white uppercase tracking-wide text-sm bg-vault-surface border border-vault-muted',
-              focusedRow === 9 ? 'ring-2 ring-white' : '',
+              focusedRow === 2 ? 'ring-2 ring-white' : '',
             ].join(' ')}
           >
             Pick Random Game
@@ -193,7 +196,7 @@ export function FilterDrawer({
             disabled={importLoading}
             className={[
               'w-full py-3 rounded-lg font-bold text-white uppercase tracking-wide text-sm bg-vault-surface border border-vault-muted',
-              focusedRow === 10 ? 'ring-2 ring-white' : '',
+              focusedRow === 3 ? 'ring-2 ring-white' : '',
               importLoading ? 'opacity-50 cursor-not-allowed' : '',
             ].join(' ')}
           >

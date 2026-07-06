@@ -109,6 +109,14 @@ export function Settings({ systems, onBack }: Props) {
     if (action === 'back') { onBack(); return }
     if (action === 'up') setFocused(FOCUS_ITEMS[Math.max(0, focusIdx - 1)])
     if (action === 'down') setFocused(FOCUS_ITEMS[Math.min(FOCUS_ITEMS.length - 1, focusIdx + 1)])
+    if (focused === 'scrape-system' && (action === 'left' || action === 'right')) {
+      const i = systems.indexOf(selectedSystem)
+      const next = action === 'right'
+        ? systems[(i + 1) % systems.length]
+        : systems[(i - 1 + systems.length) % systems.length]
+      if (next) setSelectedSystem(next)
+      return
+    }
     if (action === 'confirm') {
       if (focused === 'username') { setVkField('username'); return }
       if (focused === 'password') { setVkField('password'); return }
