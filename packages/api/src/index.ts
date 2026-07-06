@@ -3,6 +3,7 @@ import { serveStatic } from '@hono/node-server/serve-static'
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import fs from 'node:fs'
+import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { gamesRouter } from './routes/games.js'
@@ -26,7 +27,7 @@ app.route('/meta', metaRouter)
 app.route('/import', importRouter)
 app.route('/scrape', scrapeRouter)
 
-const DATA_DIR = process.env['RETROVAULT_DATA_DIR'] ?? '/home/pi/.retrovault'
+const DATA_DIR = process.env['RETROVAULT_DATA_DIR'] ?? path.join(os.homedir(), '.retrovault')
 app.use(
   '/media/*',
   serveStatic({

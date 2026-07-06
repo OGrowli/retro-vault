@@ -1,28 +1,87 @@
 import Database, { type Database as DatabaseType } from 'better-sqlite3'
 import fs from 'node:fs'
+import os from 'node:os'
 import path from 'node:path'
 import type { GameFilter } from '@retro-vault/shared'
 
-const DATA_DIR = process.env['RETROVAULT_DATA_DIR'] ?? '/home/pi/.retrovault'
+const DATA_DIR = process.env['RETROVAULT_DATA_DIR'] ?? path.join(os.homedir(), '.retrovault')
 const DB_PATH = process.env['RETROVAULT_DB_PATH'] ?? path.join(DATA_DIR, 'retrovault.db')
 
 fs.mkdirSync(path.join(DATA_DIR, 'media'), { recursive: true })
 
+console.log(`RetroVault DB: ${DB_PATH}`)
 export const db: DatabaseType = new Database(DB_PATH)
 
 db.pragma('journal_mode = WAL')
 db.pragma('foreign_keys = ON')
 
-// Migrate from schema v1 (single games table with rom_path) to v2
 const { user_version: schemaVersion } = db.prepare('PRAGMA user_version').get() as { user_version: number }
+
 if (schemaVersion < 2) {
-  db.exec(`
-    DROP TABLE IF EXISTS play_sessions;
-    DROP TABLE IF EXISTS favorites;
-    DROP TABLE IF EXISTS filter_presets;
-    DROP TABLE IF EXISTS roms;
-    DROP TABLE IF EXISTS games;
-  `)
+  const tableNames = new Set(
+    (db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all() as Array<{ name: string }>)
+      .map(r => r.name)
+  )
+
+  if (tableNames.has('games')) {
+    const gamesCols = new Set(
+      (db.prepare('PRAGMA table_info(games)').all() as Array<{ name: string }>).map(r => r.name)
+    )
+
+    if (gamesCols.has('rom_path')) {
+      // v1 → v2: preserve game library, rebuild dependent tables
+      db.pragma('foreign_keys = OFF')
+      db.exec(`
+        DROP TABLE IF EXISTS roms;
+        CREATE TABLE roms (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          game_id INTEGER NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+          system TEXT NOT NULL,
+          rom_path TEXT NOT NULL UNIQUE,
+          region TEXT,
+          revision TEXT,
+          full_name TEXT NOT NULL
+        );
+
+        INSERT OR IGNORE INTO roms (game_id, system, rom_path, region, revision, full_name)
+        SELECT id, system, rom_path, NULL, NULL, name
+        FROM games WHERE rom_path IS NOT NULL AND trim(rom_path) != '';
+
+        DROP TABLE IF EXISTS play_sessions;
+
+        ALTER TABLE games RENAME TO games_old;
+        CREATE TABLE games (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          system TEXT NOT NULL,
+          name TEXT NOT NULL,
+          genre TEXT,
+          year INTEGER,
+          players INTEGER,
+          description TEXT,
+          box_art_path TEXT,
+          scraped_at TEXT,
+          UNIQUE(name, system)
+        );
+        INSERT OR IGNORE INTO games (id, system, name, genre, year, players, description, box_art_path, scraped_at)
+        SELECT id, system, name, genre, year, players, description, box_art_path, scraped_at
+        FROM games_old;
+        DROP TABLE games_old;
+
+        DROP TABLE IF EXISTS favorites;
+        DROP TABLE IF EXISTS filter_presets;
+      `)
+      db.pragma('foreign_keys = ON')
+    } else {
+      // games exists without rom_path: unexpected state — drop dependents for clean rebuild
+      db.exec(`
+        DROP TABLE IF EXISTS play_sessions;
+        DROP TABLE IF EXISTS favorites;
+        DROP TABLE IF EXISTS filter_presets;
+        DROP TABLE IF EXISTS roms;
+      `)
+    }
+  }
+  // Fresh install (no games table): CREATE TABLE IF NOT EXISTS below handles everything
 }
 
 db.exec(`

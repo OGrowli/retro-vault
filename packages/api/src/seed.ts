@@ -1,9 +1,10 @@
 import Database from 'better-sqlite3'
 import fs from 'node:fs'
+import os from 'node:os'
 import path from 'node:path'
 import sharp from 'sharp'
 
-const DATA_DIR = process.env['RETROVAULT_DATA_DIR'] ?? '/tmp/retrovault-test'
+const DATA_DIR = process.env['RETROVAULT_DATA_DIR'] ?? path.join(os.homedir(), '.retrovault')
 const DB_PATH = process.env['RETROVAULT_DB_PATH'] ?? path.join(DATA_DIR, 'retrovault.db')
 const MEDIA_DIR = path.join(DATA_DIR, 'media')
 
@@ -13,14 +14,23 @@ const db = new Database(DB_PATH)
 db.pragma('journal_mode = WAL')
 db.pragma('foreign_keys = ON')
 
+// Always nuke and rebuild — seed is dev-only, old schema must not survive
+db.pragma('foreign_keys = OFF')
 db.exec(`
-  CREATE TABLE IF NOT EXISTS users (
+  DROP TABLE IF EXISTS play_sessions;
+  DROP TABLE IF EXISTS favorites;
+  DROP TABLE IF EXISTS filter_presets;
+  DROP TABLE IF EXISTS roms;
+  DROP TABLE IF EXISTS games;
+  DROP TABLE IF EXISTS users;
+
+  CREATE TABLE users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     username TEXT NOT NULL UNIQUE,
     avatar_color TEXT NOT NULL DEFAULT '#0070D1',
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
-  CREATE TABLE IF NOT EXISTS games (
+  CREATE TABLE games (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     system TEXT NOT NULL,
     name TEXT NOT NULL,
@@ -32,7 +42,7 @@ db.exec(`
     scraped_at TEXT,
     UNIQUE(name, system)
   );
-  CREATE TABLE IF NOT EXISTS roms (
+  CREATE TABLE roms (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     game_id INTEGER NOT NULL REFERENCES games(id) ON DELETE CASCADE,
     system TEXT NOT NULL,
@@ -41,7 +51,7 @@ db.exec(`
     revision TEXT,
     full_name TEXT NOT NULL
   );
-  CREATE TABLE IF NOT EXISTS play_sessions (
+  CREATE TABLE play_sessions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     rom_id INTEGER NOT NULL REFERENCES roms(id) ON DELETE CASCADE,
@@ -49,26 +59,27 @@ db.exec(`
     started_at TEXT NOT NULL DEFAULT (datetime('now')),
     duration_seconds INTEGER NOT NULL DEFAULT 0
   );
-  CREATE TABLE IF NOT EXISTS favorites (
+  CREATE TABLE favorites (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     game_id INTEGER NOT NULL REFERENCES games(id) ON DELETE CASCADE,
     UNIQUE(user_id, game_id)
   );
-  CREATE TABLE IF NOT EXISTS filter_presets (
+  CREATE TABLE filter_presets (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     name TEXT NOT NULL,
     filter_json TEXT NOT NULL
   );
-  CREATE INDEX IF NOT EXISTS idx_roms_game ON roms(game_id);
-  CREATE INDEX IF NOT EXISTS idx_play_sessions_user ON play_sessions(user_id, started_at DESC);
-  CREATE INDEX IF NOT EXISTS idx_play_sessions_rom ON play_sessions(rom_id);
-  CREATE INDEX IF NOT EXISTS idx_play_sessions_game ON play_sessions(game_id);
-  CREATE INDEX IF NOT EXISTS idx_favorites_user ON favorites(user_id);
-  CREATE INDEX IF NOT EXISTS idx_games_system ON games(system);
+  CREATE INDEX idx_roms_game ON roms(game_id);
+  CREATE INDEX idx_play_sessions_user ON play_sessions(user_id, started_at DESC);
+  CREATE INDEX idx_play_sessions_rom ON play_sessions(rom_id);
+  CREATE INDEX idx_play_sessions_game ON play_sessions(game_id);
+  CREATE INDEX idx_favorites_user ON favorites(user_id);
+  CREATE INDEX idx_games_system ON games(system);
   PRAGMA user_version = 2;
 `)
+db.pragma('foreign_keys = ON')
 
 // ── Placeholder box art ──────────────────────────────────────────────────────
 
@@ -235,8 +246,6 @@ const GAMES: GameSeed[] = [
 ]
 
 // ── Insert ───────────────────────────────────────────────────────────────────
-
-db.exec('DELETE FROM play_sessions; DELETE FROM favorites; DELETE FROM roms; DELETE FROM games; DELETE FROM users;')
 
 console.log('Seeding users...')
 const insertUser = db.prepare('INSERT INTO users (username, avatar_color) VALUES (?, ?)')

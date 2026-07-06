@@ -43,8 +43,17 @@ export function GameCard({ game, focused, label, size = 'sm' }: Props) {
           />
         </>
       ) : (
-        <div className={`w-full bg-vault-surface flex items-center justify-center ${isLg ? 'h-56' : 'h-48'}`}>
-          <span className="text-vault-muted text-xs uppercase tracking-widest">{game.system}</span>
+        <div className={`w-full bg-vault-surface flex flex-col items-center justify-center gap-2 ${isLg ? 'h-56' : 'h-48'}`}>
+          <svg width="48" height="48" viewBox="0 0 48 48" fill="none" className="opacity-20">
+            <rect x="4" y="14" width="40" height="24" rx="12" stroke="white" strokeWidth="2"/>
+            <rect x="12" y="23" width="8" height="2.5" rx="1.25" fill="white"/>
+            <rect x="14.75" y="20.25" width="2.5" height="8" rx="1.25" fill="white"/>
+            <circle cx="31" cy="22" r="2" fill="white"/>
+            <circle cx="35" cy="26" r="2" fill="white"/>
+            <line x1="17" y1="14" x2="17" y2="10" stroke="white" strokeWidth="2" strokeLinecap="round"/>
+            <line x1="31" y1="14" x2="31" y2="10" stroke="white" strokeWidth="2" strokeLinecap="round"/>
+          </svg>
+          <span className="text-vault-muted text-[10px] uppercase tracking-widest">{game.system}</span>
         </div>
       )}
 

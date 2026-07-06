@@ -265,9 +265,17 @@ export function GameDetail({ game: initialGame, user, onBack }: Props) {
               className="w-60 h-80 object-cover rounded-2xl shadow-2xl"
             />
           ) : (
-            <div className="w-60 h-80 bg-vault-card rounded-2xl flex flex-col items-center justify-center gap-2">
+            <div className="w-60 h-80 bg-vault-card rounded-2xl flex flex-col items-center justify-center gap-3">
+              <svg width="72" height="72" viewBox="0 0 48 48" fill="none" className="opacity-20">
+                <rect x="4" y="14" width="40" height="24" rx="12" stroke="white" strokeWidth="2"/>
+                <rect x="12" y="23" width="8" height="2.5" rx="1.25" fill="white"/>
+                <rect x="14.75" y="20.25" width="2.5" height="8" rx="1.25" fill="white"/>
+                <circle cx="31" cy="22" r="2" fill="white"/>
+                <circle cx="35" cy="26" r="2" fill="white"/>
+                <line x1="17" y1="14" x2="17" y2="10" stroke="white" strokeWidth="2" strokeLinecap="round"/>
+                <line x1="31" y1="14" x2="31" y2="10" stroke="white" strokeWidth="2" strokeLinecap="round"/>
+              </svg>
               <span className="text-vault-muted text-xs uppercase tracking-widest">{game.system}</span>
-              <span className="text-vault-muted text-xs">No art</span>
             </div>
           )}
           {game.scraped_at && (

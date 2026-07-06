@@ -18,7 +18,7 @@ function filterToParams(filter: GameFilter, userId?: number): string {
 }
 
 async function get<T>(url: string): Promise<T> {
-  const res = await fetch(url)
+  const res = await fetch(url, { signal: AbortSignal.timeout(10_000) })
   if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
   return res.json() as Promise<T>
 }
@@ -28,6 +28,7 @@ async function post<T>(url: string, body?: unknown): Promise<T> {
     method: 'POST',
     headers: body ? { 'Content-Type': 'application/json' } : {},
     body: body ? JSON.stringify(body) : undefined,
+    signal: AbortSignal.timeout(30_000),
   })
   if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
   return res.json() as Promise<T>

@@ -2,11 +2,6 @@
 set -e
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-TEST_DATA_DIR="/tmp/retrovault-test"
-TEST_DB="$TEST_DATA_DIR/retrovault.db"
-
-export RETROVAULT_DATA_DIR="$TEST_DATA_DIR"
-export RETROVAULT_DB_PATH="$TEST_DB"
 
 cleanup() {
   echo ""
@@ -19,14 +14,20 @@ trap cleanup INT TERM
 
 cd "$ROOT"
 
-echo "==> Seeding test database at $TEST_DB..."
-RETROVAULT_DATA_DIR="$TEST_DATA_DIR" RETROVAULT_DB_PATH="$TEST_DB" \
-  npx tsx packages/api/src/seed.ts
+# Free port 3000 if held by a previous run
+if command -v lsof > /dev/null 2>&1; then
+  lsof -ti:3000 | xargs kill -9 2>/dev/null || true
+elif command -v netstat.exe > /dev/null 2>&1; then
+  pid=$(netstat.exe -ano 2>/dev/null | awk '/TCP.*:3000 .*LISTEN/{print $5}' | head -1)
+  [ -n "$pid" ] && { echo "Killing stale process on port 3000 (PID: $pid)..."; taskkill.exe /PID "$pid" /F 2>/dev/null || true; }
+fi
+
+echo "==> Seeding test database..."
+npx tsx packages/api/src/seed.ts
 
 echo ""
 echo "==> Starting API (port 3000)..."
-RETROVAULT_DATA_DIR="$TEST_DATA_DIR" RETROVAULT_DB_PATH="$TEST_DB" \
-  npx tsx packages/api/src/index.ts &
+npx tsx packages/api/src/index.ts &
 API_PID=$!
 
 echo "==> Waiting for API..."
@@ -48,7 +49,6 @@ echo "=========================================="
 echo "  RetroVault dev environment running"
 echo "  API:  http://localhost:3000"
 echo "  Web:  http://localhost:5173"
-echo "  DB:   $TEST_DB"
 echo "  Ctrl+C to stop"
 echo "=========================================="
 echo ""

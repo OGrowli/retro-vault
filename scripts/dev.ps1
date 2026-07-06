@@ -4,19 +4,20 @@ param()
 
 $ErrorActionPreference = 'Stop'
 $RootDir = Split-Path -Parent $PSScriptRoot
-$TestDataDir = "$env:TEMP\retrovault-test"
-$TestDb = "$TestDataDir\retrovault.db"
-
-# Ensure test data directory exists
-New-Item -ItemType Directory -Force -Path $TestDataDir | Out-Null
-
-$env:RETROVAULT_DATA_DIR = $TestDataDir
-$env:RETROVAULT_DB_PATH  = $TestDb
 
 Set-Location $RootDir
 
+# Free port 3000 if held by a previous run
+$existing = try { Get-NetTCPConnection -LocalPort 3000 -State Listen -ErrorAction Stop } catch { $null }
+if ($existing) {
+    $pid3000 = $existing.OwningProcess | Select-Object -First 1
+    Write-Host "Killing stale process on port 3000 (PID: $pid3000)..." -ForegroundColor Yellow
+    Stop-Process -Id $pid3000 -Force -ErrorAction SilentlyContinue
+    Start-Sleep -Milliseconds 500
+}
+
 # -- 1. Seed --
-Write-Host "==> Seeding test database at $TestDb..." -ForegroundColor Cyan
+Write-Host "==> Seeding test database..." -ForegroundColor Cyan
 & npm run seed
 if ($LASTEXITCODE -ne 0) { throw "Seed script failed (exit $LASTEXITCODE)" }
 
@@ -26,8 +27,6 @@ Write-Host "==> Starting API (port 3000)..." -ForegroundColor Cyan
 
 $apiJob = Start-Job -ScriptBlock {
     Set-Location $using:RootDir
-    $env:RETROVAULT_DATA_DIR = $using:TestDataDir
-    $env:RETROVAULT_DB_PATH = $using:TestDb
     & npm run dev:api
 }
 
@@ -62,7 +61,6 @@ Write-Host "==========================================" -ForegroundColor Yellow
 Write-Host "  RetroVault dev environment running"       -ForegroundColor Yellow
 Write-Host "  API:  http://localhost:3000"              -ForegroundColor White
 Write-Host "  Web:  http://localhost:5173"              -ForegroundColor White
-Write-Host "  DB:   $TestDb"                            -ForegroundColor White
 Write-Host "  Ctrl+C to stop both servers"              -ForegroundColor White
 Write-Host "==========================================" -ForegroundColor Yellow
 Write-Host ""
@@ -72,7 +70,7 @@ try {
     while ($true) {
         $apiState = Get-Job -Id $apiJob.Id | Select-Object -ExpandProperty State
         $webState = Get-Job -Id $webJob.Id | Select-Object -ExpandProperty State
-        
+
         if ($apiState -ne "Running") {
             Write-Warning "API job exited (state: $apiState)"
             break
@@ -86,12 +84,12 @@ try {
 } finally {
     Write-Host ""
     Write-Host "Shutting down..." -ForegroundColor Cyan
-    
+
     Stop-Job -Job $apiJob -ErrorAction SilentlyContinue
     Stop-Job -Job $webJob -ErrorAction SilentlyContinue
-    
+
     Remove-Job -Job $apiJob -Force -ErrorAction SilentlyContinue
     Remove-Job -Job $webJob -Force -ErrorAction SilentlyContinue
-    
+
     Write-Host "Done." -ForegroundColor Green
 }

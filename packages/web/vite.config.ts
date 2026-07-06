@@ -12,9 +12,11 @@ export default defineConfig({
   server: {
     proxy: {
       '/games': 'http://localhost:3000',
+      '/roms': 'http://localhost:3000',
       '/users': 'http://localhost:3000',
       '/meta': 'http://localhost:3000',
       '/import': 'http://localhost:3000',
+      '/scrape': 'http://localhost:3000',
       '/media': 'http://localhost:3000',
     },
   },
