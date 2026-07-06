@@ -74,7 +74,7 @@ export function VirtualGrid({ games, loading, focusedRow, focusedCol, isActiveRe
   return (
     <section className="px-[5%] py-3">
       <h2 className="text-white text-lg font-semibold mb-3 tracking-wide">All Games</h2>
-      <div ref={containerRef} className="overflow-hidden">
+      <div ref={containerRef}>
         {loading ? (
           <div className="flex gap-4 flex-wrap">
             {Array.from({ length: COLS * 2 }, (_, i) => <SkeletonCard key={i} />)}

@@ -44,7 +44,7 @@ export function Rail({
       <h2 className="text-white text-lg font-semibold mb-3 tracking-wide">{title}</h2>
       <div
         ref={containerRef}
-        className="flex gap-4 overflow-x-auto pb-1"
+        className="flex gap-4 overflow-x-auto py-3 -my-3 px-3 -mx-3"
         style={{ scrollbarWidth: 'none' }}
       >
         {loading
