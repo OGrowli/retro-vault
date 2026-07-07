@@ -41,8 +41,9 @@ romsRouter.get('/:id', (c) => {
   return c.json(rom)
 })
 
-romsRouter.post('/:id/launch', (c) => {
+romsRouter.post('/:id/launch', async (c) => {
   const id = parseInt(c.req.param('id'), 10)
+  const body = await c.req.json<{ user_id?: number }>().catch(() => ({} as { user_id?: number }))
   const rom = db.prepare('SELECT * FROM roms WHERE id = ?').get(id) as {
     id: number; system: string; rom_path: string; game_id: number
   } | undefined
@@ -83,21 +84,49 @@ romsRouter.post('/:id/launch', (c) => {
       detached: true,
       stdio: 'ignore',
     })
+
+    // Log the play session server-side: launching tears down the kiosk
+    // browser, so the frontend cannot log it after the fact.
+    const startedAt = new Date()
+    let sessionId: number | null = null
+    if (body.user_id) {
+      const ins = db.prepare(`
+        INSERT INTO play_sessions (user_id, rom_id, game_id, started_at, duration_seconds)
+        VALUES (?, ?, ?, ?, 0)
+      `).run(body.user_id, rom.id, rom.game_id, startedAt.toISOString())
+      sessionId = Number(ins.lastInsertRowid)
+    }
+    const dropSession = () => {
+      if (sessionId !== null) db.prepare('DELETE FROM play_sessions WHERE id = ?').run(sessionId)
+      sessionId = null
+    }
+    const finishSession = () => {
+      if (sessionId === null) return
+      const secs = Math.round((Date.now() - startedAt.getTime()) / 1000)
+      db.prepare('UPDATE play_sessions SET duration_seconds = ? WHERE id = ?').run(secs, sessionId)
+      sessionId = null
+    }
+
     let settled = false
     const settle = (r: Response) => {
       if (!settled) { settled = true; resolve(r) }
     }
     child.on('error', (err) => {
+      dropSession()
       settle(c.json({ error: `Launch failed: ${err.message}` }, 500))
     })
     // The wrapper runs for the whole game session — an exit within the first
-    // few seconds means the launch itself failed.
+    // few seconds means the launch itself failed. A later exit is the game
+    // ending (its code is unreliable: openvt returns 8 when it cannot
+    // deallocate the VT that systemd-logind holds).
     child.on('exit', (code) => {
-      if (code !== 0) {
+      if (!settled && code !== 0) {
+        dropSession()
         settle(c.json({ error: `Launcher exited with code ${code} — check ~/.retrovault/launch.log on the Pi` }, 500))
-      } else {
-        settle(c.json({ launched: true }))
+        return
       }
+      finishSession()
+      settle(c.json({ launched: true }))
     })
     setTimeout(() => {
       child.unref()

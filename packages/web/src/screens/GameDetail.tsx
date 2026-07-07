@@ -113,11 +113,7 @@ export function GameDetail({ game: initialGame, user, onBack }: Props) {
     setLaunching(rom.id)
     setLaunchError(null)
     try {
-      await api.roms.launch(rom.id)
-      const startedAt = new Date().toISOString()
-      setTimeout(() => {
-        api.roms.logSession(rom.id, user.id, 0, startedAt).catch(() => {})
-      }, 5000)
+      await api.roms.launch(rom.id, user.id)
       // RetroArch takes over the display; clear the spinner in case it exits
       setTimeout(() => setLaunching(null), 10_000)
     } catch (e) {

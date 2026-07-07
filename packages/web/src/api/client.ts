@@ -79,13 +79,10 @@ export const api = {
 
   roms: {
     get: (id: number) => get<Rom>(`/roms/${id}`),
-    launch: (id: number) => post<{ launched: boolean; pid?: number }>(`/roms/${id}/launch`),
-    logSession: (id: number, userId: number, durationSeconds: number, startedAt: string) =>
-      post<{ id: number }>(`/roms/${id}/session`, {
-        user_id: userId,
-        duration_seconds: durationSeconds,
-        started_at: startedAt,
-      }),
+    // user_id lets the server log the play session — the kiosk browser is
+    // torn down during launch, so the frontend can't log it afterwards
+    launch: (id: number, userId: number) =>
+      post<{ launched: boolean; pid?: number }>(`/roms/${id}/launch`, { user_id: userId }),
   },
 
   users: {
