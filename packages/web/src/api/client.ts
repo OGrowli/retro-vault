@@ -83,6 +83,8 @@ export const api = {
     // torn down during launch, so the frontend can't log it afterwards
     launch: (id: number, userId: number) =>
       post<{ launched: boolean; pid?: number }>(`/roms/${id}/launch`, { user_id: userId }),
+    // One-shot: who was playing what, if a game just ended
+    resume: () => get<{ resume: { user_id: number; game_id: number } | null }>('/roms/resume'),
   },
 
   users: {

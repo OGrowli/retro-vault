@@ -7,6 +7,22 @@ import { getSystemConfig } from '../systems.config.js'
 
 export const romsRouter = new Hono()
 
+// One-shot resume hint for the kiosk. Launching kills the browser, and the
+// replacement only boots after the game exits — localStorage writes made at
+// launch time routinely die with the browser, so the API tracks it instead.
+// Registered before ':id' so it isn't captured as a rom id.
+let resumeHint: { userId: number; gameId: number; endedAt: number } | null = null
+const RESUME_WINDOW_MS = 3 * 60 * 1000
+
+romsRouter.get('resume', (c) => {
+  const hint = resumeHint
+  resumeHint = null
+  if (!hint || Date.now() - hint.endedAt > RESUME_WINDOW_MS) {
+    return c.json({ resume: null })
+  }
+  return c.json({ resume: { user_id: hint.userId, game_id: hint.gameId } })
+})
+
 // Wrapper that frees the display (stops the kiosk), runs the game on the
 // console, and restores the kiosk on exit. Resolved from the service's
 // WorkingDirectory (repo root). Logs to ~/.retrovault/launch.log
@@ -105,6 +121,9 @@ romsRouter.post('/:id/launch', async (c) => {
       const secs = Math.round((Date.now() - startedAt.getTime()) / 1000)
       db.prepare('UPDATE play_sessions SET duration_seconds = ? WHERE id = ?').run(secs, sessionId)
       sessionId = null
+      if (body.user_id) {
+        resumeHint = { userId: body.user_id, gameId: rom.game_id, endedAt: Date.now() }
+      }
     }
 
     let settled = false

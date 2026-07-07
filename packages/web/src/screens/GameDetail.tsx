@@ -112,20 +112,15 @@ export function GameDetail({ game: initialGame, user, onBack }: Props) {
     if (launching !== null) return
     setLaunching(rom.id)
     setLaunchError(null)
-    // Launching kills the kiosk browser; leave a marker so the fresh
-    // Chromium after the game exits comes back to this screen. Written
-    // before the request — the browser can die before the response lands.
-    localStorage.setItem('rv:resume', JSON.stringify({ userId: user.id, gameId: game.id }))
     try {
       await api.roms.launch(rom.id, user.id)
       // RetroArch takes over the display; clear the spinner in case it exits
       setTimeout(() => setLaunching(null), 10_000)
     } catch (e) {
-      localStorage.removeItem('rv:resume')
       setLaunchError(e instanceof Error ? e.message : 'Launch failed')
       setLaunching(null)
     }
-  }, [launching, user.id, game.id])
+  }, [launching, user.id])
 
   const toggleFavorite = useCallback(async () => {
     try {
