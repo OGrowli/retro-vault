@@ -32,6 +32,28 @@ export function App() {
 
   useEffect(() => { refreshMeta() }, [refreshMeta])
 
+  // Launching a game tears down the kiosk browser; GameDetail leaves a
+  // marker so the fresh Chromium after the game exits returns to that
+  // game's screen instead of profile select.
+  useEffect(() => {
+    const raw = localStorage.getItem('rv:resume')
+    if (!raw) return
+    localStorage.removeItem('rv:resume')
+    let userId: number, gameId: number
+    try {
+      ({ userId, gameId } = JSON.parse(raw) as { userId: number; gameId: number })
+    } catch { return }
+    Promise.all([api.users.list(), api.games.get(gameId)])
+      .then(([users, game]) => {
+        const user = users.find(u => u.id === userId)
+        if (!user || !game) return
+        setCurrentUser(user)
+        setSelectedGame(game)
+        setScreen('game-detail')
+      })
+      .catch(() => {})
+  }, [])
+
   const handleProfileSelect = (user: User) => {
     setCurrentUser(user)
     setScreen('home')
