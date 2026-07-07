@@ -73,8 +73,8 @@ export const api = {
     favorite: (id: number, userId: number) =>
       post<{ favorited: boolean }>(`/games/${id}/favorite`, { userId }),
     sessions: (id: number) => get<SessionWithRom[]>(`/games/${id}/sessions`),
-    scrape: (id: number, username: string, password: string) =>
-      post<Game>(`/games/${id}/scrape`, { username, password }),
+    // Credentials come from saved settings on the server
+    scrape: (id: number) => post<Game>(`/games/${id}/scrape`),
   },
 
   roms: {

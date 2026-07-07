@@ -3,7 +3,6 @@ import type { Game, GameWithRoms, Rom, User } from '@retro-vault/shared'
 import { api } from '../api/client'
 import { useGamepad } from '../hooks/useGamepad'
 import { Glyph } from '../components/Glyph'
-import { VirtualKeyboard } from '../components/VirtualKeyboard'
 
 interface Props {
   game: Game
@@ -83,122 +82,6 @@ function RomRow({
   )
 }
 
-interface ScrapeModalProps {
-  gameId: number
-  onDone: (updatedGame: Game) => void
-  onClose: () => void
-}
-
-function ScrapeModal({ gameId, onDone, onClose }: ScrapeModalProps) {
-  const [username, setUsername] = useState('')
-  const [password, setPassword] = useState('')
-  const [activeField, setActiveField] = useState<'username' | 'password'>('username')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  const handleScrape = async () => {
-    if (loading) return
-    setLoading(true)
-    setError(null)
-    try {
-      const updated = await api.games.scrape(gameId, username, password)
-      onDone(updated)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Scrape failed')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleVkDone = () => {
-    if (activeField === 'username') setActiveField('password')
-    else void handleScrape()
-  }
-
-  const handleVkCancel = () => {
-    if (activeField === 'password') setActiveField('username')
-    else onClose()
-  }
-
-  return (
-    <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center px-4">
-      <div className="bg-vault-card rounded-2xl p-6 w-full max-w-[480px] max-h-[90vh] overflow-y-auto space-y-4" style={{ scrollbarWidth: 'none' }}>
-        <h2 className="text-white text-xl font-bold">Scrape Metadata</h2>
-        <p className="text-vault-muted text-sm">Enter ScreenScraper credentials for full metadata. Without dev credentials on the server, box art is fetched free from libretro thumbnails.</p>
-
-        <div className="space-y-2">
-          <div
-            className={`rounded-lg border overflow-hidden cursor-pointer ${activeField === 'username' ? 'border-vault-accent' : 'border-vault-muted'}`}
-            onClick={() => setActiveField('username')}
-          >
-            <label className="block text-vault-muted text-xs uppercase tracking-wide px-3 pt-2 pointer-events-none">SS Username</label>
-            <input
-              autoFocus
-              type="text"
-              value={username}
-              onChange={e => setUsername(e.target.value)}
-              onFocus={() => setActiveField('username')}
-              onKeyDown={e => {
-                if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); handleVkDone() }
-                if (e.key === 'Escape') handleVkCancel()
-              }}
-              className="w-full bg-transparent px-3 pb-2 pt-0 text-white text-sm focus:outline-none font-mono placeholder:text-vault-muted"
-              placeholder="Username (optional)"
-            />
-          </div>
-
-          <div
-            className={`rounded-lg border overflow-hidden cursor-pointer ${activeField === 'password' ? 'border-vault-accent' : 'border-vault-muted'}`}
-            onClick={() => setActiveField('password')}
-          >
-            <label className="block text-vault-muted text-xs uppercase tracking-wide px-3 pt-2 pointer-events-none">SS Password</label>
-            <input
-              type="password"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              onFocus={() => setActiveField('password')}
-              onKeyDown={e => {
-                if (e.key === 'Enter') { e.preventDefault(); void handleScrape() }
-                if (e.key === 'Escape') handleVkCancel()
-              }}
-              className="w-full bg-transparent px-3 pb-2 pt-0 text-white text-sm focus:outline-none font-mono placeholder:text-vault-muted"
-              placeholder="Password (optional)"
-            />
-          </div>
-        </div>
-
-        <VirtualKeyboard
-          value={activeField === 'username' ? username : password}
-          onChange={activeField === 'username' ? setUsername : setPassword}
-          masked={activeField === 'password'}
-          onDone={handleVkDone}
-          onCancel={handleVkCancel}
-          enabled={!loading}
-        />
-
-        {error && <p className="text-red-400 text-sm">{error}</p>}
-
-        <div className="flex gap-3">
-          <button
-            onClick={handleVkDone}
-            disabled={loading}
-            className="flex-1 py-2.5 bg-vault-accent text-white font-bold rounded-lg uppercase tracking-wide text-sm disabled:opacity-50"
-          >
-            {loading ? 'Scraping…' : activeField === 'username' ? 'Next →' : 'Scrape'}
-          </button>
-          <button
-            onClick={handleVkCancel}
-            disabled={loading}
-            className="px-5 py-2.5 bg-vault-surface text-vault-muted font-bold rounded-lg uppercase tracking-wide text-sm border border-vault-muted disabled:opacity-50"
-          >
-            {activeField === 'password' ? '← Back' : 'Cancel'}
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
 export function GameDetail({ game: initialGame, user, onBack }: Props) {
   const [detail, setDetail] = useState<GameWithRoms | null>(null)
   const [game, setGame] = useState<Game>(initialGame)
@@ -208,7 +91,8 @@ export function GameDetail({ game: initialGame, user, onBack }: Props) {
   const [actionIdx, setActionIdx] = useState(0)
   const [launching, setLaunching] = useState<number | null>(null)
   const [launchError, setLaunchError] = useState<string | null>(null)
-  const [scrapeOpen, setScrapeOpen] = useState(false)
+  const [scraping, setScraping] = useState(false)
+  const [scrapeError, setScrapeError] = useState<string | null>(null)
 
   useEffect(() => {
     api.games.get(game.id).then(d => {
@@ -249,9 +133,24 @@ export function GameDetail({ game: initialGame, user, onBack }: Props) {
     } catch {}
   }, [game.id, user.id])
 
-  useGamepad((action) => {
-    if (scrapeOpen) return
+  // Credentials come from Settings (stored server-side) — scrape directly
+  const scrape = useCallback(async () => {
+    if (scraping) return
+    setScraping(true)
+    setScrapeError(null)
+    try {
+      const updated = await api.games.scrape(game.id)
+      setGame(updated)
+      const d = await api.games.get(updated.id)
+      setDetail(d)
+    } catch (e) {
+      setScrapeError(e instanceof Error ? e.message : 'Scrape failed')
+    } finally {
+      setScraping(false)
+    }
+  }, [game.id, scraping])
 
+  useGamepad((action) => {
     if (action === 'back') { onBack(); return }
     if (action === 'favorite') { void toggleFavorite(); return }
 
@@ -276,11 +175,11 @@ export function GameDetail({ game: initialGame, user, onBack }: Props) {
       if (action === 'confirm') {
         const act = ACTIONS[actionIdx]
         if (act === 'favorite') void toggleFavorite()
-        if (act === 'scrape') setScrapeOpen(true)
+        if (act === 'scrape') void scrape()
         if (act === 'back') onBack()
       }
     }
-  }, !scrapeOpen)
+  }, true)
 
   const lastPlayedDate = detail?.last_played
     ? new Date(detail.last_played).toLocaleDateString()
@@ -379,6 +278,9 @@ export function GameDetail({ game: initialGame, user, onBack }: Props) {
           {launchError && (
             <p className="text-red-400 text-sm px-1">{launchError}</p>
           )}
+          {scrapeError && (
+            <p className="text-red-400 text-sm px-1">{scrapeError}</p>
+          )}
 
           {/* Versions section */}
           <div className="flex-1 overflow-hidden">
@@ -421,15 +323,16 @@ export function GameDetail({ game: initialGame, user, onBack }: Props) {
             const focused = focusSection === 'actions' && actionIdx === i
             const label = act === 'favorite'
               ? (isFavorite ? 'Unfavorite' : 'Favorite')
-              : act === 'scrape' ? 'Scrape Metadata'
+              : act === 'scrape' ? (scraping ? 'Scraping…' : 'Scrape Metadata')
               : 'Back'
             const glyph = act === 'favorite' ? 'square' : act === 'scrape' ? 'triangle' : 'circle'
             return (
               <button
                 key={act}
+                disabled={act === 'scrape' && scraping}
                 onClick={() => {
                   if (act === 'favorite') void toggleFavorite()
-                  if (act === 'scrape') setScrapeOpen(true)
+                  if (act === 'scrape') void scrape()
                   if (act === 'back') onBack()
                 }}
                 className={[
@@ -455,17 +358,6 @@ export function GameDetail({ game: initialGame, user, onBack }: Props) {
         </p>
       </div>
 
-      {scrapeOpen && (
-        <ScrapeModal
-          gameId={game.id}
-          onDone={(updated) => {
-            setGame(updated)
-            setScrapeOpen(false)
-            api.games.get(updated.id).then(setDetail).catch(() => {})
-          }}
-          onClose={() => setScrapeOpen(false)}
-        />
-      )}
     </div>
   )
 }
