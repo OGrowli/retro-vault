@@ -261,7 +261,7 @@ export function Home({ user, systems, genres, onGameSelect, onSwitchUser, onSett
             <button
               onClick={() => setFilterOpen(true)}
               className="px-3 py-1.5 rounded-lg text-vault-muted hover:text-white text-xs font-semibold uppercase tracking-wide border border-vault-muted hover:border-vault-accent transition-colors"
-              title="Filters (Start / Tab)"
+              title="Filters (Options / Tab)"
             >
               Filters
             </button>
@@ -373,7 +373,7 @@ export function Home({ user, systems, genres, onGameSelect, onSwitchUser, onSett
 
       <div className="absolute bottom-0 left-0 right-0 h-12 flex items-center px-[5%] bg-gradient-to-t from-vault-bg to-transparent pointer-events-none">
         <p className="text-vault-muted text-xs uppercase tracking-wide flex items-center gap-1.5 flex-wrap">
-          <Glyph type="cross" /> Select  ·  <Glyph type="square" /> Favorite  ·  <Glyph type="circle" /> Back  ·  Start Filter  ·  Options Settings
+          <Glyph type="cross" /> Select  ·  <Glyph type="square" /> Favorite  ·  <Glyph type="circle" /> Back  ·  Options Filter  ·  Share Settings
         </p>
       </div>
     </div>
