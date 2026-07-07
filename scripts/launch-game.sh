@@ -40,14 +40,17 @@ for _ in $(seq 1 20); do
 done
 sudo pkill -KILL -t tty1 2>/dev/null
 
+# openvt runs its child as root; drop back to pi so the emulator matches how
+# EmulationStation runs it — configs, saves, and controller autoconfigs all
+# live under pi, and root-run emulators leave root-owned files behind.
+# -f on openvt: systemd-logind keeps /dev/tty1 open for VT tracking, so the
+# VT always looks "in use" even once the kiosk session is dead.
 if [ -f "$RUNCOMMAND" ]; then
-  # -f: systemd-logind keeps /dev/tty1 open for VT tracking, so the VT always
-  # looks "in use" to openvt even once the kiosk session is dead.
-  sudo openvt -c 1 -s -w -f -- bash "$RUNCOMMAND" 0 _SYS_ "$SYSTEM" "$ROM"
+  sudo openvt -c 1 -s -w -f -- sudo -u pi -H bash "$RUNCOMMAND" 0 _SYS_ "$SYSTEM" "$ROM"
   RC=$?
 elif [ -n "$CORE" ]; then
   RETROARCH="$(command -v retroarch || echo /opt/retropie/emulators/retroarch/bin/retroarch)"
-  sudo openvt -c 1 -s -w -f -- "$RETROARCH" -L "$CORE" "$ROM"
+  sudo openvt -c 1 -s -w -f -- sudo -u pi -H "$RETROARCH" -L "$CORE" "$ROM"
   RC=$?
 else
   echo "ERROR: no runcommand.sh and no core path given — cannot launch"
