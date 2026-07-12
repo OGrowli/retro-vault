@@ -62,7 +62,7 @@ export function RandomGameModal({ game, loading, onClose, onView, onAnother }: P
                 />
               ) : (
                 <div className="w-28 h-36 bg-vault-surface rounded-lg flex items-center justify-center">
-                  <span className="text-vault-muted text-[10px] uppercase tracking-widest text-center px-1">
+                  <span className="text-vault-muted text-xs uppercase tracking-widest text-center px-1">
                     {game.system}
                   </span>
                 </div>

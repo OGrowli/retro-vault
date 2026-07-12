@@ -84,7 +84,7 @@ async function saveBoxArt(buf: Buffer, system: string, gameId: number): Promise<
   // blur of a 1080p layer, which the Pi cannot afford per-frame.
   await sharp(buf)
     .resize(96, 96, { fit: 'inside', withoutEnlargement: true })
-    .blur(1.5)
+    .blur(3)
     .jpeg({ quality: 60 })
     .toFile(path.join(dir, `${gameId}-bg.jpg`))
   return `/media/${system}/${gameId}.jpg`
@@ -98,7 +98,7 @@ export async function ensureBgVariant(bgAbsPath: string): Promise<boolean> {
   if (base === bgAbsPath || !fs.existsSync(base)) return false
   await sharp(base)
     .resize(96, 96, { fit: 'inside', withoutEnlargement: true })
-    .blur(1.5)
+    .blur(3)
     .jpeg({ quality: 60 })
     .toFile(bgAbsPath)
   return true

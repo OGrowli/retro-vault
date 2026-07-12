@@ -21,13 +21,13 @@ export function GameCard({ game, focused, label, size = 'sm', onClick }: Props) 
         'relative flex-shrink-0 rounded-xl overflow-hidden cursor-pointer',
         'bg-vault-card',
         isLg ? 'w-56 h-72' : 'w-44 h-60',
-        focused ? 'ring-2 ring-vault-accent' : 'ring-0',
+        focused ? 'ring-4 ring-vault-accent-bright' : 'ring-0',
       ].join(' ')}
     >
       {game.box_art_path ? (
         <>
           {!imgLoaded && (
-            <div className="absolute inset-0 bg-vault-muted animate-pulse" />
+            <div className="absolute inset-0 bg-vault-surface animate-pulse" />
           )}
           <img
             src={game.box_art_path}
@@ -52,17 +52,17 @@ export function GameCard({ game, focused, label, size = 'sm', onClick }: Props) 
             <line x1="17" y1="14" x2="17" y2="10" stroke="white" strokeWidth="2" strokeLinecap="round"/>
             <line x1="31" y1="14" x2="31" y2="10" stroke="white" strokeWidth="2" strokeLinecap="round"/>
           </svg>
-          <span className="text-vault-muted text-[10px] uppercase tracking-widest">{game.system}</span>
+          <span className="text-vault-muted text-xs uppercase tracking-widest">{game.system}</span>
         </div>
       )}
 
       <div className="p-2">
-        <p className="text-white text-xs font-semibold uppercase tracking-wide truncate leading-tight">
+        <p className="text-white text-sm font-semibold uppercase tracking-wide truncate leading-tight">
           {game.name}
         </p>
         <p className="text-vault-muted text-xs mt-0.5 uppercase tracking-wider">{game.system}</p>
         {label && (
-          <span className="mt-1 inline-block bg-vault-accent text-white text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded">
+          <span className="mt-1 inline-block bg-vault-accent text-white text-xs font-bold uppercase tracking-wide px-1.5 py-0.5 rounded">
             {label}
           </span>
         )}

@@ -11,7 +11,9 @@ export default {
           surface: '#1e1e2a',
           accent: '#0070D1',
           'accent-bright': '#0090ff',
-          muted: '#3a3a4a',
+          // 10-foot rule: secondary text must survive a TV at couch distance.
+          // Was #3a3a4a (~1.9:1 on bg) — unreadable by design.
+          muted: '#9aa3b5',
         },
       },
       fontFamily: {

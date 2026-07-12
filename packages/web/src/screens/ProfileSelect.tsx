@@ -75,8 +75,8 @@ export function ProfileSelect({ onSelect }: Props) {
         <div className="grid grid-cols-4 gap-8">
           {Array.from({ length: 4 }, (_, i) => (
             <div key={i} className="flex flex-col items-center gap-3">
-              <div className="w-24 h-24 rounded-full bg-vault-muted animate-pulse" />
-              <div className="h-3 w-16 bg-vault-muted animate-pulse rounded" />
+              <div className="w-24 h-24 rounded-full bg-vault-surface animate-pulse" />
+              <div className="h-3 w-16 bg-vault-surface animate-pulse rounded" />
             </div>
           ))}
         </div>
@@ -98,7 +98,7 @@ export function ProfileSelect({ onSelect }: Props) {
                 <div
                   className={[
                     'w-24 h-24 rounded-full flex items-center justify-center',
-                    focused ? 'ring-4 ring-vault-accent' : 'ring-0',
+                    focused ? 'ring-4 ring-vault-accent-bright' : 'ring-0',
                   ].join(' ')}
                   style={{ background: isNew ? '#1e1e2a' : item.avatar_color }}
                 >

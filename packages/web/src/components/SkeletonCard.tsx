@@ -7,10 +7,10 @@ export function SkeletonCard({ size = 'sm' }: { size?: 'sm' | 'lg' }) {
         isLg ? 'w-56 h-72' : 'w-44 h-60',
       ].join(' ')}
     >
-      <div className={`bg-vault-muted animate-pulse ${isLg ? 'h-56' : 'h-48'}`} />
+      <div className={`bg-vault-surface animate-pulse ${isLg ? 'h-56' : 'h-48'}`} />
       <div className="p-2 space-y-1.5">
-        <div className="h-3 bg-vault-muted animate-pulse rounded w-3/4" />
-        <div className="h-2.5 bg-vault-muted animate-pulse rounded w-1/2" />
+        <div className="h-3 bg-vault-surface animate-pulse rounded w-3/4" />
+        <div className="h-2.5 bg-vault-surface animate-pulse rounded w-1/2" />
       </div>
     </div>
   )

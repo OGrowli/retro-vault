@@ -5,6 +5,8 @@
 @layer base {
   :root {
     color-scheme: dark;
+    /* 10-foot UI: 18px base scales every rem-derived size up ~12.5% */
+    font-size: 112.5%;
   }
 
   * {

@@ -52,7 +52,7 @@ function RomRow({
         'flex items-center gap-4 px-4 py-3 rounded-xl transition-colors duration-150 cursor-pointer',
         'motion-reduce:transition-none',
         focused
-          ? 'bg-vault-surface ring-2 ring-vault-accent'
+          ? 'bg-vault-surface ring-4 ring-vault-accent-bright'
           : 'bg-vault-card hover:bg-vault-surface',
       ].join(' ')}
     >
@@ -197,7 +197,7 @@ export function GameDetail({ game: initialGame, user, onBack }: Props) {
             backgroundImage: `url(${bgVariant(game.box_art_path)})`,
             backgroundSize: 'cover',
             backgroundPosition: 'center',
-            opacity: 0.08,
+            opacity: 0.15,
           }}
         />
       )}

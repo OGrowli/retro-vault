@@ -34,7 +34,8 @@ export function Home({ user, systems, genres, onGameSelect, onSwitchUser, onSett
   const [filterOpen, setFilterOpen] = useState(false)
   const [bgGame, setBgGame] = useState<Game | null>(null)
   const [bgSrc, setBgSrc] = useState<string | null>(null)
-  const [bgOpacity, setBgOpacity] = useState(0.15)
+  // Game art is the only color on screen — let it work (pre-blurred, cheap)
+  const [bgOpacity, setBgOpacity] = useState(0.25)
   const [randomGame, setRandomGame] = useState<Game | null>(null)
   const [randomLoading, setRandomLoading] = useState(false)
   const [importLoading, setImportLoading] = useState(false)
@@ -88,7 +89,7 @@ export function Home({ user, systems, genres, onGameSelect, onSwitchUser, onSett
     setBgOpacity(0)
     const t = setTimeout(() => {
       setBgSrc(bgVariant(art))
-      setBgOpacity(0.15)
+      setBgOpacity(0.25)
     }, 150)
     return () => clearTimeout(t)
   }, [bgGame])
@@ -370,7 +371,7 @@ export function Home({ user, systems, genres, onGameSelect, onSwitchUser, onSett
         </div>
       )}
 
-      <div className="absolute bottom-0 left-0 right-0 h-12 flex items-center px-[5%] bg-gradient-to-t from-vault-bg to-transparent pointer-events-none">
+      <div className="absolute bottom-0 left-0 right-0 h-20 flex items-end pb-3 px-[5%] bg-gradient-to-t from-vault-bg via-vault-bg/80 to-transparent pointer-events-none">
         <p className="text-vault-muted text-xs uppercase tracking-wide flex items-center gap-1.5 flex-wrap">
           <Glyph type="cross" /> Select  ·  <Glyph type="square" /> Favorite  ·  <Glyph type="circle" /> Back  ·  Options Filter  ·  Share Settings
         </p>
