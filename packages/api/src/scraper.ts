@@ -185,6 +185,17 @@ async function scrapeLibretroThumb(game: SSGameRow): Promise<ScrapeResult> {
   }
 }
 
+// ZIP local file header: sig=PK\x03\x04, CRC32 at byte 14.
+// Bit 3 of flags means CRC is in the trailing data descriptor instead — skip those.
+function zipCrc32(buf: Buffer): string | null {
+  if (buf.length < 18) return null
+  if (buf.readUInt32LE(0) !== 0x04034b50) return null
+  if (buf.readUInt16LE(6) & 0x8) return null
+  const crc = buf.readUInt32LE(14)
+  if (crc === 0) return null
+  return crc.toString(16).toUpperCase().padStart(8, '0')
+}
+
 async function fetchSS(params: URLSearchParams): Promise<Response> {
   const url = `https://www.screenscraper.fr/api2/jeuInfos.php?${params}`
   const res = await fetch(url)
@@ -232,11 +243,15 @@ export async function scrapeGame(gameId: number, username: string, password: str
     systemeid: String(systemId),
   })
 
-  if (game.system.toLowerCase() === 'gba' && fs.existsSync(game.rom_path)) {
-    const md5 = crypto.createHash('md5').update(fs.readFileSync(game.rom_path)).digest('hex')
-    params.set('md5', md5)
-  } else {
-    params.set('romnom', path.basename(game.rom_path))
+  params.set('romnom', path.basename(game.rom_path))
+  if (fs.existsSync(game.rom_path)) {
+    const buf = fs.readFileSync(game.rom_path)
+    if (path.extname(game.rom_path).toLowerCase() === '.zip') {
+      const crc = zipCrc32(buf)
+      if (crc) params.set('crc', crc)
+    } else {
+      params.set('md5', crypto.createHash('md5').update(buf).digest('hex'))
+    }
   }
 
   let res: Response

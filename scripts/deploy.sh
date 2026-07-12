@@ -37,5 +37,4 @@ echo ""
 echo "==> Deploy complete."
 sudo systemctl status retrovault-api --no-pager -l || true
 echo ""
-echo "Note: Chromium kiosk keeps the old frontend in memory until relaunched."
-echo "Reboot the Pi to pick up web changes, or: sudo pkill chromium-browser"
+sudo reboot
