@@ -206,6 +206,37 @@ async function fetchSS(params: URLSearchParams): Promise<Response> {
   return res
 }
 
+// Returns the jeu object, null if not found (404/500 → retry with hash), throws on other errors.
+async function fetchSSJeu(params: URLSearchParams): Promise<Record<string, unknown> | null> {
+  const res = await fetchSS(params)
+  if (res.status === 404 || res.status === 500) return null
+  if (!res.ok) {
+    const text = (await res.text().catch(() => '')).trim().slice(0, 200)
+    throw new Error(`ScreenScraper ${res.status}${text ? `: ${text}` : ''}`)
+  }
+  let raw: unknown
+  try { raw = await res.json() } catch { throw new Error('Invalid JSON from ScreenScraper') }
+  const response = (raw as Record<string, unknown>)?.['response'] as Record<string, unknown> | undefined
+  return (response?.['jeu'] as Record<string, unknown> | undefined) ?? null
+}
+
+function hashParams(romPath: string): URLSearchParams | null {
+  if (!fs.existsSync(romPath)) return null
+  const buf = fs.readFileSync(romPath)
+  const p = new URLSearchParams()
+  if (path.extname(romPath).toLowerCase() === '.zip') {
+    const crc = zipCrc32(buf)
+    if (!crc) return null
+    p.set('crc', crc)
+    // romnom without .zip so SS name-matching works if CRC alone isn't enough
+    p.set('romnom', path.basename(romPath, '.zip'))
+  } else {
+    p.set('md5', crypto.createHash('md5').update(buf).digest('hex'))
+    p.set('romnom', path.basename(romPath))
+  }
+  return p
+}
+
 export async function scrapeGame(gameId: number, username: string, password: string): Promise<ScrapeResult> {
   const game = db.prepare(`
     SELECT g.id, g.name, g.system, r.rom_path, r.full_name
@@ -233,7 +264,7 @@ export async function scrapeGame(gameId: number, username: string, password: str
   const systemId = SCREENSCRAPER_SYSTEM_IDS[game.system.toLowerCase()]
   if (!systemId) return { success: false, error: `No ScreenScraper ID for system: ${game.system}` }
 
-  const params = new URLSearchParams({
+  const baseParams = new URLSearchParams({
     devid: devId,
     devpassword: devPass,
     softname: 'retrovault',
@@ -243,39 +274,28 @@ export async function scrapeGame(gameId: number, username: string, password: str
     systemeid: String(systemId),
   })
 
-  params.set('romnom', path.basename(game.rom_path))
-  if (fs.existsSync(game.rom_path)) {
-    const buf = fs.readFileSync(game.rom_path)
-    if (path.extname(game.rom_path).toLowerCase() === '.zip') {
-      const crc = zipCrc32(buf)
-      if (crc) params.set('crc', crc)
-    } else {
-      params.set('md5', crypto.createHash('md5').update(buf).digest('hex'))
+  const mergeParams = (extra: URLSearchParams) => {
+    const p = new URLSearchParams(baseParams)
+    extra.forEach((v, k) => p.set(k, v))
+    return p
+  }
+
+  // Step 1: romnom lookup
+  let jeu: Record<string, unknown> | null = null
+  try {
+    jeu = await fetchSSJeu(mergeParams(new URLSearchParams({ romnom: path.basename(game.rom_path) })))
+  } catch (e) {
+    return { success: false, error: String(e) }
+  }
+
+  // Step 2: hash fallback (ZIP → CRC from header; others → MD5)
+  if (!jeu) {
+    const hp = hashParams(game.rom_path)
+    if (hp) {
+      try { jeu = await fetchSSJeu(mergeParams(hp)) } catch { /* fall through to error below */ }
     }
   }
 
-  let res: Response
-  try {
-    res = await fetchSS(params)
-  } catch (e) {
-    return { success: false, error: `Network error: ${e}` }
-  }
-
-  if (!res.ok) {
-    // ScreenScraper returns plain-text reasons (bad dev creds, closed API, bad ssid…)
-    const text = (await res.text().catch(() => '')).trim().slice(0, 200)
-    return { success: false, error: `ScreenScraper ${res.status}${text ? `: ${text}` : ''}` }
-  }
-
-  let raw: unknown
-  try {
-    raw = await res.json()
-  } catch {
-    return { success: false, error: 'Invalid JSON from ScreenScraper' }
-  }
-
-  const response = (raw as Record<string, unknown>)?.['response'] as Record<string, unknown> | undefined
-  const jeu = response?.['jeu'] as Record<string, unknown> | undefined
   if (!jeu) return { success: false, error: 'No game data in ScreenScraper response' }
 
   // Name
