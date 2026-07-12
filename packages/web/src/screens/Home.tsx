@@ -69,7 +69,7 @@ export function Home({ user, systems, genres, onGameSelect, onSwitchUser, onSett
     }).catch(() => setLoading(false))
   }, [user.id])
 
-  // Quiet refresh of recent/favorites when returning from GameDetail (Home stays mounted)
+  // Quiet refresh when returning from GameDetail/Settings (Home stays mounted)
   const prevActiveRef = useRef(inputActive)
   useEffect(() => {
     if (inputActive && !prevActiveRef.current) {
@@ -79,9 +79,10 @@ export function Home({ user, systems, genres, onGameSelect, onSwitchUser, onSett
           setRawHistory(history.slice(0, 40))
           setFavorites(favs)
         }).catch(() => {})
+      void refreshGames()
     }
     prevActiveRef.current = inputActive
-  }, [inputActive, user.id])
+  }, [inputActive, user.id, refreshGames])
 
   useEffect(() => {
     const art = bgGame?.box_art_path
