@@ -33,6 +33,10 @@ export const SCREENSCRAPER_SYSTEM_IDS: Record<string, number> = {
   'mame-libretro': 75,
   'mame-mame4all': 75,
   psx: 57,
+  atarilynx: 28,
+  atari5200: 66,
+  atari7800: 26,
+  vectrex: 102,
 }
 
 // libretro thumbnail repo names — https://thumbnails.libretro.com (free, no API key)
