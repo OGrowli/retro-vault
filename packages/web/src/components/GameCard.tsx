@@ -19,12 +19,9 @@ export function GameCard({ game, focused, label, size = 'sm', onClick }: Props) 
       onClick={() => onClick?.(game)}
       className={[
         'relative flex-shrink-0 rounded-xl overflow-hidden cursor-pointer',
-        'transition-transform duration-150 motion-reduce:transition-none',
         'bg-vault-card',
         isLg ? 'w-56 h-72' : 'w-44 h-60',
-        focused
-          ? 'ring-2 ring-vault-accent scale-105 motion-reduce:scale-100'
-          : 'ring-0 scale-100',
+        focused ? 'ring-2 ring-vault-accent' : 'ring-0',
       ].join(' ')}
     >
       {game.box_art_path ? (

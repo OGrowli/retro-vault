@@ -49,10 +49,10 @@ function RomRow({
       data-focusable="true"
       onClick={() => onLaunch(rom)}
       className={[
-        'flex items-center gap-4 px-4 py-3 rounded-xl transition-all duration-150 cursor-pointer',
+        'flex items-center gap-4 px-4 py-3 rounded-xl transition-colors duration-150 cursor-pointer',
         'motion-reduce:transition-none',
         focused
-          ? 'bg-vault-surface ring-2 ring-vault-accent scale-[1.02] motion-reduce:scale-100'
+          ? 'bg-vault-surface ring-2 ring-vault-accent'
           : 'bg-vault-card hover:bg-vault-surface',
       ].join(' ')}
     >
@@ -276,7 +276,7 @@ export function GameDetail({ game: initialGame, user, onBack }: Props) {
             <div
               onClick={() => setDescExpanded(v => !v)}
               className={[
-                'rounded-lg cursor-pointer transition-all duration-150 motion-reduce:transition-none -mx-2 px-2 py-1',
+                'rounded-lg cursor-pointer transition-colors duration-150 motion-reduce:transition-none -mx-2 px-2 py-1',
                 focusSection === 'description' ? 'ring-2 ring-vault-accent bg-vault-card' : '',
               ].join(' ')}
             >
@@ -358,7 +358,7 @@ export function GameDetail({ game: initialGame, user, onBack }: Props) {
                   if (act === 'back') onBack()
                 }}
                 className={[
-                  'px-6 py-3 rounded-xl font-bold text-sm uppercase tracking-wide transition-all duration-150',
+                  'px-6 py-3 rounded-xl font-bold text-sm uppercase tracking-wide transition-colors duration-150',
                   'inline-flex items-center gap-2 motion-reduce:transition-none',
                   act === 'back'
                     ? 'bg-vault-surface text-white border border-vault-muted'
@@ -367,7 +367,7 @@ export function GameDetail({ game: initialGame, user, onBack }: Props) {
                     : isFavorite
                     ? 'bg-vault-accent text-white'
                     : 'bg-vault-surface text-white border border-vault-muted',
-                  focused ? 'ring-2 ring-white scale-105 motion-reduce:scale-100' : '',
+                  focused ? 'ring-2 ring-white' : '',
                 ].join(' ')}
               >
                 <Glyph type={glyph as 'square' | 'triangle' | 'circle'} /> {label}

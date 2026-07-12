@@ -97,9 +97,8 @@ export function ProfileSelect({ onSelect }: Props) {
               >
                 <div
                   className={[
-                    'w-24 h-24 rounded-full flex items-center justify-center transition-transform duration-150',
-                    'motion-reduce:transition-none',
-                    focused ? 'ring-4 ring-vault-accent scale-110 motion-reduce:scale-100' : 'ring-0',
+                    'w-24 h-24 rounded-full flex items-center justify-center',
+                    focused ? 'ring-4 ring-vault-accent' : 'ring-0',
                   ].join(' ')}
                   style={{ background: isNew ? '#1e1e2a' : item.avatar_color }}
                 >

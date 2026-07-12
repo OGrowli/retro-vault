@@ -96,8 +96,8 @@ export function VirtualKeyboard({ value, onChange, onDone, onCancel, enabled, ma
           >
             {keys.map((key, ci) => {
               const isFocused = enabled && row === ri && col === ci
-              const base = 'flex items-center justify-center font-bold tracking-wide transition-all duration-75 border rounded-lg'
-              const focusCls = isFocused ? 'ring-2 ring-vault-accent border-vault-accent text-white scale-110' : ''
+              const base = 'flex items-center justify-center font-bold tracking-wide transition-colors duration-75 border rounded-lg'
+              const focusCls = isFocused ? 'ring-2 ring-vault-accent border-vault-accent text-white' : ''
 
               if (key === 'SPACE') {
                 return (
@@ -113,7 +113,7 @@ export function VirtualKeyboard({ value, onChange, onDone, onCancel, enabled, ma
                 return (
                   <button key={key}
                     onPointerDown={e => { e.preventDefault(); pressKey(key) }}
-                    className={`${base} h-10 min-w-[90px] text-sm uppercase text-white bg-vault-accent ${isFocused ? 'ring-2 ring-white scale-110 border-vault-accent' : 'border-vault-accent'}`}
+                    className={`${base} h-10 min-w-[90px] text-sm uppercase text-white bg-vault-accent ${isFocused ? 'ring-2 ring-white border-vault-accent' : 'border-vault-accent'}`}
                   >
                     Done ✓
                   </button>

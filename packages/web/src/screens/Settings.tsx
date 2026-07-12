@@ -247,8 +247,8 @@ export function Settings({ systems, onBack }: Props) {
               onClick={() => void saveCreds()}
               className={[
                 'w-full py-3 rounded-xl font-bold text-white uppercase tracking-wide text-sm',
-                'bg-vault-surface border border-vault-muted transition-all duration-150 motion-reduce:transition-none',
-                isFocused('save-creds') ? 'ring-2 ring-white border-vault-accent scale-105 motion-reduce:scale-100' : '',
+                'bg-vault-surface border border-vault-muted transition-colors duration-150 motion-reduce:transition-none',
+                isFocused('save-creds') ? 'ring-2 ring-white border-vault-accent' : '',
               ].join(' ')}
             >
               Save Credentials
@@ -266,8 +266,8 @@ export function Settings({ systems, onBack }: Props) {
               disabled={running}
               className={[
                 'w-full py-4 rounded-xl font-bold text-white uppercase tracking-wide text-sm',
-                'bg-vault-accent transition-all duration-150 motion-reduce:transition-none',
-                isFocused('scrape-all') ? 'ring-2 ring-white scale-105 motion-reduce:scale-100' : '',
+                'bg-vault-accent transition-colors duration-150 motion-reduce:transition-none',
+                isFocused('scrape-all') ? 'ring-2 ring-white' : '',
                 running ? 'opacity-50 cursor-not-allowed' : '',
               ].join(' ')}
             >
@@ -287,8 +287,8 @@ export function Settings({ systems, onBack }: Props) {
                 disabled={running || !selectedSystem}
                 className={[
                   'px-6 py-3 rounded-xl font-bold text-white uppercase tracking-wide text-sm',
-                  'bg-vault-surface border border-vault-muted transition-all duration-150 motion-reduce:transition-none',
-                  isFocused('scrape-system') ? 'ring-2 ring-white border-vault-accent scale-105 motion-reduce:scale-100' : '',
+                  'bg-vault-surface border border-vault-muted transition-colors duration-150 motion-reduce:transition-none',
+                  isFocused('scrape-system') ? 'ring-2 ring-white border-vault-accent' : '',
                   running ? 'opacity-50 cursor-not-allowed' : '',
                 ].join(' ')}
               >
@@ -312,7 +312,7 @@ export function Settings({ systems, onBack }: Props) {
                   </div>
                   <div className="w-full bg-vault-surface rounded-full h-2">
                     <div
-                      className="bg-vault-accent h-2 rounded-full transition-all duration-300"
+                      className="bg-vault-accent h-2 rounded-full transition-[width] duration-300"
                       style={{ width: progress.total > 0 ? `${((progress.done + progress.failed) / progress.total) * 100}%` : '0%' }}
                     />
                   </div>
@@ -350,10 +350,10 @@ export function Settings({ systems, onBack }: Props) {
         <button
           onClick={onBack}
           className={[
-            'px-6 py-3 rounded-xl font-bold text-sm uppercase tracking-wide transition-all duration-150',
+            'px-6 py-3 rounded-xl font-bold text-sm uppercase tracking-wide transition-colors duration-150',
             'bg-vault-surface text-white border border-vault-muted inline-flex items-center gap-2',
             'motion-reduce:transition-none',
-            isFocused('back') ? 'ring-2 ring-white scale-105 motion-reduce:scale-100' : '',
+            isFocused('back') ? 'ring-2 ring-white' : '',
           ].join(' ')}
         >
           <Glyph type="circle" /> Back
