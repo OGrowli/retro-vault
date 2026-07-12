@@ -1,3 +1,4 @@
+import crypto from 'node:crypto'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -225,8 +226,14 @@ export async function scrapeGame(gameId: number, username: string, password: str
     ssid: ssUser,
     sspassword: ssPass,
     systemeid: String(systemId),
-    romnom: path.basename(game.rom_path),
   })
+
+  if (game.system.toLowerCase() === 'gba' && fs.existsSync(game.rom_path)) {
+    const md5 = crypto.createHash('md5').update(fs.readFileSync(game.rom_path)).digest('hex')
+    params.set('md5', md5)
+  } else {
+    params.set('romnom', path.basename(game.rom_path))
+  }
 
   let res: Response
   try {
