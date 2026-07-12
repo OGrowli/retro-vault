@@ -82,6 +82,36 @@ async function saveBoxArt(buf: Buffer, system: string, gameId: number): Promise<
   return `/media/${system}/${gameId}.jpg`
 }
 
+interface SSMedia {
+  type: string
+  url: string
+  region?: string
+  format?: string
+}
+
+// Extra image types to pull besides box art: media type → stored kind
+const EXTRA_MEDIA: Record<string, string> = {
+  ss: 'screenshot',
+  sstitle: 'title',
+  wheel: 'wheel',
+}
+
+function pickMedia(medias: SSMedia[], type: string): SSMedia | undefined {
+  const list = medias.filter(m => m.type === type && m.url)
+  return list.find(m => m.region === 'us') ?? list.find(m => m.region === 'wor') ?? list[0]
+}
+
+// Screenshots/logos are larger than box art; wheel logos need alpha, so PNG
+async function saveExtraMedia(buf: Buffer, system: string, gameId: number, kind: string): Promise<string> {
+  const dir = path.join(MEDIA_DIR, system)
+  fs.mkdirSync(dir, { recursive: true })
+  const ext = kind === 'wheel' ? 'png' : 'jpg'
+  const dest = path.join(dir, `${gameId}-${kind}.${ext}`)
+  const img = sharp(buf).resize(640, 480, { fit: 'inside', withoutEnlargement: true })
+  await (kind === 'wheel' ? img.png() : img.jpeg({ quality: 80 })).toFile(dest)
+  return `/media/${system}/${gameId}-${kind}.${ext}`
+}
+
 // libretro thumbnails replace these characters with underscores in filenames
 function libretroSanitize(name: string): string {
   return name.replace(/[&*/:`<>?\\|"]/g, '_')
@@ -242,11 +272,25 @@ export async function scrapeGame(gameId: number, username: string, password: str
     description = pick?.text ?? null
   }
 
+  // Preserve the raw jeu payload — lets us re-parse metadata or pick other
+  // media later without burning another ScreenScraper request
+  const ssId = parseInt(String(jeu['id'] ?? ''), 10)
+  db.prepare(`
+    INSERT INTO ss_games (game_id, ss_id, name, system, fetched_at, raw_json)
+    VALUES (?, ?, ?, ?, datetime('now'), ?)
+    ON CONFLICT(game_id) DO UPDATE SET
+      ss_id = excluded.ss_id,
+      name = excluded.name,
+      system = excluded.system,
+      fetched_at = excluded.fetched_at,
+      raw_json = excluded.raw_json
+  `).run(game.id, isNaN(ssId) ? null : ssId, gameName, game.system, JSON.stringify(jeu))
+
   // Box art
-  const medias = jeu['medias'] as Array<{ type: string; url: string }> | undefined
+  const medias = jeu['medias'] as SSMedia[] | undefined
   let boxArtPath: string | null = null
   if (medias?.length) {
-    const art = medias.find(m => m.type === 'box-2D') ?? medias.find(m => m.type === 'box-3D') ?? medias.find(m => /^box/.test(m.type))
+    const art = pickMedia(medias, 'box-2D') ?? pickMedia(medias, 'box-3D') ?? medias.find(m => /^box/.test(m.type) && m.url)
     if (art?.url) {
       try {
         const imgRes = await fetch(art.url)
@@ -255,6 +299,25 @@ export async function scrapeGame(gameId: number, username: string, password: str
           boxArtPath = await saveBoxArt(buf, game.system, game.id)
         }
       } catch { /* box art is optional */ }
+    }
+  }
+
+  // Extra images: screenshot, title screen, wheel logo — each optional
+  if (medias?.length) {
+    const upsertMedia = db.prepare(`
+      INSERT INTO game_media (game_id, kind, path) VALUES (?, ?, ?)
+      ON CONFLICT(game_id, kind) DO UPDATE SET path = excluded.path
+    `)
+    for (const [type, kind] of Object.entries(EXTRA_MEDIA)) {
+      const media = pickMedia(medias, type)
+      if (!media?.url) continue
+      try {
+        const imgRes = await fetch(media.url)
+        if (!imgRes.ok) continue
+        const buf = Buffer.from(await imgRes.arrayBuffer())
+        const mediaPath = await saveExtraMedia(buf, game.system, game.id, kind)
+        upsertMedia.run(game.id, kind, mediaPath)
+      } catch { /* extra media is optional */ }
     }
   }
 

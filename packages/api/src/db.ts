@@ -143,6 +143,24 @@ db.exec(`
     value TEXT NOT NULL
   );
 
+  -- Raw ScreenScraper 'jeu' payload per game, for re-parsing without re-fetching
+  CREATE TABLE IF NOT EXISTS ss_games (
+    game_id INTEGER PRIMARY KEY REFERENCES games(id) ON DELETE CASCADE,
+    ss_id INTEGER,
+    name TEXT,
+    system TEXT,
+    fetched_at TEXT NOT NULL DEFAULT (datetime('now')),
+    raw_json TEXT NOT NULL
+  );
+
+  -- Additional scraped images (screenshot, title screen, wheel logo…)
+  CREATE TABLE IF NOT EXISTS game_media (
+    game_id INTEGER NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+    kind TEXT NOT NULL,
+    path TEXT NOT NULL,
+    PRIMARY KEY (game_id, kind)
+  );
+
   CREATE INDEX IF NOT EXISTS idx_roms_game ON roms(game_id);
   CREATE INDEX IF NOT EXISTS idx_play_sessions_user ON play_sessions(user_id, started_at DESC);
   CREATE INDEX IF NOT EXISTS idx_play_sessions_rom ON play_sessions(rom_id);
