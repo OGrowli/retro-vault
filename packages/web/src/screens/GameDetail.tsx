@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import type { Game, GameWithRoms, Rom, User } from '@retro-vault/shared'
-import { api } from '../api/client'
+import { api, bgVariant } from '../api/client'
 import { useGamepad } from '../hooks/useGamepad'
 import { Glyph } from '../components/Glyph'
 
@@ -194,12 +194,10 @@ export function GameDetail({ game: initialGame, user, onBack }: Props) {
         <div
           className="absolute inset-0 pointer-events-none"
           style={{
-            backgroundImage: `url(${game.box_art_path})`,
+            backgroundImage: `url(${bgVariant(game.box_art_path)})`,
             backgroundSize: 'cover',
             backgroundPosition: 'center',
-            filter: 'blur(60px)',
             opacity: 0.08,
-            transform: 'scale(1.1)',
           }}
         />
       )}

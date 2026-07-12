@@ -17,6 +17,12 @@ function filterToParams(filter: GameFilter, userId?: number): string {
   return p.toString()
 }
 
+// Tiny pre-blurred background variant emitted at scrape time (and lazily by
+// the API). Stretched fullscreen, the upscale IS the blur — no CSS filter.
+export function bgVariant(boxArtPath: string): string {
+  return boxArtPath.replace(/\.jpg$/, '-bg.jpg')
+}
+
 async function extractError(res: Response): Promise<string> {
   try {
     const data = await res.clone().json() as Record<string, unknown>

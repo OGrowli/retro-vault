@@ -79,7 +79,29 @@ async function saveBoxArt(buf: Buffer, system: string, gameId: number): Promise<
     .resize(300, 300, { fit: 'inside', withoutEnlargement: true })
     .jpeg({ quality: 75 })
     .toFile(dest)
+  // Tiny pre-blurred background variant: stretched fullscreen by the browser,
+  // the upscale interpolation does the blurring — replaces the runtime CSS
+  // blur of a 1080p layer, which the Pi cannot afford per-frame.
+  await sharp(buf)
+    .resize(96, 96, { fit: 'inside', withoutEnlargement: true })
+    .blur(1.5)
+    .jpeg({ quality: 60 })
+    .toFile(path.join(dir, `${gameId}-bg.jpg`))
   return `/media/${system}/${gameId}.jpg`
+}
+
+// Lazy backfill for art scraped before bg variants existed: derive the tiny
+// blurred image from the stored box art on first request.
+export async function ensureBgVariant(bgAbsPath: string): Promise<boolean> {
+  if (fs.existsSync(bgAbsPath)) return true
+  const base = bgAbsPath.replace(/-bg\.jpg$/, '.jpg')
+  if (base === bgAbsPath || !fs.existsSync(base)) return false
+  await sharp(base)
+    .resize(96, 96, { fit: 'inside', withoutEnlargement: true })
+    .blur(1.5)
+    .jpeg({ quality: 60 })
+    .toFile(bgAbsPath)
+  return true
 }
 
 interface SSMedia {

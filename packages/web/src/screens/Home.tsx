@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import type { Game, User, GameFilter, HistoryEntry } from '@retro-vault/shared'
-import { api } from '../api/client'
+import { api, bgVariant } from '../api/client'
 import { useGamepad } from '../hooks/useGamepad'
 import { useSpatialNav } from '../hooks/useSpatialNav'
 import { Rail } from '../components/Rail'
@@ -83,10 +83,11 @@ export function Home({ user, systems, genres, onGameSelect, onSwitchUser, onSett
   }, [inputActive, user.id])
 
   useEffect(() => {
-    if (!bgGame?.box_art_path) return
+    const art = bgGame?.box_art_path
+    if (!art) return
     setBgOpacity(0)
     const t = setTimeout(() => {
-      setBgSrc(bgGame.box_art_path)
+      setBgSrc(bgVariant(art))
       setBgOpacity(0.15)
     }, 150)
     return () => clearTimeout(t)
@@ -248,9 +249,7 @@ export function Home({ user, systems, genres, onGameSelect, onSwitchUser, onSett
           backgroundImage: bgSrc ? `url(${bgSrc})` : 'none',
           backgroundSize: 'cover',
           backgroundPosition: 'center',
-          filter: 'blur(40px)',
           opacity: bgOpacity,
-          transform: 'scale(1.05)',
         }}
       />
 

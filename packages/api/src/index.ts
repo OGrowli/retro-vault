@@ -13,6 +13,7 @@ import { metaRouter } from './routes/meta.js'
 import { importRouter } from './routes/import.js'
 import { scrapeRouter } from './routes/scrape.js'
 import { settingsRouter } from './routes/settings.js'
+import { ensureBgVariant } from './scraper.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const WEB_DIST = path.join(__dirname, '../../web/dist')
@@ -30,6 +31,19 @@ app.route('/scrape', scrapeRouter)
 app.route('/settings', settingsRouter)
 
 const DATA_DIR = process.env['RETROVAULT_DATA_DIR'] ?? path.join(os.homedir(), '.retrovault')
+
+// Generate missing pre-blurred bg variants on demand (art scraped before
+// bg variants existed), then fall through to static serving.
+app.use('/media/*', async (c, next) => {
+  const m = c.req.path.match(/^\/media\/(.+-bg\.jpg)$/)
+  if (m && !m[1].includes('..')) {
+    try {
+      await ensureBgVariant(path.join(DATA_DIR, 'media', m[1]))
+    } catch { /* fall through to 404 */ }
+  }
+  await next()
+})
+
 app.use(
   '/media/*',
   serveStatic({

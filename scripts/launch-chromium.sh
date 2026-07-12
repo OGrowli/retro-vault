@@ -13,12 +13,16 @@ RES="$(xrandr --current 2>/dev/null | awk '/\*/{print $1; exit}')"
 W="${RES%x*}"
 H="${RES#*x}"
 
+# GPU compositing on (vc4-kms is live); --use-gl=egl is the combo that
+# works on Pi. --force-prefers-reduced-motion flips every motion-reduce:
+# variant in the app to its cheap no-transition path.
 exec "$CHROMIUM" \
   --kiosk \
   --window-position=0,0 \
   --window-size="${W:-1920},${H:-1080}" \
   --disable-extensions \
-  --disable-gpu \
+  --use-gl=egl \
+  --force-prefers-reduced-motion \
   --js-flags="--max-old-space-size=256" \
   --no-sandbox \
   --disable-infobars \
