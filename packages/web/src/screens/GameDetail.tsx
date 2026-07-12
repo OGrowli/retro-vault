@@ -92,6 +92,7 @@ export function GameDetail({ game: initialGame, user, onBack }: Props) {
   const [actionIdx, setActionIdx] = useState(0)
   const [launching, setLaunching] = useState<number | null>(null)
   const [launchError, setLaunchError] = useState<string | null>(null)
+  const [continueRom, setContinueRom] = useState<Rom | null>(null)
   const [scraping, setScraping] = useState(false)
   const [scrapeError, setScrapeError] = useState<string | null>(null)
 
@@ -109,12 +110,19 @@ export function GameDetail({ game: initialGame, user, onBack }: Props) {
   const roms = detail?.roms ?? []
   const singleRom = roms.length === 1
 
-  const launch = useCallback(async (rom: Rom) => {
+  const launch = useCallback(async (rom: Rom, fresh = false) => {
     if (launching !== null) return
+    if (!fresh) {
+      try {
+        const { exists } = await api.roms.saveState(rom.id)
+        if (exists) { setContinueRom(rom); return }
+      } catch { /* if check fails, proceed */ }
+    }
+    setContinueRom(null)
     setLaunching(rom.id)
     setLaunchError(null)
     try {
-      await api.roms.launch(rom.id, user.id)
+      await api.roms.launch(rom.id, user.id, fresh)
       // RetroArch takes over the display; clear the spinner in case it exits
       setTimeout(() => setLaunching(null), 10_000)
     } catch (e) {
@@ -148,6 +156,11 @@ export function GameDetail({ game: initialGame, user, onBack }: Props) {
   }, [game.id, scraping])
 
   useGamepad((action) => {
+    if (continueRom) {
+      if (action === 'confirm') void launch(continueRom, false)
+      if (action === 'back') void launch(continueRom, true)
+      return
+    }
     if (action === 'back') { onBack(); return }
     if (action === 'favorite') { void toggleFavorite(); return }
 
@@ -380,6 +393,30 @@ export function GameDetail({ game: initialGame, user, onBack }: Props) {
         </p>
       </div>
 
+      {continueRom && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
+          <div className="bg-vault-card rounded-2xl p-8 w-full max-w-sm space-y-5">
+            <div>
+              <h2 className="text-white text-xl font-bold">Continue?</h2>
+              <p className="text-vault-muted text-sm mt-1">A save state was found for this game.</p>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => void launch(continueRom, false)}
+                className="flex-1 px-4 py-3 bg-vault-accent text-white rounded-xl font-bold text-sm uppercase tracking-wide flex items-center justify-center gap-2"
+              >
+                <Glyph type="cross" /> Continue
+              </button>
+              <button
+                onClick={() => void launch(continueRom, true)}
+                className="flex-1 px-4 py-3 bg-vault-surface text-white rounded-xl font-bold text-sm uppercase tracking-wide border border-vault-muted flex items-center justify-center gap-2"
+              >
+                <Glyph type="circle" /> New Game
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

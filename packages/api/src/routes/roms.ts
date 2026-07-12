@@ -28,6 +28,13 @@ romsRouter.get('resume', (c) => {
 // WorkingDirectory (repo root). Logs to ~/.retrovault/launch.log
 const LAUNCH_WRAPPER = path.resolve('scripts/launch-game.sh')
 
+const SAVES_DIR = process.env['RETROVAULT_SAVES_DIR'] ?? '/home/pi/RetroPie/saves'
+
+function saveStatePath(system: string, romPath: string): string {
+  const stem = path.parse(romPath).name
+  return path.join(SAVES_DIR, system, `${stem}.state`)
+}
+
 // systemd services don't have /opt/retropie/... on PATH, so resolve explicitly
 function resolveRetroarch(): string | null {
   const candidates = [
@@ -41,6 +48,13 @@ function resolveRetroarch(): string | null {
   }
   return null
 }
+
+romsRouter.get('/:id/savestate', (c) => {
+  const id = parseInt(c.req.param('id'), 10)
+  const rom = db.prepare('SELECT system, rom_path FROM roms WHERE id = ?').get(id) as { system: string; rom_path: string } | undefined
+  if (!rom) return c.json({ error: 'Not found' }, 404)
+  return c.json({ exists: fs.existsSync(saveStatePath(rom.system, rom.rom_path)) })
+})
 
 romsRouter.get('/:id', (c) => {
   const id = parseInt(c.req.param('id'), 10)
@@ -59,7 +73,7 @@ romsRouter.get('/:id', (c) => {
 
 romsRouter.post('/:id/launch', async (c) => {
   const id = parseInt(c.req.param('id'), 10)
-  const body = await c.req.json<{ user_id?: number }>().catch(() => ({} as { user_id?: number }))
+  const body = await c.req.json<{ user_id?: number; fresh?: boolean }>().catch(() => ({} as { user_id?: number; fresh?: boolean }))
   const rom = db.prepare('SELECT * FROM roms WHERE id = ?').get(id) as {
     id: number; system: string; rom_path: string; game_id: number
   } | undefined
@@ -93,6 +107,13 @@ romsRouter.post('/:id/launch', async (c) => {
 
     cmd = retroarch
     args = ['-L', sysConfig.corePath, rom.rom_path]
+  }
+
+  if (body.fresh) {
+    const statePath = saveStatePath(rom.system, rom.rom_path)
+    if (fs.existsSync(statePath)) {
+      fs.renameSync(statePath, statePath + '.bak')
+    }
   }
 
   return new Promise<Response>((resolve) => {
