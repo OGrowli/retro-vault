@@ -4,3 +4,8 @@ dist/
 *.db-shm
 *.db-wal
 .env
+
+# Local scraper test artifacts
+packages/api/src/media/
+smb3-box.png
+test.ps1
