@@ -69,6 +69,13 @@ export function Home({ user, systems, genres, onGameSelect, onSwitchUser, onSett
     }).catch(() => setLoading(false))
   }, [user.id])
 
+  const refreshGames = useCallback(async () => {
+    try {
+      const games = await api.games.list(filter, user.id)
+      setAllGames(games)
+    } catch {}
+  }, [filter, user.id])
+
   // Quiet refresh when returning from GameDetail/Settings (Home stays mounted)
   const prevActiveRef = useRef(inputActive)
   useEffect(() => {
@@ -94,13 +101,6 @@ export function Home({ user, systems, genres, onGameSelect, onSwitchUser, onSett
     }, 150)
     return () => clearTimeout(t)
   }, [bgGame])
-
-  const refreshGames = useCallback(async () => {
-    try {
-      const games = await api.games.list(filter, user.id)
-      setAllGames(games)
-    } catch {}
-  }, [filter, user.id])
 
   const handleRandom = useCallback(async () => {
     setRandomLoading(true)
