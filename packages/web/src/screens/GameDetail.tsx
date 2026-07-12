@@ -86,7 +86,8 @@ export function GameDetail({ game: initialGame, user, onBack }: Props) {
   const [detail, setDetail] = useState<GameWithRoms | null>(null)
   const [game, setGame] = useState<Game>(initialGame)
   const [isFavorite, setIsFavorite] = useState(false)
-  const [focusSection, setFocusSection] = useState<'versions' | 'actions'>('versions')
+  const [focusSection, setFocusSection] = useState<'description' | 'versions' | 'actions'>('versions')
+  const [descExpanded, setDescExpanded] = useState(false)
   const [versionIdx, setVersionIdx] = useState(0)
   const [actionIdx, setActionIdx] = useState(0)
   const [launching, setLaunching] = useState<number | null>(null)
@@ -150,9 +151,15 @@ export function GameDetail({ game: initialGame, user, onBack }: Props) {
     if (action === 'back') { onBack(); return }
     if (action === 'favorite') { void toggleFavorite(); return }
 
+    if (focusSection === 'description') {
+      if (action === 'up') setFocusSection('actions')
+      if (action === 'down') setFocusSection(roms.length > 0 ? 'versions' : 'actions')
+      if (action === 'confirm') setDescExpanded(v => !v)
+    }
+
     if (focusSection === 'versions') {
       if (action === 'up') {
-        if (versionIdx === 0) setFocusSection('actions')
+        if (versionIdx === 0) setFocusSection(game.description ? 'description' : 'actions')
         else setVersionIdx(i => i - 1)
       }
       if (action === 'down') {
@@ -268,7 +275,28 @@ export function GameDetail({ game: initialGame, user, onBack }: Props) {
           </div>
 
           {game.description && (
-            <p className="text-vault-muted text-sm leading-relaxed line-clamp-3">{game.description}</p>
+            <div
+              onClick={() => setDescExpanded(v => !v)}
+              className={[
+                'rounded-lg cursor-pointer transition-all duration-150 motion-reduce:transition-none -mx-2 px-2 py-1',
+                focusSection === 'description' ? 'ring-2 ring-vault-accent bg-vault-card' : '',
+              ].join(' ')}
+            >
+              <p
+                className={[
+                  'text-vault-muted text-sm leading-relaxed',
+                  descExpanded ? 'overflow-y-auto' : 'line-clamp-3',
+                ].join(' ')}
+                style={descExpanded ? { maxHeight: '30vh', scrollbarWidth: 'none' } : undefined}
+              >
+                {game.description}
+              </p>
+              {focusSection === 'description' && (
+                <span className="text-vault-accent text-xs font-bold uppercase tracking-wide flex items-center gap-1 mt-1">
+                  <Glyph type="cross" /> {descExpanded ? 'Collapse' : 'Expand'}
+                </span>
+              )}
+            </div>
           )}
 
           {launchError && (
