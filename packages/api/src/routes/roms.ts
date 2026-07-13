@@ -30,9 +30,22 @@ const LAUNCH_WRAPPER = path.resolve('scripts/launch-game.sh')
 
 const SAVES_DIR = process.env['RETROVAULT_SAVES_DIR'] ?? '/home/pi/RetroPie/saves'
 
-function saveStatePath(system: string, romPath: string): string {
+// RetroArch auto-saves as .state.auto; manual slots are .state / .state0–9
+const SAVE_EXTS = ['.state.auto', '.state', '.state0']
+
+function hasSaveState(system: string, romPath: string): boolean {
   const stem = path.parse(romPath).name
-  return path.join(SAVES_DIR, system, `${stem}.state`)
+  const dir = path.join(SAVES_DIR, system)
+  return SAVE_EXTS.some(ext => fs.existsSync(path.join(dir, stem + ext)))
+}
+
+function hideSaveStates(system: string, romPath: string): void {
+  const stem = path.parse(romPath).name
+  const dir = path.join(SAVES_DIR, system)
+  for (const ext of SAVE_EXTS) {
+    const p = path.join(dir, stem + ext)
+    if (fs.existsSync(p)) fs.renameSync(p, p + '.bak')
+  }
 }
 
 // systemd services don't have /opt/retropie/... on PATH, so resolve explicitly
@@ -53,7 +66,7 @@ romsRouter.get('/:id/savestate', (c) => {
   const id = parseInt(c.req.param('id'), 10)
   const rom = db.prepare('SELECT system, rom_path FROM roms WHERE id = ?').get(id) as { system: string; rom_path: string } | undefined
   if (!rom) return c.json({ error: 'Not found' }, 404)
-  return c.json({ exists: fs.existsSync(saveStatePath(rom.system, rom.rom_path)) })
+  return c.json({ exists: hasSaveState(rom.system, rom.rom_path) })
 })
 
 romsRouter.get('/:id', (c) => {
@@ -110,10 +123,7 @@ romsRouter.post('/:id/launch', async (c) => {
   }
 
   if (body.fresh) {
-    const statePath = saveStatePath(rom.system, rom.rom_path)
-    if (fs.existsSync(statePath)) {
-      fs.renameSync(statePath, statePath + '.bak')
-    }
+    hideSaveStates(rom.system, rom.rom_path)
   }
 
   return new Promise<Response>((resolve) => {
