@@ -85,7 +85,7 @@ export const api = {
 
   roms: {
     get: (id: number) => get<Rom>(`/roms/${id}`),
-    saveState: (id: number) => get<{ exists: boolean }>(`/roms/${id}/savestate`),
+    saveState: (id: number) => get<{ exists: boolean; found: string | null; checked: string[] }>(`/roms/${id}/savestate`),
     // user_id lets the server log the play session — the kiosk browser is
     // torn down during launch, so the frontend can't log it afterwards
     launch: (id: number, userId: number, fresh = false) =>

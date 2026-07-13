@@ -66,7 +66,11 @@ romsRouter.get('/:id/savestate', (c) => {
   const id = parseInt(c.req.param('id'), 10)
   const rom = db.prepare('SELECT system, rom_path FROM roms WHERE id = ?').get(id) as { system: string; rom_path: string } | undefined
   if (!rom) return c.json({ error: 'Not found' }, 404)
-  return c.json({ exists: hasSaveState(rom.system, rom.rom_path) })
+  const stem = path.parse(rom.rom_path).name
+  const dir = path.join(SAVES_DIR, rom.system)
+  const checked = SAVE_EXTS.map(ext => path.join(dir, stem + ext))
+  const found = checked.find(p => fs.existsSync(p)) ?? null
+  return c.json({ exists: found !== null, found, checked })
 })
 
 romsRouter.get('/:id', (c) => {

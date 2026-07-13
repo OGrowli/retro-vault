@@ -114,9 +114,12 @@ export function GameDetail({ game: initialGame, user, onBack }: Props) {
     if (launching !== null) return
     if (!fresh) {
       try {
-        const { exists } = await api.roms.saveState(rom.id)
-        if (exists) { setContinueRom(rom); return }
-      } catch { /* if check fails, proceed */ }
+        const result = await api.roms.saveState(rom.id)
+        if (result.exists) { setContinueRom(rom); return }
+      } catch (e) {
+        setLaunchError(`Save state check failed: ${e instanceof Error ? e.message : String(e)}`)
+        return
+      }
     }
     setContinueRom(null)
     setLaunching(rom.id)
