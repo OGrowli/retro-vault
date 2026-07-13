@@ -72,8 +72,8 @@ function RomRow({
           {launching ? (
             <span className="text-vault-muted text-xs uppercase tracking-wide">Launching…</span>
           ) : (
-            <span className="text-vault-accent text-xs font-bold uppercase tracking-wide flex items-center gap-1">
-              <Glyph type="cross" /> Launch
+            <span className="text-vault-accent text-xs font-bold uppercase tracking-wide">
+              Launch
             </span>
           )}
         </div>
@@ -367,7 +367,6 @@ export function GameDetail({ game: initialGame, user, onBack }: Props) {
               ? (isFavorite ? 'Unfavorite' : 'Favorite')
               : act === 'scrape' ? (scraping ? 'Scraping…' : 'Scrape Metadata')
               : 'Back'
-            const glyph = act === 'favorite' ? 'square' : act === 'scrape' ? 'triangle' : 'circle'
             return (
               <button
                 key={act}
@@ -379,7 +378,7 @@ export function GameDetail({ game: initialGame, user, onBack }: Props) {
                 }}
                 className={[
                   'px-6 py-3 rounded-xl font-bold text-sm uppercase tracking-wide transition-colors duration-150',
-                  'inline-flex items-center gap-2 motion-reduce:transition-none',
+                  'motion-reduce:transition-none',
                   act === 'back'
                     ? 'bg-vault-surface text-white border border-vault-muted'
                     : act === 'scrape'
@@ -390,7 +389,7 @@ export function GameDetail({ game: initialGame, user, onBack }: Props) {
                   focused ? 'ring-2 ring-white' : '',
                 ].join(' ')}
               >
-                <Glyph type={glyph as 'square' | 'triangle' | 'circle'} /> {label}
+                {label}
               </button>
             )
           })}
@@ -409,25 +408,24 @@ export function GameDetail({ game: initialGame, user, onBack }: Props) {
             </div>
             <div className="flex gap-3">
               {([
-                { label: 'Continue', glyph: 'cross', fresh: false },
-                { label: 'New Game', glyph: 'circle', fresh: true },
-              ] as const).map(({ label, glyph, fresh }, i) => (
+                { label: 'Continue', fresh: false },
+                { label: 'New Game', fresh: true },
+              ] as const).map(({ label, fresh }, i) => (
                 <button
                   key={label}
                   onClick={() => void doLaunch(continueRom, fresh)}
                   className={[
-                    'flex-1 px-4 py-3 rounded-xl font-bold text-sm uppercase tracking-wide',
-                    'flex items-center justify-center gap-2 transition-colors duration-150',
+                    'flex-1 px-4 py-3 rounded-xl font-bold text-sm uppercase tracking-wide transition-colors duration-150',
                     i === 0 ? 'bg-vault-accent text-white' : 'bg-vault-surface text-white border border-vault-muted',
                     continueIdx === i ? 'ring-4 ring-white' : '',
                   ].join(' ')}
                 >
-                  <Glyph type={glyph} /> {label}
+                  {label}
                 </button>
               ))}
             </div>
             <p className="text-vault-muted text-xs uppercase tracking-wide text-center">
-              ← → Select · <Glyph type="cross" /> Confirm · <Glyph type="circle" /> Cancel
+              ← → Select · D-Pad Confirm · Back Cancel
             </p>
           </div>
         </div>
