@@ -93,6 +93,7 @@ export function GameDetail({ game: initialGame, user, onBack }: Props) {
   const [launching, setLaunching] = useState<number | null>(null)
   const [launchError, setLaunchError] = useState<string | null>(null)
   const [continueRom, setContinueRom] = useState<Rom | null>(null)
+  const [continueIdx, setContinueIdx] = useState(0) // 0=Continue 1=New Game
   const [scraping, setScraping] = useState(false)
   const [scrapeError, setScrapeError] = useState<string | null>(null)
 
@@ -110,29 +111,30 @@ export function GameDetail({ game: initialGame, user, onBack }: Props) {
   const roms = detail?.roms ?? []
   const singleRom = roms.length === 1
 
-  const launch = useCallback(async (rom: Rom, fresh = false) => {
-    if (launching !== null) return
-    if (!fresh) {
-      try {
-        const result = await api.roms.saveState(rom.id)
-        if (result.exists) { setContinueRom(rom); return }
-      } catch (e) {
-        setLaunchError(`Save state check failed: ${e instanceof Error ? e.message : String(e)}`)
-        return
-      }
-    }
+  const doLaunch = useCallback(async (rom: Rom, fresh: boolean) => {
     setContinueRom(null)
     setLaunching(rom.id)
     setLaunchError(null)
     try {
       await api.roms.launch(rom.id, user.id, fresh)
-      // RetroArch takes over the display; clear the spinner in case it exits
       setTimeout(() => setLaunching(null), 10_000)
     } catch (e) {
       setLaunchError(e instanceof Error ? e.message : 'Launch failed')
       setLaunching(null)
     }
-  }, [launching, user.id])
+  }, [user.id])
+
+  const launch = useCallback(async (rom: Rom) => {
+    if (launching !== null) return
+    try {
+      const result = await api.roms.saveState(rom.id)
+      if (result.exists) { setContinueRom(rom); setContinueIdx(0); return }
+    } catch (e) {
+      setLaunchError(`Save state check failed: ${e instanceof Error ? e.message : String(e)}`)
+      return
+    }
+    void doLaunch(rom, false)
+  }, [launching, doLaunch])
 
   const toggleFavorite = useCallback(async () => {
     try {
@@ -160,8 +162,10 @@ export function GameDetail({ game: initialGame, user, onBack }: Props) {
 
   useGamepad((action) => {
     if (continueRom) {
-      if (action === 'confirm') void launch(continueRom, false)
-      if (action === 'back') void launch(continueRom, true)
+      if (action === 'left' || action === 'up') setContinueIdx(0)
+      if (action === 'right' || action === 'down') setContinueIdx(1)
+      if (action === 'confirm') void doLaunch(continueRom, continueIdx === 1)
+      if (action === 'back') setContinueRom(null)
       return
     }
     if (action === 'back') { onBack(); return }
@@ -404,19 +408,27 @@ export function GameDetail({ game: initialGame, user, onBack }: Props) {
               <p className="text-vault-muted text-sm mt-1">A save state was found for this game.</p>
             </div>
             <div className="flex gap-3">
-              <button
-                onClick={() => void launch(continueRom, false)}
-                className="flex-1 px-4 py-3 bg-vault-accent text-white rounded-xl font-bold text-sm uppercase tracking-wide flex items-center justify-center gap-2"
-              >
-                <Glyph type="cross" /> Continue
-              </button>
-              <button
-                onClick={() => void launch(continueRom, true)}
-                className="flex-1 px-4 py-3 bg-vault-surface text-white rounded-xl font-bold text-sm uppercase tracking-wide border border-vault-muted flex items-center justify-center gap-2"
-              >
-                <Glyph type="circle" /> New Game
-              </button>
+              {([
+                { label: 'Continue', glyph: 'cross', fresh: false },
+                { label: 'New Game', glyph: 'circle', fresh: true },
+              ] as const).map(({ label, glyph, fresh }, i) => (
+                <button
+                  key={label}
+                  onClick={() => void doLaunch(continueRom, fresh)}
+                  className={[
+                    'flex-1 px-4 py-3 rounded-xl font-bold text-sm uppercase tracking-wide',
+                    'flex items-center justify-center gap-2 transition-colors duration-150',
+                    i === 0 ? 'bg-vault-accent text-white' : 'bg-vault-surface text-white border border-vault-muted',
+                    continueIdx === i ? 'ring-4 ring-white' : '',
+                  ].join(' ')}
+                >
+                  <Glyph type={glyph} /> {label}
+                </button>
+              ))}
             </div>
+            <p className="text-vault-muted text-xs uppercase tracking-wide text-center">
+              ← → Select · <Glyph type="cross" /> Confirm · <Glyph type="circle" /> Cancel
+            </p>
           </div>
         </div>
       )}
