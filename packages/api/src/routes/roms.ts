@@ -28,44 +28,41 @@ romsRouter.get('resume', (c) => {
 // WorkingDirectory (repo root). Logs to ~/.retrovault/launch.log
 const LAUNCH_WRAPPER = path.resolve('scripts/launch-game.sh')
 
-// RetroArch auto-saves as .state.auto; manual slots are .state / .state0–9
+// RetroArch auto-saves as .state.auto; manual slots are .state / .state0–9.
+// RetroPie's runcommand sets savestate_directory to <roms_dir>/<emulator_name>/
+// (e.g. roms/gba/mGBA/, roms/nes/Nestopia/) — we don't know the emulator name
+// ahead of time, so scan the ROM's directory and its immediate subdirectories.
 const SAVE_EXTS = ['.state.auto', '.state', '.state0']
 
-// Read a single key from a retroarch.cfg-style file (key = "value" or key = value)
-function readRaCfgKey(cfgPath: string, key: string): string | null {
-  try {
-    const text = fs.readFileSync(cfgPath, 'utf8')
-    const re = new RegExp(`^\\s*${key}\\s*=\\s*"?([^"\\n]+)"?`, 'm')
-    const m = re.exec(text)
-    return m ? m[1].trim() : null
-  } catch {
-    return null
+function findSaveStates(romPath: string): string[] {
+  const stem = path.parse(romPath).name
+  const romDir = path.dirname(romPath)
+  const found: string[] = []
+
+  const checkDir = (dir: string) => {
+    for (const ext of SAVE_EXTS) {
+      const p = path.join(dir, stem + ext)
+      if (fs.existsSync(p)) found.push(p)
+    }
   }
+
+  checkDir(romDir)
+  try {
+    for (const entry of fs.readdirSync(romDir, { withFileTypes: true })) {
+      if (entry.isDirectory()) checkDir(path.join(romDir, entry.name))
+    }
+  } catch { /* ignore unreadable dirs */ }
+
+  return found
 }
 
-// Resolve savestate_directory the same way runcommand.sh does:
-// global config, then system override, then env/hardcoded fallback.
-function savestateDir(system: string): string {
-  const global  = '/opt/retropie/configs/all/retroarch.cfg'
-  const perSys  = `/opt/retropie/configs/${system}/retroarch.cfg`
-  const fallback = process.env['RETROVAULT_SAVES_DIR'] ?? '/home/pi/RetroPie/saves'
-  return readRaCfgKey(perSys, 'savestate_directory')
-      ?? readRaCfgKey(global, 'savestate_directory')
-      ?? fallback
+function hasSaveState(_system: string, romPath: string): boolean {
+  return findSaveStates(romPath).length > 0
 }
 
-function hasSaveState(system: string, romPath: string): boolean {
-  const stem = path.parse(romPath).name
-  const dir = savestateDir(system)
-  return SAVE_EXTS.some(ext => fs.existsSync(path.join(dir, stem + ext)))
-}
-
-function hideSaveStates(system: string, romPath: string): void {
-  const stem = path.parse(romPath).name
-  const dir = savestateDir(system)
-  for (const ext of SAVE_EXTS) {
-    const p = path.join(dir, stem + ext)
-    if (fs.existsSync(p)) fs.renameSync(p, p + '.bak')
+function hideSaveStates(_system: string, romPath: string): void {
+  for (const p of findSaveStates(romPath)) {
+    fs.renameSync(p, p + '.bak')
   }
 }
 
@@ -87,11 +84,8 @@ romsRouter.get('/:id/savestate', (c) => {
   const id = parseInt(c.req.param('id'), 10)
   const rom = db.prepare('SELECT system, rom_path FROM roms WHERE id = ?').get(id) as { system: string; rom_path: string } | undefined
   if (!rom) return c.json({ error: 'Not found' }, 404)
-  const stem = path.parse(rom.rom_path).name
-  const dir = savestateDir(rom.system)
-  const checked = SAVE_EXTS.map(ext => path.join(dir, stem + ext))
-  const found = checked.find(p => fs.existsSync(p)) ?? null
-  return c.json({ exists: found !== null, found, checked })
+  const found = findSaveStates(rom.rom_path)
+  return c.json({ exists: found.length > 0, found })
 })
 
 romsRouter.get('/:id', (c) => {
