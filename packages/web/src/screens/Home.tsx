@@ -19,14 +19,18 @@ interface Props {
   onGameSelect: (game: Game) => void
   onSwitchUser: () => void
   onSettings: () => void
+  onSeeMore: (title: string, games: Game[]) => void
   onLibraryChange?: () => void
   inputActive?: boolean
 }
 
 const CONTINUE_THRESHOLD = 5 * 60
+// Show a "See More" tile once a rail overflows enough to be clunky to scroll.
+const SEE_MORE_MIN = 6
 
-export function Home({ user, systems, genres, onGameSelect, onSwitchUser, onSettings, onLibraryChange, inputActive = true }: Props) {
+export function Home({ user, systems, genres, onGameSelect, onSwitchUser, onSettings, onSeeMore, onLibraryChange, inputActive = true }: Props) {
   const [recent, setRecent] = useState<Game[]>([])
+  const [recentAll, setRecentAll] = useState<Game[]>([])
   const [favorites, setFavorites] = useState<Game[]>([])
   const [allGames, setAllGames] = useState<Game[]>([])
   const [loading, setLoading] = useState(true)
@@ -43,15 +47,16 @@ export function Home({ user, systems, genres, onGameSelect, onSwitchUser, onSett
   const [rawHistory, setRawHistory] = useState<HistoryEntry[]>([])
   const [searchVkOpen, setSearchVkOpen] = useState(false)
 
-  const historyToRecent = (history: HistoryEntry[]): Game[] =>
-    history
+  const historyToGames = (history: HistoryEntry[], limit?: number): Game[] => {
+    const deduped = history
       .filter((h, i, arr) => arr.findIndex(x => x.id === h.id) === i)
-      .slice(0, 8)
       .map(h => ({
         id: h.id, name: h.name, system: h.system, genre: h.genre,
         year: h.year, players: h.players, description: h.description,
         box_art_path: h.box_art_path, scraped_at: h.scraped_at,
       } as Game))
+    return limit ? deduped.slice(0, limit) : deduped
+  }
 
   useEffect(() => {
     Promise.all([
@@ -59,8 +64,9 @@ export function Home({ user, systems, genres, onGameSelect, onSwitchUser, onSett
       api.users.favorites(user.id),
       api.games.list(filter, user.id),
     ]).then(([history, favs, games]) => {
-      const recentGames = historyToRecent(history)
+      const recentGames = historyToGames(history, 8)
       setRecent(recentGames)
+      setRecentAll(historyToGames(history))
       setRawHistory(history.slice(0, 40))
       setFavorites(favs)
       setAllGames(games)
@@ -82,7 +88,8 @@ export function Home({ user, systems, genres, onGameSelect, onSwitchUser, onSett
     if (inputActive && !prevActiveRef.current) {
       Promise.all([api.users.history(user.id), api.users.favorites(user.id)])
         .then(([history, favs]) => {
-          setRecent(historyToRecent(history))
+          setRecent(historyToGames(history, 8))
+          setRecentAll(historyToGames(history))
           setRawHistory(history.slice(0, 40))
           setFavorites(favs)
         }).catch(() => {})
@@ -178,11 +185,16 @@ export function Home({ user, systems, genres, onGameSelect, onSwitchUser, onSett
     setFilterOpen(false)
   }
 
+  const recentSeeMore = recentAll.length > SEE_MORE_MIN
+  const favoritesSeeMore = favorites.length > SEE_MORE_MIN
+
   const nav = useSpatialNav({
     recentCount: recent.length,
     favoritesCount: favorites.length,
     allGamesCount: allGames.length,
     gridCols: GRID_COLS,
+    recentSeeMore,
+    favoritesSeeMore,
     filterDrawerRowCounts: drawerRows.map(r => r.count),
     filterDrawerOpen: filterOpen,
     onToggleFilter: () => setFilterOpen(v => !v),
@@ -199,6 +211,12 @@ export function Home({ user, systems, genres, onGameSelect, onSwitchUser, onSett
           default: toggleDrawerChip(rowDef.kind, col)
         }
         return
+      }
+      if (region === 'recently-played' && recentSeeMore && col === recent.length) {
+        onSeeMore('Recently Played', recentAll); return
+      }
+      if (region === 'favorites' && favoritesSeeMore && col === favorites.length) {
+        onSeeMore('Favorites', favorites); return
       }
       let game: Game | undefined
       if (region === 'recently-played') game = recent[col]
@@ -304,6 +322,7 @@ export function Home({ user, systems, genres, onGameSelect, onSwitchUser, onSett
           getContinueLabel={getContinueLabel}
           onFocusGame={setBgGame}
           onSelectGame={onGameSelect}
+          onSeeMore={recentSeeMore ? () => onSeeMore('Recently Played', recentAll) : undefined}
         />
 
         {(favorites.length > 0 || loading) && (
@@ -316,6 +335,7 @@ export function Home({ user, systems, genres, onGameSelect, onSwitchUser, onSett
             skeletonCount={6}
             onFocusGame={setBgGame}
             onSelectGame={onGameSelect}
+            onSeeMore={favoritesSeeMore ? () => onSeeMore('Favorites', favorites) : undefined}
           />
         )}
 

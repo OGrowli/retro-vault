@@ -17,9 +17,11 @@ interface Props {
   isActiveRegion: boolean
   onFocusGame?: (game: Game) => void
   onSelectGame?: (game: Game) => void
+  /** Section heading; pass "" to render the grid with no heading */
+  title?: string
 }
 
-export function VirtualGrid({ games, loading, focusedRow, focusedCol, isActiveRegion, onFocusGame, onSelectGame }: Props) {
+export function VirtualGrid({ games, loading, focusedRow, focusedCol, isActiveRegion, onFocusGame, onSelectGame, title = 'All Games' }: Props) {
   const totalRows = Math.ceil(games.length / COLS)
   const windowStartRef = useRef(0)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -73,7 +75,7 @@ export function VirtualGrid({ games, loading, focusedRow, focusedCol, isActiveRe
 
   return (
     <section className="px-[5%] py-3">
-      <h2 className="text-white text-lg font-semibold mb-3 tracking-wide">All Games</h2>
+      {title && <h2 className="text-white text-lg font-semibold mb-3 tracking-wide">{title}</h2>}
       <div ref={containerRef}>
         {loading ? (
           <div className="flex gap-4 flex-wrap">

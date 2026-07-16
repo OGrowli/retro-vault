@@ -34,6 +34,16 @@ const LAUNCH_WRAPPER = path.resolve('scripts/launch-game.sh')
 // ahead of time, so scan the ROM's directory and its immediate subdirectories.
 const SAVE_EXTS = ['.state.auto', '.state', '.state0']
 
+// Some libretro cores crash when RetroArch autoloads a save state (vecx's
+// serialize/unserialize is unstable) — clicking Continue hard-crashes the
+// game. Treat these systems as stateless: never offer Continue, and hide any
+// stray .state.auto on launch so RetroArch can't autoload it.
+const SAVESTATE_UNSUPPORTED = new Set(['vectrex'])
+
+function supportsSaveStates(system: string): boolean {
+  return !SAVESTATE_UNSUPPORTED.has(system.toLowerCase())
+}
+
 function findSaveStates(romPath: string): string[] {
   const stem = path.parse(romPath).name
   const romDir = path.dirname(romPath)
@@ -56,8 +66,8 @@ function findSaveStates(romPath: string): string[] {
   return found
 }
 
-function hasSaveState(_system: string, romPath: string): boolean {
-  return findSaveStates(romPath).length > 0
+function hasSaveState(system: string, romPath: string): boolean {
+  return supportsSaveStates(system) && findSaveStates(romPath).length > 0
 }
 
 function hideSaveStates(_system: string, romPath: string): void {
@@ -84,6 +94,7 @@ romsRouter.get('/:id/savestate', (c) => {
   const id = parseInt(c.req.param('id'), 10)
   const rom = db.prepare('SELECT system, rom_path FROM roms WHERE id = ?').get(id) as { system: string; rom_path: string } | undefined
   if (!rom) return c.json({ error: 'Not found' }, 404)
+  if (!supportsSaveStates(rom.system)) return c.json({ exists: false, found: [] })
   const found = findSaveStates(rom.rom_path)
   return c.json({ exists: found.length > 0, found })
 })
@@ -141,7 +152,9 @@ romsRouter.post('/:id/launch', async (c) => {
     args = ['-L', sysConfig.corePath, rom.rom_path]
   }
 
-  if (body.fresh) {
+  // Hide states on an explicit New Game, and always for cores that crash on
+  // autoload (vecx) so RetroArch can't autoload a stray .state.auto.
+  if (body.fresh || !supportsSaveStates(rom.system)) {
     hideSaveStates(rom.system, rom.rom_path)
   }
 

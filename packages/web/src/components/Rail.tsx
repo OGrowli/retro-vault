@@ -14,6 +14,8 @@ interface Props {
   onSelectGame?: (game: Game) => void
   getContinueLabel?: (game: Game) => string | undefined
   size?: 'sm' | 'lg'
+  /** When set, a focusable "See More" tile is appended after the last card */
+  onSeeMore?: () => void
 }
 
 export function Rail({
@@ -27,6 +29,7 @@ export function Rail({
   onSelectGame,
   getContinueLabel,
   size = 'sm',
+  onSeeMore,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const cardRefs = useRef<(HTMLDivElement | null)[]>([])
@@ -67,6 +70,25 @@ export function Rail({
                 </div>
               )
             })}
+
+        {!loading && onSeeMore && (
+          <div ref={el => { cardRefs.current[games.length] = el }}>
+            <button
+              onClick={onSeeMore}
+              className={[
+                'flex-shrink-0 rounded-xl flex flex-col items-center justify-center gap-2',
+                'bg-vault-card text-vault-muted hover:text-white transition-colors cursor-pointer',
+                size === 'lg' ? 'w-56 h-72' : 'w-44 h-60',
+                isActiveRegion && focusedIndex === games.length ? 'ring-4 ring-vault-accent-bright' : 'ring-0',
+              ].join(' ')}
+            >
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 18l6-6-6-6" />
+              </svg>
+              <span className="text-sm font-semibold uppercase tracking-wide">See More</span>
+            </button>
+          </div>
+        )}
       </div>
     </section>
   )

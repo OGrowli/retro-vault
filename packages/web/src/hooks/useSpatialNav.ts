@@ -21,6 +21,9 @@ interface UseSpatialNavOptions {
   favoritesCount: number
   allGamesCount: number
   gridCols: number
+  /** Adds one focusable "See More" slot at the end of the row */
+  recentSeeMore?: boolean
+  favoritesSeeMore?: boolean
   /** Column count per drawer row; row order defined by the drawer layout */
   filterDrawerRowCounts: number[]
   onConfirm?: (region: Region, row: number, col: number) => void
@@ -112,15 +115,17 @@ export function useSpatialNav(opts: UseSpatialNavOptions) {
 
     if (region === 'recently-played') {
       const cur = indices['recently-played']
-      if (action === 'left') updateIndex('recently-played', { col: clamp(cur.col - 1, 0, o.recentCount - 1) })
-      if (action === 'right') updateIndex('recently-played', { col: clamp(cur.col + 1, 0, o.recentCount - 1) })
+      const maxCol = o.recentCount - 1 + (o.recentSeeMore ? 1 : 0)
+      if (action === 'left') updateIndex('recently-played', { col: clamp(cur.col - 1, 0, maxCol) })
+      if (action === 'right') updateIndex('recently-played', { col: clamp(cur.col + 1, 0, maxCol) })
       if (action === 'down') setRegion(o.favoritesCount > 0 ? 'favorites' : 'all-games')
     }
 
     if (region === 'favorites') {
       const cur = indices['favorites']
-      if (action === 'left') updateIndex('favorites', { col: clamp(cur.col - 1, 0, o.favoritesCount - 1) })
-      if (action === 'right') updateIndex('favorites', { col: clamp(cur.col + 1, 0, o.favoritesCount - 1) })
+      const maxCol = o.favoritesCount - 1 + (o.favoritesSeeMore ? 1 : 0)
+      if (action === 'left') updateIndex('favorites', { col: clamp(cur.col - 1, 0, maxCol) })
+      if (action === 'right') updateIndex('favorites', { col: clamp(cur.col + 1, 0, maxCol) })
       if (action === 'up') setRegion('recently-played')
       if (action === 'down') setRegion('all-games')
     }
