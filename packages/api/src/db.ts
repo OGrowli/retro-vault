@@ -157,6 +157,16 @@ db.exec(`
     value TEXT NOT NULL
   );
 
+  CREATE TABLE IF NOT EXISTS events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    level TEXT NOT NULL DEFAULT 'error',
+    category TEXT NOT NULL,
+    message TEXT NOT NULL,
+    detail TEXT,
+    game_id INTEGER REFERENCES games(id) ON DELETE SET NULL
+  );
+
   -- Raw ScreenScraper 'jeu' payload per game, for re-parsing without re-fetching
   CREATE TABLE IF NOT EXISTS ss_games (
     game_id INTEGER PRIMARY KEY REFERENCES games(id) ON DELETE CASCADE,
@@ -183,6 +193,8 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_games_system ON games(system);
   CREATE INDEX IF NOT EXISTS idx_lists_user ON lists(user_id);
   CREATE INDEX IF NOT EXISTS idx_list_games_list ON list_games(list_id);
+  CREATE INDEX IF NOT EXISTS idx_events_created ON events(created_at);
+  CREATE INDEX IF NOT EXISTS idx_events_category ON events(category);
 `)
 
 if (schemaVersion < 2) {
@@ -284,4 +296,25 @@ export function parseFilter(query: Record<string, string | string[]>): GameFilte
   if (userId) filter.userId = userId as string
 
   return filter
+}
+
+export interface LogEventInput {
+  level?: 'info' | 'warn' | 'error'
+  category: string
+  message: string
+  detail?: Record<string, unknown>
+  gameId?: number | null
+}
+
+export function logEvent(input: LogEventInput): void {
+  db.prepare(`
+    INSERT INTO events (level, category, message, detail, game_id)
+    VALUES (?, ?, ?, ?, ?)
+  `).run(
+    input.level ?? 'error',
+    input.category,
+    input.message,
+    input.detail ? JSON.stringify(input.detail) : null,
+    input.gameId ?? null,
+  )
 }

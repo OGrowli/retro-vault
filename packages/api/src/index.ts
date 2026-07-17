@@ -14,6 +14,7 @@ import { metaRouter } from './routes/meta.js'
 import { importRouter } from './routes/import.js'
 import { scrapeRouter } from './routes/scrape.js'
 import { settingsRouter } from './routes/settings.js'
+import { eventsRouter } from './routes/events.js'
 import { ensureBgVariant } from './scraper.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -31,6 +32,7 @@ app.route('/meta', metaRouter)
 app.route('/import', importRouter)
 app.route('/scrape', scrapeRouter)
 app.route('/settings', settingsRouter)
+app.route('/events', eventsRouter)
 
 const DATA_DIR = process.env['RETROVAULT_DATA_DIR'] ?? path.join(os.homedir(), '.retrovault')
 

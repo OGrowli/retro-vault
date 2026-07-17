@@ -3,7 +3,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import sharp from 'sharp'
-import { db, getSetting } from './db.js'
+import { db, getSetting, logEvent } from './db.js'
 
 const DATA_DIR = process.env['RETROVAULT_DATA_DIR'] ?? path.join(os.homedir(), '.retrovault')
 const MEDIA_DIR = path.join(DATA_DIR, 'media')
@@ -247,7 +247,10 @@ export async function scrapeGame(gameId: number, username: string, password: str
     LIMIT 1
   `).get(gameId) as SSGameRow | undefined
 
-  if (!game) return { success: false, error: 'Game not found or has no ROMs' }
+  if (!game) {
+    logEvent({ category: 'scrape', message: 'Game not found or has no ROMs', gameId })
+    return { success: false, error: 'Game not found or has no ROMs' }
+  }
 
   // Credentials: saved settings first, env vars as fallback
   const devId = getSetting('ss_dev_id') || DEV_ID
@@ -262,7 +265,10 @@ export async function scrapeGame(gameId: number, username: string, password: str
   }
 
   const systemId = SCREENSCRAPER_SYSTEM_IDS[game.system.toLowerCase()]
-  if (!systemId) return { success: false, error: `No ScreenScraper ID for system: ${game.system}` }
+  if (!systemId) {
+    logEvent({ category: 'scrape', message: `No ScreenScraper ID for system: ${game.system}`, gameId: game.id, detail: { system: game.system, romPath: game.rom_path } })
+    return { success: false, error: `No ScreenScraper ID for system: ${game.system}` }
+  }
 
   const baseParams = new URLSearchParams({
     devid: devId,
@@ -285,6 +291,7 @@ export async function scrapeGame(gameId: number, username: string, password: str
   try {
     jeu = await fetchSSJeu(mergeParams(new URLSearchParams({ romnom: path.basename(game.rom_path) })))
   } catch (e) {
+    logEvent({ category: 'scrape', message: String(e), gameId: game.id, detail: { system: game.system, romPath: game.rom_path } })
     return { success: false, error: String(e) }
   }
 
@@ -296,7 +303,10 @@ export async function scrapeGame(gameId: number, username: string, password: str
     }
   }
 
-  if (!jeu) return { success: false, error: 'No game data in ScreenScraper response' }
+  if (!jeu) {
+    logEvent({ category: 'scrape', message: 'No game data in ScreenScraper response', gameId: game.id, detail: { system: game.system, romPath: game.rom_path } })
+    return { success: false, error: 'No game data in ScreenScraper response' }
+  }
 
   // Name
   const names = jeu['noms'] as Array<{ region: string; text: string }> | undefined

@@ -209,6 +209,7 @@ export function FilterDrawer({
               placeholder="Game name..."
               value={filter.query ?? ''}
               onChange={e => onChange({ ...filter, query: e.target.value || undefined })}
+              onKeyDown={e => { if (e.key === 'Enter') onApply() }}
               data-drawer-focused={isFocused('search') ? 'true' : undefined}
               className={[
                 'w-full bg-vault-surface border rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-vault-accent',

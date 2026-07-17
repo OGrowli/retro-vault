@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import { spawn } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
-import { db } from '../db.js'
+import { db, logEvent } from '../db.js'
 import { getSystemConfig } from '../systems.config.js'
 
 export const romsRouter = new Hono()
@@ -138,7 +138,15 @@ romsRouter.post('/:id/launch', async (c) => {
   } else {
     // Dev machines / no wrapper: direct retroarch
     const sysConfig = getSystemConfig(rom.system)
-    if (!sysConfig) return c.json({ error: `No core configured for system: ${rom.system}` }, 422)
+    if (!sysConfig) {
+      logEvent({
+        category: 'rom_launch',
+        message: `No core configured for system: ${rom.system}`,
+        gameId: rom.game_id,
+        detail: { system: rom.system, romPath: rom.rom_path },
+      })
+      return c.json({ error: `No core configured for system: ${rom.system}` }, 422)
+    }
 
     const retroarch = resolveRetroarch()
     if (!retroarch) {
@@ -195,6 +203,12 @@ romsRouter.post('/:id/launch', async (c) => {
     }
     child.on('error', (err) => {
       dropSession()
+      logEvent({
+        category: 'rom_launch',
+        message: `RetroArch launch failed: ${err.message}`,
+        gameId: rom.game_id,
+        detail: { system: rom.system, romPath: rom.rom_path },
+      })
       settle(c.json({ error: `Launch failed: ${err.message}` }, 500))
     })
     // The wrapper runs for the whole game session — an exit within the first
