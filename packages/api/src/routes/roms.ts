@@ -4,6 +4,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { db, logEvent } from '../db.js'
 import { getSystemConfig } from '../systems.config.js'
+import { existingOverridePaths } from '../retroarch-overrides.js'
 
 export const romsRouter = new Hono()
 
@@ -126,6 +127,12 @@ romsRouter.post('/:id/launch', async (c) => {
     return c.json({ error: `ROM file not found: ${rom.rom_path}` }, 422)
   }
 
+  // RetroArch resolves these binds at the frontend level (before input reaches
+  // the core), so a single --appendconfig works uniformly across every core.
+  // Only pass the flag when at least one override file actually exists.
+  const overridePaths = existingOverridePaths(rom.system)
+  const appendConfigArg = overridePaths.length ? `--appendconfig=${overridePaths.join(',')}` : null
+
   let cmd: string
   let args: string[]
 
@@ -135,6 +142,8 @@ romsRouter.post('/:id/launch', async (c) => {
     args = [LAUNCH_WRAPPER, rom.system, rom.rom_path]
     // Core path lets the wrapper fall back to direct retroarch on non-RetroPie setups
     if (sysConfig && fs.existsSync(sysConfig.corePath)) args.push(sysConfig.corePath)
+    // 4th positional arg: the launch wrapper forwards it to retroarch's --appendconfig
+    if (appendConfigArg) args.push(appendConfigArg)
   } else {
     // Dev machines / no wrapper: direct retroarch
     const sysConfig = getSystemConfig(rom.system)
@@ -158,6 +167,7 @@ romsRouter.post('/:id/launch', async (c) => {
 
     cmd = retroarch
     args = ['-L', sysConfig.corePath, rom.rom_path]
+    if (appendConfigArg) args.push(appendConfigArg)
   }
 
   // Hide states on an explicit New Game, and always for cores that crash on

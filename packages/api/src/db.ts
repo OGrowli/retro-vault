@@ -167,6 +167,22 @@ db.exec(`
     game_id INTEGER REFERENCES games(id) ON DELETE SET NULL
   );
 
+  -- One row per system (created on first save). config_json shape is flexible
+  -- per system so different controllers can carry different button sets.
+  CREATE TABLE IF NOT EXISTS controller_settings (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    system TEXT NOT NULL UNIQUE,
+    config_json TEXT NOT NULL,
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  -- Single global hotkey row (id fixed at 1).
+  CREATE TABLE IF NOT EXISTS hotkey_settings (
+    id INTEGER PRIMARY KEY,
+    config_json TEXT NOT NULL,
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
   -- Raw ScreenScraper 'jeu' payload per game, for re-parsing without re-fetching
   CREATE TABLE IF NOT EXISTS ss_games (
     game_id INTEGER PRIMARY KEY REFERENCES games(id) ON DELETE CASCADE,

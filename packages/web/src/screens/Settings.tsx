@@ -9,9 +9,11 @@ import { VirtualKeyboard } from '../components/VirtualKeyboard'
 interface Props {
   systems: string[]
   onBack: () => void
+  onOpenControllers: () => void
+  onOpenHotkeys: () => void
 }
 
-const FOCUS_ITEMS = ['dev-id', 'dev-password', 'username', 'password', 'save-creds', 'scrape-all', 'scrape-system', 'back'] as const
+const FOCUS_ITEMS = ['dev-id', 'dev-password', 'username', 'password', 'save-creds', 'scrape-all', 'scrape-system', 'controllers', 'hotkeys', 'update', 'back'] as const
 type FocusItem = (typeof FOCUS_ITEMS)[number]
 
 type CredField = 'dev-id' | 'dev-password' | 'username' | 'password'
@@ -56,7 +58,64 @@ async function streamScrape(
   }
 }
 
-export function Settings({ systems, onBack }: Props) {
+// Rebooting the device is disruptive — gate the update behind an explicit
+// confirm (defaulting focus to Cancel) with its own gamepad handling.
+function UpdateConfirmModal({ updating, onConfirm, onCancel }: {
+  updating: boolean
+  onConfirm: () => void
+  onCancel: () => void
+}) {
+  const [focus, setFocus] = useState<'confirm' | 'cancel'>('cancel')
+
+  useGamepad((action) => {
+    if (updating) return
+    if (action === 'back') { onCancel(); return }
+    if (action === 'left' || action === 'right') setFocus(f => (f === 'confirm' ? 'cancel' : 'confirm'))
+    if (action === 'confirm') { if (focus === 'confirm') onConfirm(); else onCancel() }
+  }, true)
+
+  return (
+    <>
+      <div className="fixed inset-0 bg-black/80 z-40" onClick={updating ? undefined : onCancel} />
+      <div className="fixed inset-0 z-50 flex items-center justify-center px-6">
+        <div className="bg-vault-card rounded-2xl p-8 w-full max-w-sm space-y-5" style={{ boxShadow: '0 24px 64px rgba(0,0,0,0.6)' }}>
+          <div>
+            <h2 className="text-white text-xl font-bold">Update RetroVault?</h2>
+            <p className="text-vault-muted text-sm mt-2">
+              Pulls the latest code, rebuilds, and reboots the device. This can take a few minutes and
+              will interrupt any running game.
+            </p>
+          </div>
+          <div className="flex gap-3">
+            {([
+              { key: 'cancel', label: 'Cancel' },
+              { key: 'confirm', label: updating ? 'Starting…' : 'Update & Reboot' },
+            ] as const).map(({ key, label }) => (
+              <button
+                key={key}
+                disabled={updating}
+                onClick={() => { if (key === 'confirm') onConfirm(); else onCancel() }}
+                className={[
+                  'flex-1 px-4 py-3 rounded-xl font-bold text-sm uppercase tracking-wide transition-colors duration-150',
+                  key === 'confirm' ? 'bg-vault-accent text-white' : 'bg-vault-surface text-white border border-vault-muted',
+                  focus === key ? 'ring-2 ring-white' : '',
+                  updating ? 'opacity-60' : '',
+                ].join(' ')}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <p className="text-vault-muted text-xs uppercase tracking-wide text-center">
+            ← → Select · <Glyph type="cross" /> Confirm · <Glyph type="circle" /> Cancel
+          </p>
+        </div>
+      </div>
+    </>
+  )
+}
+
+export function Settings({ systems, onBack, onOpenControllers, onOpenHotkeys }: Props) {
   const [devId, setDevId] = useState('')
   const [devPassword, setDevPassword] = useState('')
   const [username, setUsername] = useState('')
@@ -68,6 +127,9 @@ export function Settings({ systems, onBack }: Props) {
   const [error, setError] = useState<string | null>(null)
   const [saveMsg, setSaveMsg] = useState<string | null>(null)
   const [vkField, setVkField] = useState<CredField | null>(null)
+  const [updateOpen, setUpdateOpen] = useState(false)
+  const [updating, setUpdating] = useState(false)
+  const [updateMsg, setUpdateMsg] = useState<string | null>(null)
   const abortRef = useRef<AbortController | null>(null)
 
   const focusIdx = FOCUS_ITEMS.indexOf(focused)
@@ -105,6 +167,20 @@ export function Settings({ systems, onBack }: Props) {
     abortRef.current?.abort()
     abortRef.current = null
     setRunning(false)
+  }, [])
+
+  const runUpdate = useCallback(async () => {
+    setUpdating(true)
+    setUpdateMsg(null)
+    try {
+      await api.system.update()
+      setUpdateMsg('Update started — the device will rebuild and reboot shortly.')
+    } catch (e) {
+      setUpdateMsg(e instanceof Error ? e.message : 'Update failed to start')
+    } finally {
+      setUpdating(false)
+      setUpdateOpen(false)
+    }
   }, [])
 
   const scrapeAll = useCallback(async () => {
@@ -167,9 +243,12 @@ export function Settings({ systems, onBack }: Props) {
       if (focused === 'save-creds') void saveCreds()
       if (focused === 'scrape-all') void scrapeAll()
       if (focused === 'scrape-system') void scrapeSystem()
+      if (focused === 'controllers') onOpenControllers()
+      if (focused === 'hotkeys') onOpenHotkeys()
+      if (focused === 'update') setUpdateOpen(true)
       if (focused === 'back') onBack()
     }
-  }, !running && !vkField)
+  }, !running && !vkField && !updateOpen)
 
   const isFocused = (item: FocusItem) => focused === item
 
@@ -300,6 +379,60 @@ export function Settings({ systems, onBack }: Props) {
           </div>
         </section>
 
+        {/* Controls */}
+        <section>
+          <h2 className="text-vault-muted text-xs uppercase tracking-widest mb-4">Controls</h2>
+          <div className="space-y-3 max-w-sm">
+            <button
+              onClick={onOpenControllers}
+              className={[
+                'w-full py-4 rounded-xl font-bold text-white uppercase tracking-wide text-sm text-left px-5',
+                'bg-vault-surface border border-vault-muted transition-colors duration-150 motion-reduce:transition-none',
+                isFocused('controllers') ? 'ring-2 ring-white border-vault-accent' : '',
+              ].join(' ')}
+            >
+              Controller Settings
+              <span className="block text-vault-muted text-[0.7rem] font-normal normal-case tracking-normal mt-0.5">
+                Remap buttons per system
+              </span>
+            </button>
+            <button
+              onClick={onOpenHotkeys}
+              className={[
+                'w-full py-4 rounded-xl font-bold text-white uppercase tracking-wide text-sm text-left px-5',
+                'bg-vault-surface border border-vault-muted transition-colors duration-150 motion-reduce:transition-none',
+                isFocused('hotkeys') ? 'ring-2 ring-white border-vault-accent' : '',
+              ].join(' ')}
+            >
+              Emulator Hotkeys
+              <span className="block text-vault-muted text-[0.7rem] font-normal normal-case tracking-normal mt-0.5">
+                Save states, fast-forward, reset — all systems
+              </span>
+            </button>
+          </div>
+        </section>
+
+        {/* System */}
+        <section>
+          <h2 className="text-vault-muted text-xs uppercase tracking-widest mb-4">System</h2>
+          <div className="space-y-3 max-w-sm">
+            <button
+              onClick={() => setUpdateOpen(true)}
+              className={[
+                'w-full py-4 rounded-xl font-bold text-white uppercase tracking-wide text-sm text-left px-5',
+                'bg-vault-surface border border-vault-muted transition-colors duration-150 motion-reduce:transition-none',
+                isFocused('update') ? 'ring-2 ring-white border-vault-accent' : '',
+              ].join(' ')}
+            >
+              Update RetroVault
+              <span className="block text-vault-muted text-[0.7rem] font-normal normal-case tracking-normal mt-0.5">
+                Pull latest, rebuild, and reboot
+              </span>
+            </button>
+            {updateMsg && <p className="text-vault-accent text-sm">{updateMsg}</p>}
+          </div>
+        </section>
+
         {/* Progress */}
         {(running || progress) && (
           <section>
@@ -364,6 +497,13 @@ export function Settings({ systems, onBack }: Props) {
           <Glyph type="circle" /> Back  ·  D-Pad Navigate  ·  <Glyph type="cross" /> Select
         </p>
       </div>
+      {updateOpen && (
+        <UpdateConfirmModal
+          updating={updating}
+          onConfirm={() => void runUpdate()}
+          onCancel={() => setUpdateOpen(false)}
+        />
+      )}
       {vkField && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 px-4">
           <div className="bg-vault-card rounded-2xl p-6 w-full max-w-[480px] max-h-[90vh] overflow-y-auto space-y-4" style={{ scrollbarWidth: 'none' }}>

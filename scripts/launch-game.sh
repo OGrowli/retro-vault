@@ -6,7 +6,7 @@
 # So: stop the kiosk's getty session (kills X), run the game on tty1 via
 # openvt, then restart getty — autologin + .bash_profile bring the kiosk back.
 #
-# Usage: launch-game.sh <system> <rom_path> [core_path]
+# Usage: launch-game.sh <system> <rom_path> [core_path] [--appendconfig=...]
 # Logs:  ~/.retrovault/launch.log
 
 LOG="$HOME/.retrovault/launch.log"
@@ -16,6 +16,9 @@ exec >> "$LOG" 2>&1
 SYSTEM="$1"
 ROM="$2"
 CORE="${3:-}"
+# Optional RetroArch --appendconfig=... flag (RetroVault controller/hotkey overrides).
+# Only forwarded on the direct-retroarch path; runcommand.sh does not accept it.
+APPENDCONFIG="${4:-}"
 RUNCOMMAND="/opt/retropie/supplementary/runcommand/runcommand.sh"
 
 echo "=== $(date -Is) launching [$SYSTEM] $ROM"
@@ -50,7 +53,7 @@ if [ -f "$RUNCOMMAND" ]; then
   RC=$?
 elif [ -n "$CORE" ]; then
   RETROARCH="$(command -v retroarch || echo /opt/retropie/emulators/retroarch/bin/retroarch)"
-  sudo openvt -c 1 -s -w -f -- sudo -u pi -H "$RETROARCH" -L "$CORE" "$ROM"
+  sudo openvt -c 1 -s -w -f -- sudo -u pi -H "$RETROARCH" -L "$CORE" "$ROM" ${APPENDCONFIG:+"$APPENDCONFIG"}
   RC=$?
 else
   echo "ERROR: no runcommand.sh and no core path given — cannot launch"

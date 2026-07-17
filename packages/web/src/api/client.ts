@@ -1,6 +1,7 @@
 import type {
   Game, GameFilter, GameWithRoms, Rom, User,
   HistoryEntry, SessionWithRom, GameList,
+  ControllerConfig, HotkeyConfig,
 } from '@retro-vault/shared'
 
 function filterToParams(filter: GameFilter, userId?: number): string {
@@ -43,6 +44,17 @@ async function post<T>(url: string, body?: unknown): Promise<T> {
     headers: body ? { 'Content-Type': 'application/json' } : {},
     body: body ? JSON.stringify(body) : undefined,
     signal: AbortSignal.timeout(30_000),
+  })
+  if (!res.ok) throw new Error(await extractError(res))
+  return res.json() as Promise<T>
+}
+
+async function put<T>(url: string, body?: unknown): Promise<T> {
+  const res = await fetch(url, {
+    method: 'PUT',
+    headers: body ? { 'Content-Type': 'application/json' } : {},
+    body: body ? JSON.stringify(body) : undefined,
+    signal: AbortSignal.timeout(10_000),
   })
   if (!res.ok) throw new Error(await extractError(res))
   return res.json() as Promise<T>
@@ -123,8 +135,24 @@ export const api = {
     save: (s: Record<string, string>) => post<{ saved: boolean }>('/settings', s),
   },
 
+  controllerSettings: {
+    get: (system: string) => get<ControllerConfig>(`/controller-settings/${system}`),
+    save: (system: string, config: ControllerConfig) =>
+      put<{ saved: boolean; config: ControllerConfig }>(`/controller-settings/${system}`, config),
+  },
+
+  hotkeySettings: {
+    get: () => get<HotkeyConfig>('/hotkey-settings'),
+    save: (config: HotkeyConfig) =>
+      put<{ saved: boolean; config: HotkeyConfig }>('/hotkey-settings', config),
+  },
+
   import: {
     run: () => post<ImportResult>('/import'),
+  },
+
+  system: {
+    update: () => post<{ started: boolean }>('/system/update'),
   },
 
   scrape: {
@@ -145,5 +173,5 @@ export const api = {
   },
 }
 
-export type { Game, GameWithRoms, Rom, User, GameFilter, HistoryEntry, SessionWithRom, GameList }
+export type { Game, GameWithRoms, Rom, User, GameFilter, HistoryEntry, SessionWithRom, GameList, ControllerConfig, HotkeyConfig }
 export { del }

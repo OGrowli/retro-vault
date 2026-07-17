@@ -74,6 +74,28 @@ export interface GameList {
   included?: boolean
 }
 
+// Per-system controller remap. `bindings` maps a RetroArch input suffix
+// (e.g. 'a', 'b', 'start', 'l2') to the RAW joypad button index captured live
+// from the Gamepad API — indices vary by controller/driver, never hardcoded.
+export interface ControllerConfig {
+  bindings: Record<string, number>
+  /** 0..1 analog deadzone, for systems with an analog stick (n64, psx) */
+  deadzone?: number
+}
+
+// Single global hotkey config applied to every launch. Each value is a raw
+// joypad button index; fastForwardRatio is a plain speed multiplier.
+export interface HotkeyConfig {
+  enableHotkey?: number
+  saveState?: number
+  loadState?: number
+  slotIncrease?: number
+  slotDecrease?: number
+  fastForward?: number
+  reset?: number
+  fastForwardRatio?: number
+}
+
 export interface GameWithRoms extends Game {
   roms: Rom[]
   total_play_count: number
