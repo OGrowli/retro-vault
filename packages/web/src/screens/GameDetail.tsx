@@ -3,6 +3,8 @@ import type { Game, GameWithRoms, Rom, User } from '@retro-vault/shared'
 import { api, bgVariant } from '../api/client'
 import { useGamepad } from '../hooks/useGamepad'
 import { Glyph } from '../components/Glyph'
+import { Clock } from '../components/Clock'
+import { AddToListModal } from '../components/AddToListModal'
 
 interface Props {
   game: Game
@@ -10,8 +12,8 @@ interface Props {
   onBack: () => void
 }
 
-type ActionFocus = 'favorite' | 'scrape' | 'back'
-const ACTIONS: ActionFocus[] = ['favorite', 'scrape', 'back']
+type ActionFocus = 'favorite' | 'add-to-list' | 'scrape' | 'back'
+const ACTIONS: ActionFocus[] = ['favorite', 'add-to-list', 'scrape', 'back']
 
 const REGION_FLAGS: Record<string, string> = {
   USA: '🇺🇸',
@@ -96,6 +98,7 @@ export function GameDetail({ game: initialGame, user, onBack }: Props) {
   const [continueIdx, setContinueIdx] = useState(0) // 0=Continue 1=New Game
   const [scraping, setScraping] = useState(false)
   const [scrapeError, setScrapeError] = useState<string | null>(null)
+  const [addToListOpen, setAddToListOpen] = useState(false)
 
   useEffect(() => {
     api.games.get(game.id).then(d => {
@@ -198,11 +201,12 @@ export function GameDetail({ game: initialGame, user, onBack }: Props) {
       if (action === 'confirm') {
         const act = ACTIONS[actionIdx]
         if (act === 'favorite') void toggleFavorite()
+        if (act === 'add-to-list') setAddToListOpen(true)
         if (act === 'scrape') void scrape()
         if (act === 'back') onBack()
       }
     }
-  }, true)
+  }, !addToListOpen)
 
   const lastPlayedDate = detail?.last_played
     ? new Date(detail.last_played).toLocaleDateString()
@@ -222,7 +226,11 @@ export function GameDetail({ game: initialGame, user, onBack }: Props) {
         />
       )}
 
-      <div className="relative flex-1 flex gap-12 px-[5%] pt-[5%] overflow-hidden">
+      <div className="relative flex justify-end px-[5%] pt-[3%]">
+        <Clock />
+      </div>
+
+      <div className="relative flex-1 flex gap-12 px-[5%] pt-[2%] overflow-hidden">
         {/* Box art */}
         <div className="flex-shrink-0">
           {game.box_art_path ? (
@@ -365,6 +373,7 @@ export function GameDetail({ game: initialGame, user, onBack }: Props) {
             const focused = focusSection === 'actions' && actionIdx === i
             const label = act === 'favorite'
               ? (isFavorite ? 'Unfavorite' : 'Favorite')
+              : act === 'add-to-list' ? 'Add to List'
               : act === 'scrape' ? (scraping ? 'Scraping…' : 'Scrape Metadata')
               : 'Back'
             return (
@@ -373,17 +382,14 @@ export function GameDetail({ game: initialGame, user, onBack }: Props) {
                 disabled={act === 'scrape' && scraping}
                 onClick={() => {
                   if (act === 'favorite') void toggleFavorite()
+                  if (act === 'add-to-list') setAddToListOpen(true)
                   if (act === 'scrape') void scrape()
                   if (act === 'back') onBack()
                 }}
                 className={[
                   'px-6 py-3 rounded-xl font-bold text-sm uppercase tracking-wide transition-colors duration-150',
                   'motion-reduce:transition-none',
-                  act === 'back'
-                    ? 'bg-vault-surface text-white border border-vault-muted'
-                    : act === 'scrape'
-                    ? 'bg-vault-surface text-white border border-vault-muted'
-                    : isFavorite
+                  act === 'favorite' && isFavorite
                     ? 'bg-vault-accent text-white'
                     : 'bg-vault-surface text-white border border-vault-muted',
                   focused ? 'ring-2 ring-white' : '',
@@ -398,6 +404,10 @@ export function GameDetail({ game: initialGame, user, onBack }: Props) {
           <Glyph type="cross" /> Launch  ·  <Glyph type="square" /> Favorite  ·  <Glyph type="triangle" /> Scrape  ·  <Glyph type="circle" /> Back  ·  D-Pad Navigate
         </p>
       </div>
+
+      {addToListOpen && (
+        <AddToListModal game={game} user={user} onClose={() => setAddToListOpen(false)} />
+      )}
 
       {continueRom && (
         <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">

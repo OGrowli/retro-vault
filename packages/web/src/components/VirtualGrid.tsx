@@ -75,7 +75,14 @@ export function VirtualGrid({ games, loading, focusedRow, focusedCol, isActiveRe
 
   return (
     <section className="px-[5%] py-3">
-      {title && <h2 className="text-white text-lg font-semibold mb-3 tracking-wide">{title}</h2>}
+      {title && (
+        <h2 className="text-white text-lg font-semibold mb-3 tracking-wide">
+          {title}
+          {!loading && (
+            <span className="text-vault-muted text-sm font-normal"> · {games.length} titles</span>
+          )}
+        </h2>
+      )}
       <div ref={containerRef}>
         {loading ? (
           <div className="flex gap-4 flex-wrap">

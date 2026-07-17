@@ -3,6 +3,7 @@ import type { User } from '@retro-vault/shared'
 import { api } from '../api/client'
 import { useGamepad } from '../hooks/useGamepad'
 import { Glyph } from '../components/Glyph'
+import { Clock } from '../components/Clock'
 import { VirtualKeyboard } from '../components/VirtualKeyboard'
 
 const COLORS = [
@@ -66,6 +67,7 @@ export function ProfileSelect({ onSelect }: Props) {
 
   return (
     <div className="fixed inset-0 bg-vault-bg flex flex-col items-center justify-center">
+      <div className="absolute top-[3%] right-[5%]"><Clock /></div>
       <div className="mb-12">
         <h1 className="text-white text-4xl font-bold tracking-tight text-center">RetroVault</h1>
         <p className="text-vault-muted text-sm uppercase tracking-widest text-center mt-2">Choose your profile</p>

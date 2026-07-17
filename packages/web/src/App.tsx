@@ -1,13 +1,13 @@
 import { useState, useEffect, useCallback } from 'react'
-import type { User, Game } from '@retro-vault/shared'
+import type { User, Game, GameFilter } from '@retro-vault/shared'
 import { api } from './api/client'
 import { ProfileSelect } from './screens/ProfileSelect'
 import { Home } from './screens/Home'
 import { GameDetail } from './screens/GameDetail'
-import { CategoryList } from './screens/CategoryList'
+import { ListView } from './screens/ListView'
 import { Settings } from './screens/Settings'
 
-type Screen = 'profile-select' | 'home' | 'game-detail' | 'settings' | 'category-list'
+type Screen = 'profile-select' | 'home' | 'game-detail' | 'settings' | 'list-view'
 
 // Navigation hierarchy: back always goes to the screen's parent.
 const SCREEN_PARENT: Record<Screen, Screen | null> = {
@@ -15,18 +15,37 @@ const SCREEN_PARENT: Record<Screen, Screen | null> = {
   'home': 'profile-select',
   'game-detail': 'home',
   'settings': 'home',
-  'category-list': 'home',
+  'list-view': 'home',
+}
+
+const filterKey = (userId: number) => `retrovault:filter:${userId}`
+
+function loadFilter(userId: number): GameFilter {
+  try {
+    const raw = localStorage.getItem(filterKey(userId))
+    return raw ? (JSON.parse(raw) as GameFilter) : {}
+  } catch {
+    return {}
+  }
+}
+
+function saveFilter(userId: number, filter: GameFilter) {
+  try {
+    localStorage.setItem(filterKey(userId), JSON.stringify(filter))
+  } catch { /* storage full / disabled — filter just won't persist */ }
 }
 
 export function App() {
   const [screen, setScreen] = useState<Screen>('profile-select')
   const [currentUser, setCurrentUser] = useState<User | null>(null)
   const [selectedGame, setSelectedGame] = useState<Game | null>(null)
-  const [category, setCategory] = useState<{ title: string; games: Game[] } | null>(null)
-  // Where game-detail was opened from, so Back returns there (home or a category list).
+  const [listView, setListView] = useState<{ title: string; games: Game[] } | null>(null)
+  // Where game-detail was opened from, so Back returns there (home or a list view).
   const [gameDetailFrom, setGameDetailFrom] = useState<Screen>('home')
   const [systems, setSystems] = useState<string[]>([])
   const [genres, setGenres] = useState<string[]>([])
+  // Lifted out of Home so it survives Home's unmount/remount when launching a game.
+  const [filter, setFilter] = useState<GameFilter>({})
 
   const refreshMeta = useCallback(() => {
     Promise.all([api.meta.systems(), api.meta.genres()]).then(([s, g]) => {
@@ -36,6 +55,16 @@ export function App() {
   }, [])
 
   useEffect(() => { refreshMeta() }, [refreshMeta])
+
+  // Hydrate the filter from localStorage whenever the active user changes, so it
+  // survives a full page reload / kiosk relaunch, not just in-app navigation.
+  useEffect(() => {
+    if (currentUser) setFilter(loadFilter(currentUser.id))
+  }, [currentUser?.id])
+
+  useEffect(() => {
+    if (currentUser) saveFilter(currentUser.id, filter)
+  }, [filter, currentUser?.id])
 
   // Launching a game tears down the kiosk browser; the fresh Chromium after
   // the game exits asks the API who was playing what and returns to that
@@ -61,14 +90,14 @@ export function App() {
   }
 
   const handleGameSelect = (game: Game) => {
-    setGameDetailFrom(screen === 'category-list' ? 'category-list' : 'home')
+    setGameDetailFrom(screen === 'list-view' ? 'list-view' : 'home')
     setSelectedGame(game)
     setScreen('game-detail')
   }
 
-  const handleSeeMore = (title: string, games: Game[]) => {
-    setCategory({ title, games })
-    setScreen('category-list')
+  const handleShowMore = (title: string, games: Game[]) => {
+    setListView({ title, games })
+    setScreen('list-view')
   }
 
   const goBack = useCallback(() => {
@@ -87,26 +116,28 @@ export function App() {
       {screen === 'profile-select' && (
         <ProfileSelect onSelect={handleProfileSelect} />
       )}
-      {(screen === 'home' || screen === 'game-detail' || screen === 'category-list') && currentUser && (
+      {(screen === 'home' || screen === 'game-detail' || screen === 'list-view') && currentUser && (
         <Home
           user={currentUser}
           systems={systems}
           genres={genres}
+          filter={filter}
+          onFilterChange={setFilter}
           onGameSelect={handleGameSelect}
           onSwitchUser={goBack}
           onSettings={() => setScreen('settings')}
-          onSeeMore={handleSeeMore}
+          onShowMore={handleShowMore}
           onLibraryChange={refreshMeta}
           inputActive={screen === 'home'}
         />
       )}
-      {(screen === 'category-list' || (screen === 'game-detail' && gameDetailFrom === 'category-list')) && category && (
-        <CategoryList
-          title={category.title}
-          games={category.games}
+      {(screen === 'list-view' || (screen === 'game-detail' && gameDetailFrom === 'list-view')) && listView && (
+        <ListView
+          title={listView.title}
+          games={listView.games}
           onGameSelect={handleGameSelect}
           onBack={goBack}
-          inputActive={screen === 'category-list'}
+          inputActive={screen === 'list-view'}
         />
       )}
       {screen === 'game-detail' && currentUser && selectedGame && (

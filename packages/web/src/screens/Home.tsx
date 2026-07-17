@@ -1,40 +1,45 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
-import type { Game, User, GameFilter, HistoryEntry } from '@retro-vault/shared'
+import type { Game, User, GameFilter, HistoryEntry, GameList } from '@retro-vault/shared'
 import { api, bgVariant } from '../api/client'
 import { useGamepad } from '../hooks/useGamepad'
 import { useSpatialNav } from '../hooks/useSpatialNav'
-import { Rail } from '../components/Rail'
+import type { RailDef } from '../hooks/useSpatialNav'
+import { Rail, RAIL_CAP } from '../components/Rail'
 import { VirtualGrid, GRID_COLS } from '../components/VirtualGrid'
 import { FilterDrawer } from '../components/FilterDrawer'
 import type { DrawerRowKind } from '../components/FilterDrawer'
 import { RandomGameModal } from '../components/RandomGameModal'
 import { VirtualKeyboard } from '../components/VirtualKeyboard'
 import { Glyph } from '../components/Glyph'
+import { Clock } from '../components/Clock'
 import type { GamepadAction } from '../hooks/useGamepad'
 
 interface Props {
   user: User
   systems: string[]
   genres: string[]
+  filter: GameFilter
+  onFilterChange: (update: (f: GameFilter) => GameFilter) => void
   onGameSelect: (game: Game) => void
   onSwitchUser: () => void
   onSettings: () => void
-  onSeeMore: (title: string, games: Game[]) => void
+  onShowMore: (title: string, games: Game[]) => void
   onLibraryChange?: () => void
   inputActive?: boolean
 }
 
 const CONTINUE_THRESHOLD = 5 * 60
-// Show a "See More" tile once a rail overflows enough to be clunky to scroll.
-const SEE_MORE_MIN = 6
 
-export function Home({ user, systems, genres, onGameSelect, onSwitchUser, onSettings, onSeeMore, onLibraryChange, inputActive = true }: Props) {
+// Focusable columns in a rail: visible cards (capped) plus a Show More tile when there's overflow.
+const railColCount = (len: number) => Math.min(len, RAIL_CAP) + (len > RAIL_CAP ? 1 : 0)
+
+export function Home({ user, systems, genres, filter, onFilterChange, onGameSelect, onSwitchUser, onSettings, onShowMore, onLibraryChange, inputActive = true }: Props) {
   const [recent, setRecent] = useState<Game[]>([])
-  const [recentAll, setRecentAll] = useState<Game[]>([])
   const [favorites, setFavorites] = useState<Game[]>([])
   const [allGames, setAllGames] = useState<Game[]>([])
+  const [lists, setLists] = useState<GameList[]>([])
+  const [listGames, setListGames] = useState<Record<number, Game[]>>({})
   const [loading, setLoading] = useState(true)
-  const [filter, setFilter] = useState<GameFilter>({})
   const [filterOpen, setFilterOpen] = useState(false)
   const [bgGame, setBgGame] = useState<Game | null>(null)
   const [bgSrc, setBgSrc] = useState<string | null>(null)
@@ -47,16 +52,27 @@ export function Home({ user, systems, genres, onGameSelect, onSwitchUser, onSett
   const [rawHistory, setRawHistory] = useState<HistoryEntry[]>([])
   const [searchVkOpen, setSearchVkOpen] = useState(false)
 
-  const historyToGames = (history: HistoryEntry[], limit?: number): Game[] => {
-    const deduped = history
+  const historyToGames = (history: HistoryEntry[]): Game[] =>
+    history
       .filter((h, i, arr) => arr.findIndex(x => x.id === h.id) === i)
       .map(h => ({
         id: h.id, name: h.name, system: h.system, genre: h.genre,
         year: h.year, players: h.players, description: h.description,
         box_art_path: h.box_art_path, scraped_at: h.scraped_at,
       } as Game))
-    return limit ? deduped.slice(0, limit) : deduped
-  }
+
+  // Fetch a user's custom lists and the games inside each non-empty one.
+  const loadLists = useCallback(async () => {
+    try {
+      const userLists = await api.lists.forUser(user.id)
+      setLists(userLists)
+      const withGames = userLists.filter(l => l.game_count > 0)
+      const entries = await Promise.all(
+        withGames.map(async l => [l.id, await api.lists.games(l.id)] as const)
+      )
+      setListGames(Object.fromEntries(entries))
+    } catch { /* lists are non-critical */ }
+  }, [user.id])
 
   useEffect(() => {
     Promise.all([
@@ -64,16 +80,17 @@ export function Home({ user, systems, genres, onGameSelect, onSwitchUser, onSett
       api.users.favorites(user.id),
       api.games.list(filter, user.id),
     ]).then(([history, favs, games]) => {
-      const recentGames = historyToGames(history, 8)
+      const recentGames = historyToGames(history)
       setRecent(recentGames)
-      setRecentAll(historyToGames(history))
       setRawHistory(history.slice(0, 40))
       setFavorites(favs)
       setAllGames(games)
       setLoading(false)
       if (recentGames[0]) setBgGame(recentGames[0])
     }).catch(() => setLoading(false))
-  }, [user.id])
+    void loadLists()
+    // filter intentionally excluded — it drives refreshGames, not the initial load
+  }, [user.id, loadLists])
 
   const refreshGames = useCallback(async () => {
     try {
@@ -88,15 +105,15 @@ export function Home({ user, systems, genres, onGameSelect, onSwitchUser, onSett
     if (inputActive && !prevActiveRef.current) {
       Promise.all([api.users.history(user.id), api.users.favorites(user.id)])
         .then(([history, favs]) => {
-          setRecent(historyToGames(history, 8))
-          setRecentAll(historyToGames(history))
+          setRecent(historyToGames(history))
           setRawHistory(history.slice(0, 40))
           setFavorites(favs)
         }).catch(() => {})
       void refreshGames()
+      void loadLists()
     }
     prevActiveRef.current = inputActive
-  }, [inputActive, user.id, refreshGames])
+  }, [inputActive, user.id, refreshGames, loadLists])
 
   useEffect(() => {
     const art = bgGame?.box_art_path
@@ -155,7 +172,7 @@ export function Home({ user, systems, genres, onGameSelect, onSwitchUser, onSett
     if (kind === 'systems') {
       const s = systems[col]
       if (!s) return
-      setFilter(f => {
+      onFilterChange(f => {
         const cur = f.systems ?? []
         return { ...f, systems: cur.includes(s) ? cur.filter(x => x !== s) : [...cur, s] }
       })
@@ -163,19 +180,19 @@ export function Home({ user, systems, genres, onGameSelect, onSwitchUser, onSett
     if (kind === 'genres') {
       const g = genres[col]
       if (!g) return
-      setFilter(f => {
+      onFilterChange(f => {
         const cur = f.genres ?? []
         return { ...f, genres: cur.includes(g) ? cur.filter(x => x !== g) : [...cur, g] }
       })
     }
     if (kind === 'players') {
       const p = [1, 2, 4][col]
-      setFilter(f => ({ ...f, players: f.players === p ? undefined : p }))
+      onFilterChange(f => ({ ...f, players: f.players === p ? undefined : p }))
     }
     if (kind === 'options') {
-      if (col === 0) setFilter(f => ({ ...f, favoritesOnly: !f.favoritesOnly }))
-      if (col === 1) setFilter(f => ({ ...f, neverPlayed: !f.neverPlayed }))
-      if (col === 2) setFilter(f => ({ ...f, noMetadata: !f.noMetadata }))
+      if (col === 0) onFilterChange(f => ({ ...f, favoritesOnly: !f.favoritesOnly }))
+      if (col === 1) onFilterChange(f => ({ ...f, neverPlayed: !f.neverPlayed }))
+      if (col === 2) onFilterChange(f => ({ ...f, noMetadata: !f.noMetadata }))
     }
   }
 
@@ -185,16 +202,40 @@ export function Home({ user, systems, genres, onGameSelect, onSwitchUser, onSett
     setFilterOpen(false)
   }
 
-  const recentSeeMore = recentAll.length > SEE_MORE_MIN
-  const favoritesSeeMore = favorites.length > SEE_MORE_MIN
+  // Rails above the grid, in render/nav order. Only non-empty lists become rails.
+  const activeLists = useMemo(
+    () => lists.filter(l => (listGames[l.id]?.length ?? 0) > 0),
+    [lists, listGames]
+  )
+
+  // Region key → the collection + title it represents (for confirm/favorite/show-more).
+  const collectionFor = useCallback((region: string): { title: string; games: Game[] } | null => {
+    if (region === 'recently-played') return { title: 'Recently Played', games: recent }
+    if (region === 'favorites') return { title: 'Favorites', games: favorites }
+    if (region.startsWith('list-')) {
+      const id = Number(region.slice(5))
+      const list = lists.find(l => l.id === id)
+      if (!list) return null
+      return { title: list.name, games: listGames[id] ?? [] }
+    }
+    return null
+  }, [recent, favorites, lists, listGames])
+
+  const navRails = useMemo<RailDef[]>(() => {
+    const rails: RailDef[] = [
+      { key: 'recently-played', colCount: railColCount(recent.length) },
+      { key: 'favorites', colCount: railColCount(favorites.length) },
+    ]
+    for (const l of activeLists) {
+      rails.push({ key: `list-${l.id}`, colCount: railColCount(listGames[l.id]?.length ?? 0) })
+    }
+    return rails
+  }, [recent.length, favorites.length, activeLists, listGames])
 
   const nav = useSpatialNav({
-    recentCount: recent.length,
-    favoritesCount: favorites.length,
+    rails: navRails,
     allGamesCount: allGames.length,
     gridCols: GRID_COLS,
-    recentSeeMore,
-    favoritesSeeMore,
     filterDrawerRowCounts: drawerRows.map(r => r.count),
     filterDrawerOpen: filterOpen,
     onToggleFilter: () => setFilterOpen(v => !v),
@@ -212,24 +253,26 @@ export function Home({ user, systems, genres, onGameSelect, onSwitchUser, onSett
         }
         return
       }
-      if (region === 'recently-played' && recentSeeMore && col === recent.length) {
-        onSeeMore('Recently Played', recentAll); return
+      if (region === 'all-games') {
+        const game = allGames[row * GRID_COLS + col]
+        if (game) onGameSelect(game)
+        return
       }
-      if (region === 'favorites' && favoritesSeeMore && col === favorites.length) {
-        onSeeMore('Favorites', favorites); return
+      const coll = collectionFor(region)
+      if (!coll) return
+      const visible = Math.min(coll.games.length, RAIL_CAP)
+      if (coll.games.length > RAIL_CAP && col === visible) {
+        onShowMore(coll.title, coll.games)
+        return
       }
-      let game: Game | undefined
-      if (region === 'recently-played') game = recent[col]
-      if (region === 'favorites') game = favorites[col]
-      if (region === 'all-games') game = allGames[row * GRID_COLS + col]
+      const game = coll.games[col]
       if (game) onGameSelect(game)
     },
     onBack: onSwitchUser,
     onFavorite: (region, row, col) => {
       let game: Game | undefined
-      if (region === 'recently-played') game = recent[col]
-      if (region === 'favorites') game = favorites[col]
       if (region === 'all-games') game = allGames[row * GRID_COLS + col]
+      else game = collectionFor(region)?.games[col]
       if (!game) return
       const g = game
       api.games.favorite(g.id, user.id).then(({ favorited }) => {
@@ -249,8 +292,6 @@ export function Home({ user, systems, genres, onGameSelect, onSwitchUser, onSett
 
   useGamepad(handleAction, inputActive && !randomGame && !randomLoading && !searchVkOpen)
 
-  const recentIdx = nav.getIndex('recently-played')
-  const favIdx = nav.getIndex('favorites')
   const gridIdx = nav.getIndex('all-games')
   const drawerIdx = nav.getIndex('filter-drawer')
 
@@ -277,6 +318,7 @@ export function Home({ user, systems, genres, onGameSelect, onSwitchUser, onSett
         <header className="px-[5%] pt-[3%] pb-2 flex items-center justify-between">
           <h1 className="text-white text-2xl font-bold tracking-tight">RetroVault</h1>
           <div className="flex items-center gap-3">
+            <Clock />
             <button
               onClick={() => setFilterOpen(true)}
               className="px-3 py-1.5 rounded-lg text-vault-muted hover:text-white text-xs font-semibold uppercase tracking-wide border border-vault-muted hover:border-vault-accent transition-colors"
@@ -315,14 +357,14 @@ export function Home({ user, systems, genres, onGameSelect, onSwitchUser, onSett
           title="Recently Played"
           games={recent}
           loading={loading}
-          focusedIndex={recentIdx.col}
+          focusedIndex={nav.getIndex('recently-played').col}
           isActiveRegion={nav.region === 'recently-played' && !filterOpen}
           skeletonCount={6}
           size="lg"
           getContinueLabel={getContinueLabel}
           onFocusGame={setBgGame}
           onSelectGame={onGameSelect}
-          onSeeMore={recentSeeMore ? () => onSeeMore('Recently Played', recentAll) : undefined}
+          onShowMore={() => onShowMore('Recently Played', recent)}
         />
 
         {(favorites.length > 0 || loading) && (
@@ -330,14 +372,31 @@ export function Home({ user, systems, genres, onGameSelect, onSwitchUser, onSett
             title="Favorites"
             games={favorites}
             loading={loading}
-            focusedIndex={favIdx.col}
+            focusedIndex={nav.getIndex('favorites').col}
             isActiveRegion={nav.region === 'favorites' && !filterOpen}
             skeletonCount={6}
             onFocusGame={setBgGame}
             onSelectGame={onGameSelect}
-            onSeeMore={favoritesSeeMore ? () => onSeeMore('Favorites', favorites) : undefined}
+            onShowMore={() => onShowMore('Favorites', favorites)}
           />
         )}
+
+        {activeLists.map(list => {
+          const games = listGames[list.id] ?? []
+          const region = `list-${list.id}`
+          return (
+            <Rail
+              key={list.id}
+              title={list.name}
+              games={games}
+              focusedIndex={nav.getIndex(region).col}
+              isActiveRegion={nav.region === region && !filterOpen}
+              onFocusGame={setBgGame}
+              onSelectGame={onGameSelect}
+              onShowMore={() => onShowMore(list.name, games)}
+            />
+          )
+        })}
 
         <VirtualGrid
           games={allGames}
@@ -355,7 +414,7 @@ export function Home({ user, systems, genres, onGameSelect, onSwitchUser, onSett
       <FilterDrawer
         open={filterOpen}
         filter={filter}
-        onChange={setFilter}
+        onChange={(f) => onFilterChange(() => f)}
         onApply={applyFilters}
         onRandom={() => { setFilterOpen(false); void handleRandom() }}
         onImport={() => void handleImport()}
@@ -383,7 +442,7 @@ export function Home({ user, systems, genres, onGameSelect, onSwitchUser, onSett
             <h2 className="text-white text-lg font-bold">Search Games</h2>
             <VirtualKeyboard
               value={filter.query ?? ''}
-              onChange={(v) => setFilter(f => ({ ...f, query: v || undefined }))}
+              onChange={(v) => onFilterChange(f => ({ ...f, query: v || undefined }))}
               onDone={() => { setSearchVkOpen(false); applyFilters() }}
               onCancel={() => setSearchVkOpen(false)}
               enabled={searchVkOpen}

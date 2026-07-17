@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url'
 import { gamesRouter } from './routes/games.js'
 import { romsRouter } from './routes/roms.js'
 import { usersRouter } from './routes/users.js'
+import { listsRouter } from './routes/lists.js'
 import { metaRouter } from './routes/meta.js'
 import { importRouter } from './routes/import.js'
 import { scrapeRouter } from './routes/scrape.js'
@@ -25,6 +26,7 @@ app.use('*', cors({ origin: '*' }))
 app.route('/games', gamesRouter)
 app.route('/roms', romsRouter)
 app.route('/users', usersRouter)
+app.route('/lists', listsRouter)
 app.route('/meta', metaRouter)
 app.route('/import', importRouter)
 app.route('/scrape', scrapeRouter)

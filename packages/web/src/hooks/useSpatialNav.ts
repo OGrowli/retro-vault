@@ -1,29 +1,28 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import type { GamepadAction } from './useGamepad'
 
-export type Region =
-  | 'profile-select'
-  | 'recently-played'
-  | 'favorites'
-  | 'all-games'
-  | 'filter-drawer'
-  | 'game-detail'
-  | 'versions-list'
-  | 'settings'
+/** A horizontal rail's focusable region. Rails are identified by a string key
+ *  ('recently-played', 'favorites', or `list-<id>`) so custom lists can add rails
+ *  dynamically. The grid is 'all-games'; the filter drawer is 'filter-drawer'. */
+export type Region = string
 
 interface RegionState {
   row: number
   col: number
 }
 
+/** One horizontal rail, in vertical render order. `colCount` is the number of
+ *  focusable columns — visible cards plus one for the trailing "Show More" tile. */
+export interface RailDef {
+  key: string
+  colCount: number
+}
+
 interface UseSpatialNavOptions {
-  recentCount: number
-  favoritesCount: number
+  /** Rails above the grid, in vertical order (recently, favorites, then lists) */
+  rails: RailDef[]
   allGamesCount: number
   gridCols: number
-  /** Adds one focusable "See More" slot at the end of the row */
-  recentSeeMore?: boolean
-  favoritesSeeMore?: boolean
   /** Column count per drawer row; row order defined by the drawer layout */
   filterDrawerRowCounts: number[]
   onConfirm?: (region: Region, row: number, col: number) => void
@@ -34,23 +33,32 @@ interface UseSpatialNavOptions {
   onSettings?: () => void
 }
 
-const DEFAULT_INDICES: Record<Region, RegionState> = {
-  'profile-select':  { row: 0, col: 0 },
-  'recently-played': { row: 0, col: 0 },
-  'favorites':       { row: 0, col: 0 },
-  'all-games':       { row: 0, col: 0 },
-  'filter-drawer':   { row: 0, col: 0 },
-  'game-detail':     { row: 0, col: 0 },
-  'versions-list':   { row: 0, col: 0 },
-  'settings':        { row: 0, col: 0 },
-}
+const DEFAULT_STATE: RegionState = { row: 0, col: 0 }
 
 export function useSpatialNav(opts: UseSpatialNavOptions) {
   const [region, setRegion] = useState<Region>('recently-played')
-  const [indices, setIndices] = useState<Record<Region, RegionState>>(DEFAULT_INDICES)
+  const [indices, setIndices] = useState<Record<string, RegionState>>({})
 
   const optsRef = useRef(opts)
   optsRef.current = opts
+
+  const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v))
+
+  // Ordered list of navigable regions (rails with cards, then the grid if it has games).
+  const navOrder = (o: UseSpatialNavOptions): string[] => {
+    const railKeys = o.rails.filter(r => r.colCount > 0).map(r => r.key)
+    return o.allGamesCount > 0 ? [...railKeys, 'all-games'] : railKeys
+  }
+
+  // When the focused region empties out (data loads, favorite removed, filter
+  // applied), snap focus to the first valid region.
+  useEffect(() => {
+    if (opts.filterDrawerOpen) return
+    const order = navOrder(opts)
+    if (order.length && !order.includes(region)) {
+      setRegion(order[0])
+    }
+  }, [opts.rails, opts.allGamesCount, opts.filterDrawerOpen, region])
 
   // When filter drawer opens, start focus on the first chip row
   useEffect(() => {
@@ -63,29 +71,20 @@ export function useSpatialNav(opts: UseSpatialNavOptions) {
     setIndices(prev => ({ ...prev, [r]: { row: 0, col: 0 } }))
   }, [])
 
-  const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v))
-
-  const getIndex = useCallback((r: Region) => indices[r], [indices])
+  const getIndex = useCallback((r: Region) => indices[r] ?? DEFAULT_STATE, [indices])
 
   const updateIndex = useCallback((r: Region, update: Partial<RegionState>) => {
-    setIndices(prev => ({ ...prev, [r]: { ...prev[r], ...update } }))
+    setIndices(prev => ({ ...prev, [r]: { ...(prev[r] ?? DEFAULT_STATE), ...update } }))
   }, [])
 
   const handleAction = useCallback((action: GamepadAction) => {
     const o = optsRef.current
 
-    if (action === 'settings') {
-      o.onSettings?.()
-      return
-    }
-
-    if (action === 'filter') {
-      o.onToggleFilter?.()
-      return
-    }
+    if (action === 'settings') { o.onSettings?.(); return }
+    if (action === 'filter') { o.onToggleFilter?.(); return }
 
     if (o.filterDrawerOpen) {
-      const cur = indices['filter-drawer']
+      const cur = indices['filter-drawer'] ?? DEFAULT_STATE
       const counts = o.filterDrawerRowCounts
       const colMax = (r: number) => Math.max(0, (counts[r] ?? 1) - 1)
       if (action === 'up' || action === 'down') {
@@ -101,54 +100,34 @@ export function useSpatialNav(opts: UseSpatialNavOptions) {
 
     if (action === 'back') { o.onBack?.(); return }
 
-    if (action === 'favorite') {
-      const cur = indices[region]
-      o.onFavorite?.(region, cur.row, cur.col)
-      return
-    }
+    const cur = indices[region] ?? DEFAULT_STATE
 
-    if (action === 'confirm') {
-      const cur = indices[region]
-      o.onConfirm?.(region, cur.row, cur.col)
-      return
-    }
+    if (action === 'favorite') { o.onFavorite?.(region, cur.row, cur.col); return }
+    if (action === 'confirm') { o.onConfirm?.(region, cur.row, cur.col); return }
 
-    if (region === 'recently-played') {
-      const cur = indices['recently-played']
-      const maxCol = o.recentCount - 1 + (o.recentSeeMore ? 1 : 0)
-      if (action === 'left') updateIndex('recently-played', { col: clamp(cur.col - 1, 0, maxCol) })
-      if (action === 'right') updateIndex('recently-played', { col: clamp(cur.col + 1, 0, maxCol) })
-      if (action === 'down') setRegion(o.favoritesCount > 0 ? 'favorites' : 'all-games')
-    }
-
-    if (region === 'favorites') {
-      const cur = indices['favorites']
-      const maxCol = o.favoritesCount - 1 + (o.favoritesSeeMore ? 1 : 0)
-      if (action === 'left') updateIndex('favorites', { col: clamp(cur.col - 1, 0, maxCol) })
-      if (action === 'right') updateIndex('favorites', { col: clamp(cur.col + 1, 0, maxCol) })
-      if (action === 'up') setRegion('recently-played')
-      if (action === 'down') setRegion('all-games')
-    }
+    const order = navOrder(o)
+    const pos = order.indexOf(region)
 
     if (region === 'all-games') {
-      const cur = indices['all-games']
       const totalRows = Math.ceil(o.allGamesCount / o.gridCols)
       if (action === 'left') updateIndex('all-games', { col: clamp(cur.col - 1, 0, o.gridCols - 1) })
       if (action === 'right') updateIndex('all-games', { col: clamp(cur.col + 1, 0, o.gridCols - 1) })
       if (action === 'down') updateIndex('all-games', { row: clamp(cur.row + 1, 0, totalRows - 1) })
       if (action === 'up') {
-        if (cur.row === 0) setRegion(o.favoritesCount > 0 ? 'favorites' : 'recently-played')
+        if (cur.row === 0) { if (pos > 0) setRegion(order[pos - 1]) }
         else updateIndex('all-games', { row: cur.row - 1 })
       }
+      return
     }
 
-    if (region === 'profile-select') {
-      const cur = indices['profile-select']
-      if (action === 'left') updateIndex('profile-select', { col: clamp(cur.col - 1, 0, 3) })
-      if (action === 'right') updateIndex('profile-select', { col: clamp(cur.col + 1, 0, 3) })
-      if (action === 'up') updateIndex('profile-select', { row: clamp(cur.row - 1, 0, 4) })
-      if (action === 'down') updateIndex('profile-select', { row: clamp(cur.row + 1, 0, 4) })
-    }
+    // Otherwise: a horizontal rail region.
+    const rail = o.rails.find(r => r.key === region)
+    if (!rail) return
+    const maxCol = Math.max(0, rail.colCount - 1)
+    if (action === 'left') updateIndex(region, { col: clamp(cur.col - 1, 0, maxCol) })
+    if (action === 'right') updateIndex(region, { col: clamp(cur.col + 1, 0, maxCol) })
+    if (action === 'down') { if (pos !== -1 && pos < order.length - 1) setRegion(order[pos + 1]) }
+    if (action === 'up') { if (pos > 0) setRegion(order[pos - 1]) }
   }, [region, indices, updateIndex])
 
   return { region, setRegion, getIndex, handleAction, resetIndex }

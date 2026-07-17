@@ -9,3 +9,6 @@ dist/
 packages/api/src/media/
 smb3-box.png
 test.ps1
+
+# Local prompt / design scratch
+claude-prompts/

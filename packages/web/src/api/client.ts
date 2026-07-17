@@ -1,6 +1,6 @@
 import type {
   Game, GameFilter, GameWithRoms, Rom, User,
-  HistoryEntry, SessionWithRom,
+  HistoryEntry, SessionWithRom, GameList,
 } from '@retro-vault/shared'
 
 function filterToParams(filter: GameFilter, userId?: number): string {
@@ -102,6 +102,17 @@ export const api = {
     history: (userId: number) => get<HistoryEntry[]>(`/users/${userId}/history`),
   },
 
+  lists: {
+    forUser: (userId: number, gameId?: number) =>
+      get<GameList[]>(`/users/${userId}/lists${gameId !== undefined ? `?gameId=${gameId}` : ''}`),
+    create: (userId: number, name: string) =>
+      post<GameList>(`/users/${userId}/lists`, { name }),
+    games: (listId: number) => get<Game[]>(`/lists/${listId}/games`),
+    toggle: (listId: number, gameId: number) =>
+      post<{ included: boolean }>(`/lists/${listId}/games/${gameId}/toggle`),
+    remove: (listId: number) => del<{ deleted: boolean }>(`/lists/${listId}`),
+  },
+
   meta: {
     systems: () => get<string[]>('/meta/systems'),
     genres: () => get<string[]>('/meta/genres'),
@@ -134,5 +145,5 @@ export const api = {
   },
 }
 
-export type { Game, GameWithRoms, Rom, User, GameFilter, HistoryEntry, SessionWithRom }
+export type { Game, GameWithRoms, Rom, User, GameFilter, HistoryEntry, SessionWithRom, GameList }
 export { del }

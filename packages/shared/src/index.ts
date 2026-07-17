@@ -64,6 +64,16 @@ export interface FilterPreset {
   filter_json: string
 }
 
+export interface GameList {
+  id: number
+  user_id: number
+  name: string
+  created_at: string
+  game_count: number
+  /** Present when the list query is scoped to a specific game (add-to-list modal) */
+  included?: boolean
+}
+
 export interface GameWithRoms extends Game {
   roms: Rom[]
   total_play_count: number

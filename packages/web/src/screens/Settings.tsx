@@ -3,6 +3,7 @@ import { api } from '../api/client'
 import type { ScrapeProgress } from '../api/client'
 import { useGamepad } from '../hooks/useGamepad'
 import { Glyph } from '../components/Glyph'
+import { Clock } from '../components/Clock'
 import { VirtualKeyboard } from '../components/VirtualKeyboard'
 
 interface Props {
@@ -176,6 +177,7 @@ export function Settings({ systems, onBack }: Props) {
     <div className="fixed inset-0 bg-vault-bg flex flex-col">
       <header className="px-[5%] pt-[3%] pb-4 border-b border-vault-surface flex items-center gap-4">
         <h1 className="text-white text-2xl font-bold tracking-tight">Settings</h1>
+        <div className="ml-auto"><Clock /></div>
       </header>
 
       <div className="flex-1 overflow-y-auto px-[5%] py-8 space-y-8" style={{ scrollbarWidth: 'none' }}>
