@@ -1,0 +1,23 @@
+<svg viewBox="0 0 300 140" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>Game Boy Advance controller button layout</title>
+  <g fill="none" stroke="#c7c7d6" stroke-width="2.5" stroke-linejoin="round">
+    <rect x="10" y="25" width="280" height="90" rx="20"/>
+    <rect x="10" y="10" width="55" height="12" rx="4"/>
+    <rect x="235" y="10" width="55" height="12" rx="4"/>
+    <rect x="35" y="60" width="40" height="16"/>
+    <rect x="47" y="48" width="16" height="40"/>
+    <rect x="130" y="98" width="24" height="8" rx="4"/>
+    <rect x="160" y="98" width="24" height="8" rx="4"/>
+    <circle cx="222" cy="82" r="11"/>
+    <circle cx="250" cy="62" r="11"/>
+  </g>
+  <g fill="#c7c7d6" font-family="Inter, system-ui, sans-serif" font-size="8.5" text-anchor="middle">
+    <text x="37" y="19">L</text>
+    <text x="263" y="19">R</text>
+    <text x="55" y="132">D-PAD</text>
+    <text x="142" y="118">SELECT</text>
+    <text x="172" y="118">START</text>
+    <text x="222" y="85">B</text>
+    <text x="250" y="65">A</text>
+  </g>
+</svg>

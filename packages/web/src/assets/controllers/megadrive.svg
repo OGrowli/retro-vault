@@ -1,0 +1,27 @@
+<svg viewBox="0 0 280 130" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>Sega Genesis / Mega Drive 6-button controller layout</title>
+  <g fill="none" stroke="#c7c7d6" stroke-width="2.5" stroke-linejoin="round">
+    <rect x="10" y="28" width="260" height="62" rx="30"/>
+    <rect x="35" y="50" width="40" height="16"/>
+    <rect x="47" y="38" width="16" height="40"/>
+    <rect x="93" y="52" width="22" height="11" rx="5.5"/>
+    <rect x="222" y="14" width="34" height="11" rx="5.5"/>
+    <circle cx="163" cy="42" r="9"/>
+    <circle cx="188" cy="42" r="9"/>
+    <circle cx="213" cy="42" r="9"/>
+    <circle cx="163" cy="68" r="9"/>
+    <circle cx="188" cy="68" r="9"/>
+    <circle cx="213" cy="68" r="9"/>
+  </g>
+  <g fill="#c7c7d6" font-family="Inter, system-ui, sans-serif" font-size="9" text-anchor="middle">
+    <text x="55" y="106">D-PAD</text>
+    <text x="104" y="102">MODE</text>
+    <text x="239" y="106">START</text>
+    <text x="163" y="45">X</text>
+    <text x="188" y="45">Y</text>
+    <text x="213" y="45">Z</text>
+    <text x="163" y="71">A</text>
+    <text x="188" y="71">B</text>
+    <text x="213" y="71">C</text>
+  </g>
+</svg>

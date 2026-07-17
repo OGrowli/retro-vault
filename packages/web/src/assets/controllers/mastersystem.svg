@@ -1,0 +1,16 @@
+<svg viewBox="0 0 260 140" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>Sega Master System controller button layout</title>
+  <g fill="none" stroke="#c7c7d6" stroke-width="2.5" stroke-linejoin="round">
+    <rect x="10" y="30" width="240" height="60" rx="14"/>
+    <rect x="35" y="52" width="40" height="16"/>
+    <rect x="47" y="40" width="16" height="40"/>
+    <circle cx="190" cy="52" r="12"/>
+    <circle cx="215" cy="68" r="12"/>
+  </g>
+  <g fill="#c7c7d6" font-family="Inter, system-ui, sans-serif" font-size="9" text-anchor="middle">
+    <text x="55" y="106">D-PAD</text>
+    <text x="190" y="55">1</text>
+    <text x="215" y="71">2</text>
+    <text x="130" y="125" font-size="7.5" fill="#8a899a">Pause is a button on the console, not the pad</text>
+  </g>
+</svg>

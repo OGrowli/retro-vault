@@ -1,0 +1,35 @@
+<svg viewBox="0 0 200 260" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>Atari 5200 controller button layout</title>
+  <g fill="none" stroke="#c7c7d6" stroke-width="2.5" stroke-linejoin="round">
+    <rect x="20" y="10" width="160" height="240" rx="14"/>
+    <circle cx="100" cy="55" r="28"/>
+    <circle cx="100" cy="55" r="10"/>
+    <rect x="13" y="90" width="16" height="32" rx="5"/>
+    <rect x="171" y="90" width="16" height="32" rx="5"/>
+    <rect x="45" y="102" width="28" height="10" rx="5"/>
+    <rect x="86" y="102" width="28" height="10" rx="5"/>
+    <rect x="127" y="102" width="28" height="10" rx="5"/>
+    <circle cx="60" cy="140" r="13"/>
+    <circle cx="100" cy="140" r="13"/>
+    <circle cx="140" cy="140" r="13"/>
+    <circle cx="60" cy="170" r="13"/>
+    <circle cx="100" cy="170" r="13"/>
+    <circle cx="140" cy="170" r="13"/>
+    <circle cx="60" cy="200" r="13"/>
+    <circle cx="100" cy="200" r="13"/>
+    <circle cx="140" cy="200" r="13"/>
+    <circle cx="100" cy="228" r="13"/>
+  </g>
+  <g fill="#c7c7d6" font-family="Inter, system-ui, sans-serif" font-size="9" text-anchor="middle">
+    <text x="100" y="36">JOYSTICK</text>
+    <text x="21" y="109" font-size="7">FIRE</text>
+    <text x="179" y="109" font-size="7">FIRE</text>
+    <text x="59" y="120" font-size="6.5">START</text>
+    <text x="100" y="120" font-size="6.5">PAUSE</text>
+    <text x="141" y="120" font-size="6.5">RESET</text>
+    <text x="60" y="143">1</text><text x="100" y="143">2</text><text x="140" y="143">3</text>
+    <text x="60" y="173">4</text><text x="100" y="173">5</text><text x="140" y="173">6</text>
+    <text x="60" y="203">7</text><text x="100" y="203">8</text><text x="140" y="203">9</text>
+    <text x="100" y="231">0</text>
+  </g>
+</svg>

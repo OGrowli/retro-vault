@@ -6,10 +6,11 @@ import { Home } from './screens/Home'
 import { GameDetail } from './screens/GameDetail'
 import { ListView } from './screens/ListView'
 import { Settings } from './screens/Settings'
+import { ScrapeSettings } from './screens/ScrapeSettings'
 import { ControllerSettings } from './screens/ControllerSettings'
 import { EmulatorSettings } from './screens/EmulatorSettings'
 
-type Screen = 'profile-select' | 'home' | 'game-detail' | 'settings' | 'list-view' | 'controller-settings' | 'emulator-settings'
+type Screen = 'profile-select' | 'home' | 'game-detail' | 'settings' | 'list-view' | 'scrape-settings' | 'controller-settings' | 'emulator-settings'
 
 // Navigation hierarchy: back always goes to the screen's parent.
 const SCREEN_PARENT: Record<Screen, Screen | null> = {
@@ -18,6 +19,7 @@ const SCREEN_PARENT: Record<Screen, Screen | null> = {
   'game-detail': 'home',
   'settings': 'home',
   'list-view': 'home',
+  'scrape-settings': 'settings',
   'controller-settings': 'settings',
   'emulator-settings': 'settings',
 }
@@ -153,11 +155,14 @@ export function App() {
       )}
       {screen === 'settings' && (
         <Settings
-          systems={systems}
           onBack={goBack}
+          onOpenScraping={() => setScreen('scrape-settings')}
           onOpenControllers={() => setScreen('controller-settings')}
           onOpenHotkeys={() => setScreen('emulator-settings')}
         />
+      )}
+      {screen === 'scrape-settings' && (
+        <ScrapeSettings systems={systems} onBack={goBack} />
       )}
       {screen === 'controller-settings' && (
         <ControllerSettings onBack={goBack} />

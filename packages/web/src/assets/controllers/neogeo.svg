@@ -1,0 +1,23 @@
+<svg viewBox="0 0 300 130" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>Neo Geo controller button layout</title>
+  <g fill="none" stroke="#c7c7d6" stroke-width="2.5" stroke-linejoin="round">
+    <rect x="10" y="25" width="280" height="80" rx="20"/>
+    <rect x="35" y="57" width="40" height="16"/>
+    <rect x="47" y="45" width="16" height="40"/>
+    <circle cx="165" cy="65" r="12"/>
+    <circle cx="197" cy="65" r="12"/>
+    <circle cx="229" cy="65" r="12"/>
+    <circle cx="261" cy="65" r="12"/>
+    <rect x="120" y="14" width="24" height="9" rx="4.5"/>
+    <rect x="148" y="14" width="24" height="9" rx="4.5"/>
+  </g>
+  <g fill="#c7c7d6" font-family="Inter, system-ui, sans-serif" font-size="9" text-anchor="middle">
+    <text x="55" y="110">D-PAD</text>
+    <text x="165" y="68">A</text>
+    <text x="197" y="68">B</text>
+    <text x="229" y="68">C</text>
+    <text x="261" y="68">D</text>
+    <text x="132" y="9" font-size="6.5">SELECT</text>
+    <text x="160" y="9" font-size="6.5">START</text>
+  </g>
+</svg>

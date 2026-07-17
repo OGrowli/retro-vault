@@ -1,0 +1,15 @@
+<svg viewBox="0 0 220 150" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>Atari 7800 Pro-Line controller button layout</title>
+  <g fill="none" stroke="#c7c7d6" stroke-width="2.5" stroke-linejoin="round">
+    <circle cx="60" cy="80" r="26"/>
+    <circle cx="60" cy="80" r="10"/>
+    <line x1="60" y1="80" x2="60" y2="48"/>
+    <circle cx="150" cy="60" r="16"/>
+    <circle cx="150" cy="105" r="16"/>
+  </g>
+  <g fill="#c7c7d6" font-family="Inter, system-ui, sans-serif" font-size="9" text-anchor="middle">
+    <text x="60" y="122">JOYSTICK (8-WAY)</text>
+    <text x="150" y="63">FIRE 1</text>
+    <text x="150" y="108">FIRE 2</text>
+  </g>
+</svg>

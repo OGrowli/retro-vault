@@ -1,0 +1,21 @@
+<svg viewBox="0 0 220 140" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>Atari Lynx controller button layout</title>
+  <g fill="none" stroke="#c7c7d6" stroke-width="2.5" stroke-linejoin="round">
+    <rect x="10" y="15" width="200" height="110" rx="16"/>
+    <rect x="30" y="62" width="40" height="16"/>
+    <rect x="42" y="50" width="16" height="40"/>
+    <circle cx="155" cy="85" r="11"/>
+    <circle cx="180" cy="60" r="11"/>
+    <rect x="90" y="100" width="22" height="8" rx="4"/>
+    <rect x="118" y="100" width="22" height="8" rx="4"/>
+    <rect x="95" y="22" width="30" height="10" rx="5"/>
+  </g>
+  <g fill="#c7c7d6" font-family="Inter, system-ui, sans-serif" font-size="8.5" text-anchor="middle">
+    <text x="50" y="107">D-PAD</text>
+    <text x="155" y="88">B</text>
+    <text x="180" y="63">A</text>
+    <text x="101" y="116" font-size="7">OPT1</text>
+    <text x="129" y="116" font-size="7">OPT2</text>
+    <text x="110" y="30" font-size="7">PAUSE</text>
+  </g>
+</svg>

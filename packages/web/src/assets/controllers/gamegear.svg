@@ -1,0 +1,17 @@
+<svg viewBox="0 0 180 240" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>Game Gear controller button layout</title>
+  <g fill="none" stroke="#c7c7d6" stroke-width="2.5" stroke-linejoin="round">
+    <rect x="10" y="10" width="160" height="220" rx="18"/>
+    <rect x="30" y="165" width="30" height="12"/>
+    <rect x="39" y="156" width="12" height="30"/>
+    <circle cx="108" cy="170" r="11"/>
+    <circle cx="132" cy="145" r="11"/>
+    <rect x="60" y="205" width="50" height="10" rx="5"/>
+  </g>
+  <g fill="#c7c7d6" font-family="Inter, system-ui, sans-serif" font-size="9" text-anchor="middle">
+    <text x="45" y="145">D-PAD</text>
+    <text x="108" y="173">2</text>
+    <text x="132" y="148">1</text>
+    <text x="85" y="230">START</text>
+  </g>
+</svg>

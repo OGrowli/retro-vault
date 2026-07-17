@@ -1,0 +1,20 @@
+<svg viewBox="0 0 170 250" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>Game Boy / Game Boy Color controller button layout</title>
+  <g fill="none" stroke="#c7c7d6" stroke-width="2.5" stroke-linejoin="round">
+    <rect x="10" y="10" width="150" height="230" rx="14"/>
+    <rect x="25" y="25" width="120" height="90" rx="4"/>
+    <rect x="30" y="165" width="30" height="12"/>
+    <rect x="39" y="156" width="12" height="30"/>
+    <circle cx="105" cy="180" r="12"/>
+    <circle cx="132" cy="155" r="12"/>
+    <rect x="42" y="205" width="26" height="9" rx="4.5" transform="rotate(-20 55 209.5)"/>
+    <rect x="78" y="205" width="26" height="9" rx="4.5" transform="rotate(-20 91 209.5)"/>
+  </g>
+  <g fill="#c7c7d6" font-family="Inter, system-ui, sans-serif" font-size="9" text-anchor="middle">
+    <text x="45" y="145">D-PAD</text>
+    <text x="105" y="183">B</text>
+    <text x="132" y="158">A</text>
+    <text x="55" y="230">SELECT</text>
+    <text x="91" y="230">START</text>
+  </g>
+</svg>

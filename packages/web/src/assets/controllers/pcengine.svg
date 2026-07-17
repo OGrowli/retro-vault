@@ -1,0 +1,19 @@
+<svg viewBox="0 0 260 120" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>PC Engine / TurboGrafx-16 controller button layout</title>
+  <g fill="none" stroke="#c7c7d6" stroke-width="2.5" stroke-linejoin="round">
+    <rect x="10" y="25" width="240" height="60" rx="28"/>
+    <rect x="35" y="47" width="40" height="16"/>
+    <rect x="47" y="35" width="16" height="40"/>
+    <circle cx="190" cy="48" r="11"/>
+    <circle cx="215" cy="63" r="11"/>
+    <rect x="105" y="90" width="24" height="9" rx="4.5"/>
+    <rect x="137" y="90" width="24" height="9" rx="4.5"/>
+  </g>
+  <g fill="#c7c7d6" font-family="Inter, system-ui, sans-serif" font-size="9" text-anchor="middle">
+    <text x="55" y="101">D-PAD</text>
+    <text x="190" y="51">II</text>
+    <text x="215" y="66">I</text>
+    <text x="117" y="106" font-size="7">SELECT</text>
+    <text x="149" y="106" font-size="7">RUN</text>
+  </g>
+</svg>
