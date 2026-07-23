@@ -4,6 +4,93 @@ import { useGamepad } from '../hooks/useGamepad'
 import { Glyph } from '../components/Glyph'
 import { Clock } from '../components/Clock'
 
+// Streams scripts/deploy.sh output into a scrolling feed by polling the tail
+// endpoint. The deploy ends in a reboot, so once polls start failing after
+// we've seen output, we treat it as "rebooting" rather than an error.
+function UpdateProgressModal({ startOffset, onClose }: { startOffset: number; onClose: () => void }) {
+  const [log, setLog] = useState('')
+  const [phase, setPhase] = useState<'running' | 'rebooting'>('running')
+  const offsetRef = useRef(startOffset)
+  const failsRef = useRef(0)
+  const feedRef = useRef<HTMLPreElement>(null)
+
+  const complete = /==> Deploy complete\./.test(log)
+
+  useEffect(() => {
+    let active = true
+    const poll = async () => {
+      try {
+        const res = await api.system.updateLog(offsetRef.current)
+        if (!active) return
+        failsRef.current = 0
+        if (res.content) {
+          offsetRef.current = res.offset
+          setLog(prev => prev + res.content)
+        }
+      } catch {
+        if (!active) return
+        // The reboot tears down the API — a few failed polls means it's going down.
+        failsRef.current += 1
+        if (failsRef.current >= 3) setPhase('rebooting')
+      }
+    }
+    void poll()
+    const id = setInterval(poll, 1000)
+    return () => { active = false; clearInterval(id) }
+  }, [])
+
+  // Follow the tail as new lines arrive.
+  useEffect(() => {
+    const el = feedRef.current
+    if (el) el.scrollTop = el.scrollHeight
+  }, [log])
+
+  useGamepad((action) => {
+    if (action === 'back' || action === 'confirm') onClose()
+  }, true)
+
+  const status = phase === 'rebooting'
+    ? 'Device is rebooting — this screen will reload shortly.'
+    : complete
+      ? 'Build complete — rebooting the device…'
+      : 'Updating… pulling latest, rebuilding, and restarting.'
+
+  return (
+    <>
+      <div className="fixed inset-0 bg-black/80 z-40" />
+      <div className="fixed inset-0 z-50 flex items-center justify-center px-6">
+        <div className="bg-vault-card rounded-2xl p-6 w-full max-w-2xl space-y-4" style={{ boxShadow: '0 24px 64px rgba(0,0,0,0.6)' }}>
+          <div className="flex items-center gap-3">
+            {phase === 'running' && !complete && (
+              <span className="w-4 h-4 rounded-full border-2 border-vault-muted border-t-vault-accent animate-spin motion-reduce:animate-none" />
+            )}
+            <h2 className="text-white text-xl font-bold">Updating RetroVault</h2>
+          </div>
+
+          <pre
+            ref={feedRef}
+            className="h-72 overflow-y-auto rounded-xl bg-black/60 border border-vault-surface p-4 text-[0.72rem] leading-relaxed text-[#c8f7d0] font-mono whitespace-pre-wrap break-words"
+            style={{ scrollbarWidth: 'thin' }}
+          >
+            {log || 'Waiting for output…'}
+          </pre>
+
+          <p className="text-vault-muted text-sm">{status}</p>
+
+          <div className="flex justify-end">
+            <button
+              onClick={onClose}
+              className="px-5 py-2.5 rounded-xl font-bold text-sm uppercase tracking-wide bg-vault-surface text-white border border-vault-muted inline-flex items-center gap-2"
+            >
+              <Glyph type="circle" /> Close
+            </button>
+          </div>
+        </div>
+      </div>
+    </>
+  )
+}
+
 interface Props {
   onBack: () => void
   onOpenHome: () => void
@@ -77,6 +164,8 @@ export function Settings({ onBack, onOpenHome, onOpenScraping, onOpenControllers
   const [updateOpen, setUpdateOpen] = useState(false)
   const [updating, setUpdating] = useState(false)
   const [updateMsg, setUpdateMsg] = useState<string | null>(null)
+  // Set once the deploy is kicked off — drives the live-log progress modal.
+  const [progressOffset, setProgressOffset] = useState<number | null>(null)
   const itemRefs = useRef<Partial<Record<FocusItem, HTMLElement | null>>>({})
 
   const focusIdx = FOCUS_ITEMS.indexOf(focused)
@@ -89,13 +178,14 @@ export function Settings({ onBack, onOpenHome, onOpenScraping, onOpenControllers
     setUpdating(true)
     setUpdateMsg(null)
     try {
-      await api.system.update()
-      setUpdateMsg('Update started — the device will rebuild and reboot shortly.')
+      const { offset } = await api.system.update()
+      setUpdateOpen(false)
+      setProgressOffset(offset)
     } catch (e) {
       setUpdateMsg(e instanceof Error ? e.message : 'Update failed to start')
+      setUpdateOpen(false)
     } finally {
       setUpdating(false)
-      setUpdateOpen(false)
     }
   }, [])
 
@@ -113,7 +203,7 @@ export function Settings({ onBack, onOpenHome, onOpenScraping, onOpenControllers
     if (action === 'up') setFocused(FOCUS_ITEMS[Math.max(0, focusIdx - 1)])
     if (action === 'down') setFocused(FOCUS_ITEMS[Math.min(FOCUS_ITEMS.length - 1, focusIdx + 1)])
     if (action === 'confirm') activate(focused)
-  }, !updateOpen)
+  }, !updateOpen && progressOffset === null)
 
   const isFocused = (item: FocusItem) => focused === item
   const setRef = (item: FocusItem) => (el: HTMLElement | null) => { itemRefs.current[item] = el }
@@ -181,6 +271,13 @@ export function Settings({ onBack, onOpenHome, onOpenScraping, onOpenControllers
           updating={updating}
           onConfirm={() => void runUpdate()}
           onCancel={() => setUpdateOpen(false)}
+        />
+      )}
+
+      {progressOffset !== null && (
+        <UpdateProgressModal
+          startOffset={progressOffset}
+          onClose={() => setProgressOffset(null)}
         />
       )}
     </div>

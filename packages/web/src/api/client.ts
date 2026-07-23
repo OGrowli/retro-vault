@@ -152,7 +152,9 @@ export const api = {
   },
 
   system: {
-    update: () => post<{ started: boolean }>('/system/update'),
+    update: () => post<{ started: boolean; offset: number }>('/system/update'),
+    updateLog: (offset: number) =>
+      get<{ content: string; offset: number; size: number }>(`/system/update/log?offset=${offset}`),
   },
 
   scrape: {
