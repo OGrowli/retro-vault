@@ -52,6 +52,7 @@ export function Home({ user, systems, genres, filter, homePrefs, onFilterChange,
   const [importMessage, setImportMessage] = useState<string | null>(null)
   const [rawHistory, setRawHistory] = useState<HistoryEntry[]>([])
   const [searchVkOpen, setSearchVkOpen] = useState(false)
+  const scrollRef = useRef<HTMLDivElement>(null)
 
   const historyToGames = (history: HistoryEntry[]): Game[] =>
     history
@@ -315,6 +316,17 @@ export function Home({ user, systems, genres, filter, homePrefs, onFilterChange,
 
   useGamepad(handleAction, inputActive && !randomGame && !randomLoading && !searchVkOpen)
 
+  // Rail cards scroll into view with block:'nearest', which pins the topmost
+  // rail's card to the viewport top and leaves the header hidden above it.
+  // When focus reaches the first navigable rail, scroll all the way up so the
+  // header comes back into view.
+  const topRegion = navRails.find(r => r.colCount > 0)?.key
+  useEffect(() => {
+    if (topRegion && nav.region === topRegion && !filterOpen) {
+      scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
+    }
+  }, [nav.region, topRegion, filterOpen])
+
   const gridIdx = nav.getIndex('all-games')
   const drawerIdx = nav.getIndex('filter-drawer')
 
@@ -337,7 +349,7 @@ export function Home({ user, systems, genres, filter, homePrefs, onFilterChange,
         }}
       />
 
-      <div className="relative h-full overflow-y-auto" style={{ scrollbarWidth: 'none' }}>
+      <div ref={scrollRef} className="relative h-full overflow-y-auto" style={{ scrollbarWidth: 'none' }}>
         <header className="px-[5%] pt-[3%] pb-2 flex items-center justify-between">
           <h1 className="text-white text-2xl font-bold tracking-tight">RetroVault</h1>
           <div className="flex items-center gap-3">
