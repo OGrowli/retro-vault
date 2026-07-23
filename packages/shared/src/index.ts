@@ -74,6 +74,21 @@ export interface GameList {
   included?: boolean
 }
 
+// Per-user home screen layout prefs. Recently Played and All Games are always
+// shown; everything else (Favorites, custom lists) can be hidden. Stored keys
+// match the home rail region keys: 'favorites', 'list-<id>'.
+export interface HomePrefs {
+  hiddenKeys: string[]
+}
+
+// A selectable collection in the full-screen list view. Games are preloaded so
+// the dropdown can switch between lists without a round-trip.
+export interface ListSource {
+  key: string
+  label: string
+  games: Game[]
+}
+
 // Per-system controller remap. `bindings` maps a RetroArch input suffix
 // (e.g. 'a', 'b', 'start', 'l2') to the RAW joypad button index captured live
 // from the Gamepad API — indices vary by controller/driver, never hardcoded.

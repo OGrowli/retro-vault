@@ -1,17 +1,20 @@
 import { useState, useEffect, useRef } from 'react'
-import type { Game } from '@retro-vault/shared'
+import type { Game, ListSource } from '@retro-vault/shared'
 import { bgVariant } from '../api/client'
 import { useGamepad } from '../hooks/useGamepad'
 import { Clock } from '../components/Clock'
 import { Glyph } from '../components/Glyph'
 
 interface Props {
-  title: string
-  games: Game[]
+  sources: ListSource[]
+  activeKey: string
   onBack: () => void
   onGameSelect: (game: Game) => void
   inputActive?: boolean
 }
+
+// -1 focuses the list-switcher dropdown that sits above the rows.
+const SELECTOR_INDEX = -1
 
 const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v))
 
@@ -148,28 +151,58 @@ function GamePreviewPanel({ game }: { game: Game | null }) {
   )
 }
 
-export function ListView({ title, games, onBack, onGameSelect, inputActive = true }: Props) {
+export function ListView({ sources, activeKey: initialKey, onBack, onGameSelect, inputActive = true }: Props) {
+  const [activeKey, setActiveKey] = useState(initialKey)
   const [focusedIndex, setFocusedIndex] = useState(0)
+  const [dropdownOpen, setDropdownOpen] = useState(false)
+  const [dropdownFocus, setDropdownFocus] = useState(0)
   const rowRefs = useRef<(HTMLDivElement | null)[]>([])
 
-  const focusedGame = games[focusedIndex] ?? null
+  const activeSource = sources.find(s => s.key === activeKey) ?? sources[0]
+  const games = activeSource?.games ?? []
+  const title = activeSource?.label ?? 'List'
+
+  const focusedGame = focusedIndex >= 0 ? (games[focusedIndex] ?? null) : null
+
+  const selectSource = (key: string) => {
+    setActiveKey(key)
+    setFocusedIndex(0)
+    setDropdownOpen(false)
+  }
+
+  const openDropdown = () => {
+    setDropdownFocus(Math.max(0, sources.findIndex(s => s.key === activeKey)))
+    setDropdownOpen(true)
+  }
 
   useGamepad((action) => {
+    if (dropdownOpen) {
+      if (action === 'back') { setDropdownOpen(false); return }
+      if (action === 'up') setDropdownFocus(i => clamp(i - 1, 0, sources.length - 1))
+      if (action === 'down') setDropdownFocus(i => clamp(i + 1, 0, sources.length - 1))
+      if (action === 'confirm') {
+        const src = sources[dropdownFocus]
+        if (src) selectSource(src.key)
+      }
+      return
+    }
     if (action === 'back') { onBack(); return }
     if (action === 'confirm') {
+      if (focusedIndex === SELECTOR_INDEX) { openDropdown(); return }
       if (focusedGame) onGameSelect(focusedGame)
       return
     }
-    if (action === 'up') setFocusedIndex(i => clamp(i - 1, 0, games.length - 1))
-    if (action === 'down') setFocusedIndex(i => clamp(i + 1, 0, games.length - 1))
+    if (action === 'up') setFocusedIndex(i => clamp(i - 1, SELECTOR_INDEX, games.length - 1))
+    if (action === 'down') setFocusedIndex(i => clamp(i + 1, SELECTOR_INDEX, games.length - 1))
   }, inputActive)
 
   useEffect(() => {
-    if (!inputActive) return
+    if (!inputActive || focusedIndex < 0) return
     rowRefs.current[focusedIndex]?.scrollIntoView({ block: 'nearest' })
   }, [focusedIndex, inputActive])
 
   const bgSrc = focusedGame?.box_art_path ? bgVariant(focusedGame.box_art_path) : null
+  const selectorFocused = focusedIndex === SELECTOR_INDEX && !dropdownOpen
 
   return (
     <div className="fixed inset-0 bg-vault-bg flex flex-col overflow-hidden">
@@ -184,8 +217,51 @@ export function ListView({ title, games, onBack, onGameSelect, inputActive = tru
       />
 
       <header className="relative px-[5%] pt-[3%] pb-5 flex items-baseline justify-between flex-shrink-0">
-        <div className="flex items-baseline gap-3">
-          <h1 className="text-white text-2xl font-bold tracking-tight">{title}</h1>
+        <div className="flex items-center gap-4">
+          <div className="relative">
+            <button
+              onClick={() => (dropdownOpen ? setDropdownOpen(false) : openDropdown())}
+              onMouseEnter={() => setFocusedIndex(SELECTOR_INDEX)}
+              className={[
+                'flex items-center gap-3 rounded-xl px-4 py-2 -ml-4 transition-colors duration-150',
+                'motion-reduce:transition-none',
+                selectorFocused || dropdownOpen ? 'bg-vault-surface ring-2 ring-vault-accent' : 'hover:bg-vault-surface',
+              ].join(' ')}
+              title="Switch list"
+            >
+              <h1 className="text-white text-2xl font-bold tracking-tight">{title}</h1>
+              <svg
+                width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+                className={['text-vault-accent-bright transition-transform duration-150', dropdownOpen ? 'rotate-180' : ''].join(' ')}
+              >
+                <path d="M6 9l6 6 6-6" />
+              </svg>
+            </button>
+
+            {dropdownOpen && (
+              <div className="absolute left-0 top-full mt-1 z-30 min-w-[280px] max-h-[60vh] overflow-y-auto rounded-xl bg-vault-card border border-vault-surface py-2 shadow-2xl" style={{ scrollbarWidth: 'none' }}>
+                {sources.map((src, i) => (
+                  <button
+                    key={src.key}
+                    onClick={() => selectSource(src.key)}
+                    onMouseEnter={() => setDropdownFocus(i)}
+                    className={[
+                      'w-full flex items-center justify-between gap-4 px-4 py-2.5 text-left transition-colors duration-100',
+                      dropdownFocus === i ? 'bg-vault-surface' : '',
+                    ].join(' ')}
+                  >
+                    <span className={['text-sm font-semibold truncate', src.key === activeKey ? 'text-vault-accent-bright' : 'text-white'].join(' ')}>
+                      {src.label}
+                    </span>
+                    <span className="text-vault-muted text-[0.65rem] font-bold uppercase tracking-wider flex-shrink-0">
+                      {src.games.length}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
           <span className="text-vault-muted text-xs uppercase tracking-widest">{games.length} titles</span>
         </div>
         <Clock />
@@ -214,7 +290,7 @@ export function ListView({ title, games, onBack, onGameSelect, inputActive = tru
 
       <footer className="relative flex-shrink-0 px-[5%] pb-4 pt-3 bg-gradient-to-t from-vault-bg to-transparent">
         <p className="text-vault-muted text-xs uppercase tracking-wide flex items-center gap-1.5 flex-wrap">
-          <Glyph type="cross" /> Select  ·  <Glyph type="circle" /> Back  ·  ↑↓ / D-Pad to move focus
+          <Glyph type="cross" /> {dropdownOpen ? 'Choose list' : 'Select'}  ·  <Glyph type="circle" /> Back  ·  ↑↓ / D-Pad to move focus  ·  Focus title + <Glyph type="cross" /> to switch list
         </p>
       </footer>
     </div>

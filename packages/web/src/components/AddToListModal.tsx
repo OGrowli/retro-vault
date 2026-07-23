@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import type { Game, GameList, User } from '@retro-vault/shared'
 import { api } from '../api/client'
 import { useGamepad } from '../hooks/useGamepad'
@@ -20,6 +20,8 @@ export function AddToListModal({ game, user, onClose }: Props) {
   const [focusIdx, setFocusIdx] = useState(0) // 0..lists.length; last index = "New List"
   const [newName, setNewName] = useState('')
   const [toast, setToast] = useState<string | null>(null)
+  // rowRefs[0..lists.length] — last entry is the "New List" row.
+  const rowRefs = useRef<(HTMLDivElement | null)[]>([])
 
   useEffect(() => {
     api.lists.forUser(user.id, game.id)
@@ -67,6 +69,12 @@ export function AddToListModal({ game, user, onClose }: Props) {
 
   const rowCount = lists.length + 1 // + "New List" row
 
+  // Keep the gamepad-focused row visible as it moves past the scroll bounds.
+  useEffect(() => {
+    if (step !== 'browse') return
+    rowRefs.current[focusIdx]?.scrollIntoView({ block: 'nearest' })
+  }, [focusIdx, step])
+
   useGamepad((action) => {
     if (action === 'back') { onClose(); return }
     if (action === 'up') setFocusIdx(i => clamp(i - 1, 0, rowCount - 1))
@@ -106,6 +114,7 @@ export function AddToListModal({ game, user, onClose }: Props) {
                       return (
                         <div
                           key={list.id}
+                          ref={el => { rowRefs.current[i] = el }}
                           onMouseEnter={() => setFocusIdx(i)}
                           onClick={() => toggleList(list)}
                           className={[
@@ -135,6 +144,7 @@ export function AddToListModal({ game, user, onClose }: Props) {
                     })}
 
                     <div
+                      ref={el => { rowRefs.current[lists.length] = el }}
                       onMouseEnter={() => setFocusIdx(lists.length)}
                       onClick={() => setStep('create')}
                       className={[

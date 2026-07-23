@@ -1,16 +1,17 @@
 import { useState, useEffect, useCallback } from 'react'
-import type { User, Game, GameFilter } from '@retro-vault/shared'
+import type { User, Game, GameFilter, HomePrefs, ListSource } from '@retro-vault/shared'
 import { api } from './api/client'
 import { ProfileSelect } from './screens/ProfileSelect'
 import { Home } from './screens/Home'
 import { GameDetail } from './screens/GameDetail'
 import { ListView } from './screens/ListView'
 import { Settings } from './screens/Settings'
+import { HomeLayoutSettings } from './screens/HomeLayoutSettings'
 import { ScrapeSettings } from './screens/ScrapeSettings'
 import { ControllerSettings } from './screens/ControllerSettings'
 import { EmulatorSettings } from './screens/EmulatorSettings'
 
-type Screen = 'profile-select' | 'home' | 'game-detail' | 'settings' | 'list-view' | 'scrape-settings' | 'controller-settings' | 'emulator-settings'
+type Screen = 'profile-select' | 'home' | 'game-detail' | 'settings' | 'list-view' | 'home-settings' | 'scrape-settings' | 'controller-settings' | 'emulator-settings'
 
 // Navigation hierarchy: back always goes to the screen's parent.
 const SCREEN_PARENT: Record<Screen, Screen | null> = {
@@ -19,6 +20,7 @@ const SCREEN_PARENT: Record<Screen, Screen | null> = {
   'game-detail': 'home',
   'settings': 'home',
   'list-view': 'home',
+  'home-settings': 'settings',
   'scrape-settings': 'settings',
   'controller-settings': 'settings',
   'emulator-settings': 'settings',
@@ -41,17 +43,36 @@ function saveFilter(userId: number, filter: GameFilter) {
   } catch { /* storage full / disabled — filter just won't persist */ }
 }
 
+const homePrefsKey = (userId: number) => `retrovault:home-prefs:${userId}`
+const DEFAULT_HOME_PREFS: HomePrefs = { hiddenKeys: [] }
+
+function loadHomePrefs(userId: number): HomePrefs {
+  try {
+    const raw = localStorage.getItem(homePrefsKey(userId))
+    return raw ? (JSON.parse(raw) as HomePrefs) : DEFAULT_HOME_PREFS
+  } catch {
+    return DEFAULT_HOME_PREFS
+  }
+}
+
+function saveHomePrefs(userId: number, prefs: HomePrefs) {
+  try {
+    localStorage.setItem(homePrefsKey(userId), JSON.stringify(prefs))
+  } catch { /* storage full / disabled — prefs just won't persist */ }
+}
+
 export function App() {
   const [screen, setScreen] = useState<Screen>('profile-select')
   const [currentUser, setCurrentUser] = useState<User | null>(null)
   const [selectedGame, setSelectedGame] = useState<Game | null>(null)
-  const [listView, setListView] = useState<{ title: string; games: Game[] } | null>(null)
+  const [listView, setListView] = useState<{ sources: ListSource[]; activeKey: string } | null>(null)
   // Where game-detail was opened from, so Back returns there (home or a list view).
   const [gameDetailFrom, setGameDetailFrom] = useState<Screen>('home')
   const [systems, setSystems] = useState<string[]>([])
   const [genres, setGenres] = useState<string[]>([])
   // Lifted out of Home so it survives Home's unmount/remount when launching a game.
   const [filter, setFilter] = useState<GameFilter>({})
+  const [homePrefs, setHomePrefs] = useState<HomePrefs>(DEFAULT_HOME_PREFS)
 
   const refreshMeta = useCallback(() => {
     Promise.all([api.meta.systems(), api.meta.genres()]).then(([s, g]) => {
@@ -65,12 +86,19 @@ export function App() {
   // Hydrate the filter from localStorage whenever the active user changes, so it
   // survives a full page reload / kiosk relaunch, not just in-app navigation.
   useEffect(() => {
-    if (currentUser) setFilter(loadFilter(currentUser.id))
+    if (currentUser) {
+      setFilter(loadFilter(currentUser.id))
+      setHomePrefs(loadHomePrefs(currentUser.id))
+    }
   }, [currentUser?.id])
 
   useEffect(() => {
     if (currentUser) saveFilter(currentUser.id, filter)
   }, [filter, currentUser?.id])
+
+  useEffect(() => {
+    if (currentUser) saveHomePrefs(currentUser.id, homePrefs)
+  }, [homePrefs, currentUser?.id])
 
   // Launching a game tears down the kiosk browser; the fresh Chromium after
   // the game exits asks the API who was playing what and returns to that
@@ -101,8 +129,8 @@ export function App() {
     setScreen('game-detail')
   }
 
-  const handleShowMore = (title: string, games: Game[]) => {
-    setListView({ title, games })
+  const handleShowMore = (sources: ListSource[], activeKey: string) => {
+    setListView({ sources, activeKey })
     setScreen('list-view')
   }
 
@@ -128,6 +156,7 @@ export function App() {
           systems={systems}
           genres={genres}
           filter={filter}
+          homePrefs={homePrefs}
           onFilterChange={setFilter}
           onGameSelect={handleGameSelect}
           onSwitchUser={goBack}
@@ -139,8 +168,8 @@ export function App() {
       )}
       {(screen === 'list-view' || (screen === 'game-detail' && gameDetailFrom === 'list-view')) && listView && (
         <ListView
-          title={listView.title}
-          games={listView.games}
+          sources={listView.sources}
+          activeKey={listView.activeKey}
           onGameSelect={handleGameSelect}
           onBack={goBack}
           inputActive={screen === 'list-view'}
@@ -156,9 +185,18 @@ export function App() {
       {screen === 'settings' && (
         <Settings
           onBack={goBack}
+          onOpenHome={() => setScreen('home-settings')}
           onOpenScraping={() => setScreen('scrape-settings')}
           onOpenControllers={() => setScreen('controller-settings')}
           onOpenHotkeys={() => setScreen('emulator-settings')}
+        />
+      )}
+      {screen === 'home-settings' && currentUser && (
+        <HomeLayoutSettings
+          user={currentUser}
+          prefs={homePrefs}
+          onChange={setHomePrefs}
+          onBack={goBack}
         />
       )}
       {screen === 'scrape-settings' && (

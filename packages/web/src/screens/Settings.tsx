@@ -6,12 +6,13 @@ import { Clock } from '../components/Clock'
 
 interface Props {
   onBack: () => void
+  onOpenHome: () => void
   onOpenScraping: () => void
   onOpenControllers: () => void
   onOpenHotkeys: () => void
 }
 
-const FOCUS_ITEMS = ['scraping', 'controllers', 'hotkeys', 'update', 'back'] as const
+const FOCUS_ITEMS = ['home', 'scraping', 'controllers', 'hotkeys', 'update', 'back'] as const
 type FocusItem = (typeof FOCUS_ITEMS)[number]
 
 // Rebooting the device is disruptive — gate the update behind an explicit
@@ -71,8 +72,8 @@ function UpdateConfirmModal({ updating, onConfirm, onCancel }: {
   )
 }
 
-export function Settings({ onBack, onOpenScraping, onOpenControllers, onOpenHotkeys }: Props) {
-  const [focused, setFocused] = useState<FocusItem>('scraping')
+export function Settings({ onBack, onOpenHome, onOpenScraping, onOpenControllers, onOpenHotkeys }: Props) {
+  const [focused, setFocused] = useState<FocusItem>('home')
   const [updateOpen, setUpdateOpen] = useState(false)
   const [updating, setUpdating] = useState(false)
   const [updateMsg, setUpdateMsg] = useState<string | null>(null)
@@ -99,12 +100,13 @@ export function Settings({ onBack, onOpenScraping, onOpenControllers, onOpenHotk
   }, [])
 
   const activate = useCallback((item: FocusItem) => {
+    if (item === 'home') onOpenHome()
     if (item === 'scraping') onOpenScraping()
     if (item === 'controllers') onOpenControllers()
     if (item === 'hotkeys') onOpenHotkeys()
     if (item === 'update') setUpdateOpen(true)
     if (item === 'back') onBack()
-  }, [onOpenScraping, onOpenControllers, onOpenHotkeys, onBack])
+  }, [onOpenHome, onOpenScraping, onOpenControllers, onOpenHotkeys, onBack])
 
   useGamepad((action) => {
     if (action === 'back') { onBack(); return }
@@ -117,6 +119,7 @@ export function Settings({ onBack, onOpenScraping, onOpenControllers, onOpenHotk
   const setRef = (item: FocusItem) => (el: HTMLElement | null) => { itemRefs.current[item] = el }
 
   const menu: { item: FocusItem; title: string; subtitle: string }[] = [
+    { item: 'home', title: 'Home Screen', subtitle: 'Choose which lists appear on the home page' },
     { item: 'scraping', title: 'Scraping', subtitle: 'ScreenScraper credentials & metadata' },
     { item: 'controllers', title: 'Controller Settings', subtitle: 'Remap buttons per system' },
     { item: 'hotkeys', title: 'Emulator Hotkeys', subtitle: 'Save states, fast-forward, reset — all systems' },

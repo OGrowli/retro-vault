@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
-import type { Game, User, GameFilter, HistoryEntry, GameList } from '@retro-vault/shared'
+import type { Game, User, GameFilter, HistoryEntry, GameList, HomePrefs, ListSource } from '@retro-vault/shared'
 import { api, bgVariant } from '../api/client'
 import { useGamepad } from '../hooks/useGamepad'
 import { useSpatialNav } from '../hooks/useSpatialNav'
@@ -19,11 +19,12 @@ interface Props {
   systems: string[]
   genres: string[]
   filter: GameFilter
+  homePrefs: HomePrefs
   onFilterChange: (update: (f: GameFilter) => GameFilter) => void
   onGameSelect: (game: Game) => void
   onSwitchUser: () => void
   onSettings: () => void
-  onShowMore: (title: string, games: Game[]) => void
+  onShowMore: (sources: ListSource[], activeKey: string) => void
   onLibraryChange?: () => void
   inputActive?: boolean
 }
@@ -33,7 +34,7 @@ const CONTINUE_THRESHOLD = 5 * 60
 // Focusable columns in a rail: visible cards (capped) plus a Show More tile when there's overflow.
 const railColCount = (len: number) => Math.min(len, RAIL_CAP) + (len > RAIL_CAP ? 1 : 0)
 
-export function Home({ user, systems, genres, filter, onFilterChange, onGameSelect, onSwitchUser, onSettings, onShowMore, onLibraryChange, inputActive = true }: Props) {
+export function Home({ user, systems, genres, filter, homePrefs, onFilterChange, onGameSelect, onSwitchUser, onSettings, onShowMore, onLibraryChange, inputActive = true }: Props) {
   const [recent, setRecent] = useState<Game[]>([])
   const [favorites, setFavorites] = useState<Game[]>([])
   const [allGames, setAllGames] = useState<Game[]>([])
@@ -202,11 +203,33 @@ export function Home({ user, systems, genres, filter, onFilterChange, onGameSele
     setFilterOpen(false)
   }
 
-  // Rails above the grid, in render/nav order. Only non-empty lists become rails.
+  // Home layout prefs: Recently Played and All Games are always shown; the
+  // Favorites rail and custom lists can be hidden from the home screen.
+  const showFavorites = !homePrefs.hiddenKeys.includes('favorites')
+
+  // Rails above the grid, in render/nav order. Only non-empty, non-hidden lists become rails.
   const activeLists = useMemo(
-    () => lists.filter(l => (listGames[l.id]?.length ?? 0) > 0),
-    [lists, listGames]
+    () => lists.filter(l => (listGames[l.id]?.length ?? 0) > 0 && !homePrefs.hiddenKeys.includes(`list-${l.id}`)),
+    [lists, listGames, homePrefs]
   )
+
+  // Every collection selectable from the list-view dropdown (independent of what's
+  // hidden on the home screen). Games are preloaded so switching is instant.
+  const listSources = useMemo<ListSource[]>(() => {
+    const sources: ListSource[] = [
+      { key: 'recently-played', label: 'Recently Played', games: recent },
+      { key: 'favorites', label: 'Favorites', games: favorites },
+    ]
+    for (const l of lists) {
+      const games = listGames[l.id] ?? []
+      if (games.length > 0) sources.push({ key: `list-${l.id}`, label: l.name, games })
+    }
+    return sources
+  }, [recent, favorites, lists, listGames])
+
+  const showMore = useCallback((activeKey: string) => {
+    onShowMore(listSources, activeKey)
+  }, [onShowMore, listSources])
 
   // Region key → the collection + title it represents (for confirm/favorite/show-more).
   const collectionFor = useCallback((region: string): { title: string; games: Game[] } | null => {
@@ -224,13 +247,13 @@ export function Home({ user, systems, genres, filter, onFilterChange, onGameSele
   const navRails = useMemo<RailDef[]>(() => {
     const rails: RailDef[] = [
       { key: 'recently-played', colCount: railColCount(recent.length) },
-      { key: 'favorites', colCount: railColCount(favorites.length) },
     ]
+    if (showFavorites) rails.push({ key: 'favorites', colCount: railColCount(favorites.length) })
     for (const l of activeLists) {
       rails.push({ key: `list-${l.id}`, colCount: railColCount(listGames[l.id]?.length ?? 0) })
     }
     return rails
-  }, [recent.length, favorites.length, activeLists, listGames])
+  }, [recent.length, showFavorites, favorites.length, activeLists, listGames])
 
   const nav = useSpatialNav({
     rails: navRails,
@@ -262,7 +285,7 @@ export function Home({ user, systems, genres, filter, onFilterChange, onGameSele
       if (!coll) return
       const visible = Math.min(coll.games.length, RAIL_CAP)
       if (coll.games.length > RAIL_CAP && col === visible) {
-        onShowMore(coll.title, coll.games)
+        showMore(region)
         return
       }
       const game = coll.games[col]
@@ -364,10 +387,10 @@ export function Home({ user, systems, genres, filter, onFilterChange, onGameSele
           getContinueLabel={getContinueLabel}
           onFocusGame={setBgGame}
           onSelectGame={onGameSelect}
-          onShowMore={() => onShowMore('Recently Played', recent)}
+          onShowMore={() => showMore('recently-played')}
         />
 
-        {(favorites.length > 0 || loading) && (
+        {showFavorites && (favorites.length > 0 || loading) && (
           <Rail
             title="Favorites"
             games={favorites}
@@ -377,7 +400,7 @@ export function Home({ user, systems, genres, filter, onFilterChange, onGameSele
             skeletonCount={6}
             onFocusGame={setBgGame}
             onSelectGame={onGameSelect}
-            onShowMore={() => onShowMore('Favorites', favorites)}
+            onShowMore={() => showMore('favorites')}
           />
         )}
 
@@ -393,7 +416,7 @@ export function Home({ user, systems, genres, filter, onFilterChange, onGameSele
               isActiveRegion={nav.region === region && !filterOpen}
               onFocusGame={setBgGame}
               onSelectGame={onGameSelect}
-              onShowMore={() => onShowMore(list.name, games)}
+              onShowMore={() => showMore(`list-${list.id}`)}
             />
           )
         })}
