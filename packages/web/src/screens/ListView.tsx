@@ -142,7 +142,7 @@ function GamePreviewPanel({ game }: { game: Game | null }) {
         </div>
 
         {game.description && (
-          <p className="text-vault-muted text-sm leading-relaxed max-w-[60ch] line-clamp-[8]">
+          <p className="text-vault-muted text-[17px] leading-relaxed max-w-[60ch] line-clamp-[8]">
             {game.description}
           </p>
         )}

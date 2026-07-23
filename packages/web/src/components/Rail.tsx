@@ -41,13 +41,18 @@ export function Rail({
   const visible = games.slice(0, RAIL_CAP)
   const showMore = !loading && !!onShowMore && games.length > RAIL_CAP
 
+  // Depend on `games` (stable) rather than the freshly-sliced `visible` array,
+  // which changes identity every render — otherwise this re-fires on unrelated
+  // re-renders (e.g. background art updates) and re-pins the focused card to
+  // the top, fighting Home's scroll-to-top when returning to the first rail.
   useEffect(() => {
     if (!isActiveRegion) return
     const el = cardRefs.current[focusedIndex]
     if (!el) return
     el.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' })
-    if (visible[focusedIndex]) onFocusGame?.(visible[focusedIndex])
-  }, [focusedIndex, isActiveRegion, visible, onFocusGame])
+    const focusedGame = games.slice(0, RAIL_CAP)[focusedIndex]
+    if (focusedGame) onFocusGame?.(focusedGame)
+  }, [focusedIndex, isActiveRegion, games, onFocusGame])
 
   return (
     <section className="px-[5%] py-3">

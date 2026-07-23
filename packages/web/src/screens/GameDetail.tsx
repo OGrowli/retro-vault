@@ -310,7 +310,7 @@ export function GameDetail({ game: initialGame, user, onBack }: Props) {
             >
               <p
                 className={[
-                  'text-vault-muted text-sm leading-relaxed',
+                  'text-vault-muted text-[17px] leading-relaxed',
                   descExpanded ? 'overflow-y-auto' : 'line-clamp-3',
                 ].join(' ')}
                 style={descExpanded ? { maxHeight: '30vh', scrollbarWidth: 'none' } : undefined}
