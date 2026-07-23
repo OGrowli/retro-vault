@@ -8,8 +8,11 @@ export const audioSettingsRouter = new Hono()
 const EMPTY: AudioConfig = {}
 const ROW_ID = 1
 
-// Drivers we let the user pick — RetroPie ships these on the Pi.
+// Enumerated values RetroArch accepts, whitelisted so a bad payload can't write
+// a garbage cfg line. Drivers are what RetroPie ships on the Pi.
 const DRIVERS = new Set(['alsathread', 'alsa', 'pulse'])
+const RESAMPLERS = new Set(['sinc', 'cc', 'nearest'])
+const OUTPUT_RATES = new Set([32000, 44100, 48000])
 
 audioSettingsRouter.get('/', (c) => {
   const row = db.prepare('SELECT config_json FROM audio_settings WHERE id = ?').get(ROW_ID) as
@@ -30,13 +33,23 @@ audioSettingsRouter.put('/', async (c) => {
 
   const bool = (v: unknown) => (typeof v === 'boolean' ? v : undefined)
   const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : undefined)
+  const clampNum = (v: unknown, min: number, max: number) => {
+    const n = num(v)
+    return n === undefined ? undefined : Math.max(min, Math.min(max, n))
+  }
 
   const config: AudioConfig = {
+    enabled: bool(body.enabled),
     muted: bool(body.muted),
-    volumeDb: num(body.volumeDb),
+    volumeDb: clampNum(body.volumeDb, -80, 12),
     driver: DRIVERS.has(body.driver as string) ? body.driver : undefined,
-    latencyMs: num(body.latencyMs),
+    latencyMs: clampNum(body.latencyMs, 8, 512),
+    outputRate: OUTPUT_RATES.has(body.outputRate as number) ? body.outputRate : undefined,
+    resampler: RESAMPLERS.has(body.resampler as string) ? body.resampler : undefined,
+    resamplerQuality: clampNum(body.resamplerQuality, 0, 5),
     sync: bool(body.sync),
+    maxTimingSkew: clampNum(body.maxTimingSkew, 0, 0.5),
+    rateControlDelta: clampNum(body.rateControlDelta, 0, 0.2),
   }
 
   db.prepare(`

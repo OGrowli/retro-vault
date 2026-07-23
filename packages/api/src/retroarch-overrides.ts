@@ -92,17 +92,27 @@ export function writeHotkeyOverride(config: HotkeyConfig): void {
 
 // Writes ~/.retrovault/retroarch-overrides/audio.cfg. Only emits keys the user
 // has actually set — everything else falls through to RetroArch's own defaults.
+// Each line maps 1:1 onto a RetroArch Audio-menu setting.
 export function writeAudioOverride(config: AudioConfig): void {
   const lines: string[] = []
+  const num = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v)
+
+  if (typeof config.enabled === 'boolean') lines.push(`audio_enable = "${config.enabled}"`)
   if (typeof config.muted === 'boolean') lines.push(`audio_mute_enable = "${config.muted}"`)
-  if (typeof config.volumeDb === 'number' && Number.isFinite(config.volumeDb)) {
-    lines.push(`audio_volume = "${config.volumeDb.toFixed(6)}"`)
-  }
+  if (num(config.volumeDb)) lines.push(`audio_volume = "${config.volumeDb.toFixed(6)}"`)
   if (config.driver) lines.push(`audio_driver = "${config.driver}"`)
-  if (typeof config.latencyMs === 'number' && config.latencyMs > 0) {
-    lines.push(`audio_latency = "${Math.round(config.latencyMs)}"`)
-  }
+  if (num(config.latencyMs) && config.latencyMs > 0) lines.push(`audio_latency = "${Math.round(config.latencyMs)}"`)
+  if (num(config.outputRate) && config.outputRate > 0) lines.push(`audio_out_rate = "${Math.round(config.outputRate)}"`)
+  if (config.resampler) lines.push(`audio_resampler = "${config.resampler}"`)
+  if (num(config.resamplerQuality)) lines.push(`audio_resampler_quality = "${Math.round(config.resamplerQuality)}"`)
   if (typeof config.sync === 'boolean') lines.push(`audio_sync = "${config.sync}"`)
+  if (num(config.maxTimingSkew)) lines.push(`audio_max_timing_skew = "${config.maxTimingSkew.toFixed(6)}"`)
+  if (num(config.rateControlDelta)) {
+    // Dynamic rate control is gated on audio_rate_control; a delta of 0 turns it off.
+    lines.push(`audio_rate_control = "${config.rateControlDelta > 0}"`)
+    lines.push(`audio_rate_control_delta = "${config.rateControlDelta.toFixed(6)}"`)
+  }
+
   writeCfg(audioCfgPath(), lines)
 }
 

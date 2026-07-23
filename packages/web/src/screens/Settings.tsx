@@ -215,7 +215,7 @@ export function Settings({ onBack, onOpenHome, onOpenScraping, onOpenControllers
     { item: 'scraping', title: 'Scraping', subtitle: 'ScreenScraper credentials & metadata' },
     { item: 'controllers', title: 'Controller Settings', subtitle: 'Remap buttons per system' },
     { item: 'hotkeys', title: 'Emulator Hotkeys', subtitle: 'Save states, fast-forward, reset — all systems' },
-    { item: 'audio', title: 'Audio', subtitle: 'Volume, mute, driver & latency — all systems' },
+    { item: 'audio', title: 'Audio', subtitle: 'RetroArch audio config — volume, resampler, sync & more' },
     { item: 'update', title: 'Update RetroVault', subtitle: 'Pull latest, rebuild, and reboot' },
   ]
 

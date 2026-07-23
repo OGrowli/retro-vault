@@ -98,20 +98,33 @@ export interface ControllerConfig {
   deadzone?: number
 }
 
-// Single global audio config applied to every launch. Maps directly onto
-// RetroArch's audio_* config keys, written to an override cfg the emulator
-// reads via --appendconfig. Undefined fields fall back to RetroArch defaults.
+// Single global audio config applied to every launch. Mirrors RetroArch's
+// Audio settings menu — each field maps onto a retroarch.cfg audio_* key,
+// written to an override cfg the emulator reads via --appendconfig. Undefined
+// fields fall back to RetroArch's own defaults (shown below).
 export interface AudioConfig {
-  /** audio_mute_enable — silences all output */
+  /** audio_enable — master audio on/off (default true) */
+  enabled?: boolean
+  /** audio_mute_enable — silences all output (default false) */
   muted?: boolean
-  /** audio_volume — global gain in dB (0 = unity, negative = quieter) */
+  /** audio_volume — global gain in dB, 0 = unity (default 0.0) */
   volumeDb?: number
-  /** audio_driver — e.g. 'alsathread', 'alsa', 'pulse' */
+  /** audio_driver — e.g. 'alsathread', 'alsa', 'pulse' (default auto) */
   driver?: string
-  /** audio_latency — output buffer size in ms (higher = fewer crackles, more lag) */
+  /** audio_latency — output buffer size in ms (default 64) */
   latencyMs?: number
-  /** audio_sync — sync emulation to the audio clock */
+  /** audio_out_rate — output sample rate in Hz (default 48000) */
+  outputRate?: number
+  /** audio_resampler — 'sinc' | 'cc' | 'nearest' (default 'sinc') */
+  resampler?: string
+  /** audio_resampler_quality — 0 Don't Care … 5 Highest */
+  resamplerQuality?: number
+  /** audio_sync — sync emulation to the audio clock (default true) */
   sync?: boolean
+  /** audio_max_timing_skew — max resample ratio deviation, 0.0–0.5 (default 0.05) */
+  maxTimingSkew?: number
+  /** audio_rate_control_delta — dynamic rate control range, 0 disables (default 0.005) */
+  rateControlDelta?: number
 }
 
 // Single global hotkey config applied to every launch. Each value is a raw
