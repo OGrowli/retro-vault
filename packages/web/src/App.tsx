@@ -10,8 +10,9 @@ import { HomeLayoutSettings } from './screens/HomeLayoutSettings'
 import { ScrapeSettings } from './screens/ScrapeSettings'
 import { ControllerSettings } from './screens/ControllerSettings'
 import { EmulatorSettings } from './screens/EmulatorSettings'
+import { AudioSettings } from './screens/AudioSettings'
 
-type Screen = 'profile-select' | 'home' | 'game-detail' | 'settings' | 'list-view' | 'home-settings' | 'scrape-settings' | 'controller-settings' | 'emulator-settings'
+type Screen = 'profile-select' | 'home' | 'game-detail' | 'settings' | 'list-view' | 'home-settings' | 'scrape-settings' | 'controller-settings' | 'emulator-settings' | 'audio-settings'
 
 // Navigation hierarchy: back always goes to the screen's parent.
 const SCREEN_PARENT: Record<Screen, Screen | null> = {
@@ -24,6 +25,7 @@ const SCREEN_PARENT: Record<Screen, Screen | null> = {
   'scrape-settings': 'settings',
   'controller-settings': 'settings',
   'emulator-settings': 'settings',
+  'audio-settings': 'settings',
 }
 
 const filterKey = (userId: number) => `retrovault:filter:${userId}`
@@ -189,6 +191,7 @@ export function App() {
           onOpenScraping={() => setScreen('scrape-settings')}
           onOpenControllers={() => setScreen('controller-settings')}
           onOpenHotkeys={() => setScreen('emulator-settings')}
+          onOpenAudio={() => setScreen('audio-settings')}
         />
       )}
       {screen === 'home-settings' && currentUser && (
@@ -207,6 +210,9 @@ export function App() {
       )}
       {screen === 'emulator-settings' && (
         <EmulatorSettings onBack={goBack} />
+      )}
+      {screen === 'audio-settings' && (
+        <AudioSettings onBack={goBack} />
       )}
     </>
   )

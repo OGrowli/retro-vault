@@ -97,9 +97,10 @@ interface Props {
   onOpenScraping: () => void
   onOpenControllers: () => void
   onOpenHotkeys: () => void
+  onOpenAudio: () => void
 }
 
-const FOCUS_ITEMS = ['home', 'scraping', 'controllers', 'hotkeys', 'update', 'back'] as const
+const FOCUS_ITEMS = ['home', 'scraping', 'controllers', 'hotkeys', 'audio', 'update', 'back'] as const
 type FocusItem = (typeof FOCUS_ITEMS)[number]
 
 // Rebooting the device is disruptive — gate the update behind an explicit
@@ -159,7 +160,7 @@ function UpdateConfirmModal({ updating, onConfirm, onCancel }: {
   )
 }
 
-export function Settings({ onBack, onOpenHome, onOpenScraping, onOpenControllers, onOpenHotkeys }: Props) {
+export function Settings({ onBack, onOpenHome, onOpenScraping, onOpenControllers, onOpenHotkeys, onOpenAudio }: Props) {
   const [focused, setFocused] = useState<FocusItem>('home')
   const [updateOpen, setUpdateOpen] = useState(false)
   const [updating, setUpdating] = useState(false)
@@ -194,9 +195,10 @@ export function Settings({ onBack, onOpenHome, onOpenScraping, onOpenControllers
     if (item === 'scraping') onOpenScraping()
     if (item === 'controllers') onOpenControllers()
     if (item === 'hotkeys') onOpenHotkeys()
+    if (item === 'audio') onOpenAudio()
     if (item === 'update') setUpdateOpen(true)
     if (item === 'back') onBack()
-  }, [onOpenHome, onOpenScraping, onOpenControllers, onOpenHotkeys, onBack])
+  }, [onOpenHome, onOpenScraping, onOpenControllers, onOpenHotkeys, onOpenAudio, onBack])
 
   useGamepad((action) => {
     if (action === 'back') { onBack(); return }
@@ -213,6 +215,7 @@ export function Settings({ onBack, onOpenHome, onOpenScraping, onOpenControllers
     { item: 'scraping', title: 'Scraping', subtitle: 'ScreenScraper credentials & metadata' },
     { item: 'controllers', title: 'Controller Settings', subtitle: 'Remap buttons per system' },
     { item: 'hotkeys', title: 'Emulator Hotkeys', subtitle: 'Save states, fast-forward, reset — all systems' },
+    { item: 'audio', title: 'Audio', subtitle: 'Volume, mute, driver & latency — all systems' },
     { item: 'update', title: 'Update RetroVault', subtitle: 'Pull latest, rebuild, and reboot' },
   ]
 

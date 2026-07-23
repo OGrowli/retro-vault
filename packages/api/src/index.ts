@@ -17,6 +17,7 @@ import { settingsRouter } from './routes/settings.js'
 import { eventsRouter } from './routes/events.js'
 import { controllerSettingsRouter } from './routes/controller-settings.js'
 import { hotkeySettingsRouter } from './routes/hotkey-settings.js'
+import { audioSettingsRouter } from './routes/audio-settings.js'
 import { systemRouter } from './routes/system.js'
 import { ensureBgVariant } from './scraper.js'
 
@@ -38,6 +39,7 @@ app.route('/settings', settingsRouter)
 app.route('/events', eventsRouter)
 app.route('/controller-settings', controllerSettingsRouter)
 app.route('/hotkey-settings', hotkeySettingsRouter)
+app.route('/audio-settings', audioSettingsRouter)
 app.route('/system', systemRouter)
 
 const DATA_DIR = process.env['RETROVAULT_DATA_DIR'] ?? path.join(os.homedir(), '.retrovault')

@@ -183,6 +183,13 @@ db.exec(`
     updated_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
+  -- Single global audio row (id fixed at 1).
+  CREATE TABLE IF NOT EXISTS audio_settings (
+    id INTEGER PRIMARY KEY,
+    config_json TEXT NOT NULL,
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
   -- Raw ScreenScraper 'jeu' payload per game, for re-parsing without re-fetching
   CREATE TABLE IF NOT EXISTS ss_games (
     game_id INTEGER PRIMARY KEY REFERENCES games(id) ON DELETE CASCADE,

@@ -1,7 +1,7 @@
 import type {
   Game, GameFilter, GameWithRoms, Rom, User,
   HistoryEntry, SessionWithRom, GameList,
-  ControllerConfig, HotkeyConfig,
+  ControllerConfig, HotkeyConfig, AudioConfig,
 } from '@retro-vault/shared'
 
 function filterToParams(filter: GameFilter, userId?: number): string {
@@ -147,6 +147,12 @@ export const api = {
       put<{ saved: boolean; config: HotkeyConfig }>('/hotkey-settings', config),
   },
 
+  audioSettings: {
+    get: () => get<AudioConfig>('/audio-settings'),
+    save: (config: AudioConfig) =>
+      put<{ saved: boolean; config: AudioConfig }>('/audio-settings', config),
+  },
+
   import: {
     run: () => post<ImportResult>('/import'),
   },
@@ -175,5 +181,5 @@ export const api = {
   },
 }
 
-export type { Game, GameWithRoms, Rom, User, GameFilter, HistoryEntry, SessionWithRom, GameList, ControllerConfig, HotkeyConfig }
+export type { Game, GameWithRoms, Rom, User, GameFilter, HistoryEntry, SessionWithRom, GameList, ControllerConfig, HotkeyConfig, AudioConfig }
 export { del }

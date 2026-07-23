@@ -1,7 +1,7 @@
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import type { ControllerConfig, HotkeyConfig } from '@retro-vault/shared'
+import type { AudioConfig, ControllerConfig, HotkeyConfig } from '@retro-vault/shared'
 
 const DATA_DIR = process.env['RETROVAULT_DATA_DIR'] ?? path.join(os.homedir(), '.retrovault')
 export const OVERRIDES_DIR = path.join(DATA_DIR, 'retroarch-overrides')
@@ -29,6 +29,10 @@ function systemCfgPath(system: string): string {
 
 function hotkeyCfgPath(): string {
   return path.join(OVERRIDES_DIR, 'hotkeys.cfg')
+}
+
+function audioCfgPath(): string {
+  return path.join(OVERRIDES_DIR, 'audio.cfg')
 }
 
 function writeCfg(file: string, lines: string[]): void {
@@ -86,8 +90,27 @@ export function writeHotkeyOverride(config: HotkeyConfig): void {
   writeCfg(hotkeyCfgPath(), lines)
 }
 
-// Override files (hotkeys first, then the system's) that actually exist, for
-// building RetroArch's --appendconfig at launch. Empty when none are saved.
+// Writes ~/.retrovault/retroarch-overrides/audio.cfg. Only emits keys the user
+// has actually set — everything else falls through to RetroArch's own defaults.
+export function writeAudioOverride(config: AudioConfig): void {
+  const lines: string[] = []
+  if (typeof config.muted === 'boolean') lines.push(`audio_mute_enable = "${config.muted}"`)
+  if (typeof config.volumeDb === 'number' && Number.isFinite(config.volumeDb)) {
+    lines.push(`audio_volume = "${config.volumeDb.toFixed(6)}"`)
+  }
+  if (config.driver) lines.push(`audio_driver = "${config.driver}"`)
+  if (typeof config.latencyMs === 'number' && config.latencyMs > 0) {
+    lines.push(`audio_latency = "${Math.round(config.latencyMs)}"`)
+  }
+  if (typeof config.sync === 'boolean') lines.push(`audio_sync = "${config.sync}"`)
+  writeCfg(audioCfgPath(), lines)
+}
+
+// Override files (hotkeys + audio first, then the system's) that actually
+// exist, for building RetroArch's --appendconfig at launch. The audio and
+// hotkey keys are disjoint, so their relative order doesn't matter; the
+// per-system file goes last so it can win any future overlap. Empty when none
+// are saved.
 export function existingOverridePaths(system: string): string[] {
-  return [hotkeyCfgPath(), systemCfgPath(system)].filter(p => fs.existsSync(p))
+  return [hotkeyCfgPath(), audioCfgPath(), systemCfgPath(system)].filter(p => fs.existsSync(p))
 }

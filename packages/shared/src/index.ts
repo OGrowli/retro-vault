@@ -98,6 +98,22 @@ export interface ControllerConfig {
   deadzone?: number
 }
 
+// Single global audio config applied to every launch. Maps directly onto
+// RetroArch's audio_* config keys, written to an override cfg the emulator
+// reads via --appendconfig. Undefined fields fall back to RetroArch defaults.
+export interface AudioConfig {
+  /** audio_mute_enable — silences all output */
+  muted?: boolean
+  /** audio_volume — global gain in dB (0 = unity, negative = quieter) */
+  volumeDb?: number
+  /** audio_driver — e.g. 'alsathread', 'alsa', 'pulse' */
+  driver?: string
+  /** audio_latency — output buffer size in ms (higher = fewer crackles, more lag) */
+  latencyMs?: number
+  /** audio_sync — sync emulation to the audio clock */
+  sync?: boolean
+}
+
 // Single global hotkey config applied to every launch. Each value is a raw
 // joypad button index; fastForwardRatio is a plain speed multiplier.
 export interface HotkeyConfig {
