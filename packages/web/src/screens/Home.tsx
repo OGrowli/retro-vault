@@ -21,6 +21,7 @@ interface Props {
   homePrefs: HomePrefs
   onFilterChange: (update: (f: GameFilter) => GameFilter) => void
   onGameSelect: (game: Game) => void
+  onRandomView?: (game: Game) => void
   onSwitchUser: () => void
   onSettings: () => void
   onShowMore: (sources: ListSource[], activeKey: string) => void
@@ -33,7 +34,7 @@ const CONTINUE_THRESHOLD = 5 * 60
 // Focusable columns in a rail: visible cards (capped) plus a Show More tile when there's overflow.
 const railColCount = (len: number) => Math.min(len, RAIL_CAP) + (len > RAIL_CAP ? 1 : 0)
 
-export function Home({ user, systems, genres, filter, homePrefs, onFilterChange, onGameSelect, onSwitchUser, onSettings, onShowMore, onLibraryChange, inputActive = true }: Props) {
+export function Home({ user, systems, genres, filter, homePrefs, onFilterChange, onGameSelect, onRandomView, onSwitchUser, onSettings, onShowMore, onLibraryChange, inputActive = true }: Props) {
   const [recent, setRecent] = useState<Game[]>([])
   const [favorites, setFavorites] = useState<Game[]>([])
   const [allGames, setAllGames] = useState<Game[]>([])
@@ -413,7 +414,7 @@ export function Home({ user, systems, genres, filter, homePrefs, onFilterChange,
         game={randomGame}
         loading={randomLoading}
         onClose={() => setRandomGame(null)}
-        onView={(game) => { setRandomGame(null); onGameSelect(game) }}
+        onView={(game) => { setRandomGame(null); (onRandomView ?? onGameSelect)(game) }}
         onAnother={() => void handleRandom()}
       />
 

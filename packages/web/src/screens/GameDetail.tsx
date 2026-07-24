@@ -10,10 +10,12 @@ interface Props {
   game: Game
   user: User
   onBack: () => void
+  /** Set when reached via Pick Random Game — shows a "Random Again" action. */
+  fromRandom?: boolean
+  onRandomAgain?: () => void
 }
 
-type ActionFocus = 'favorite' | 'add-to-list' | 'scrape' | 'back'
-const ACTIONS: ActionFocus[] = ['favorite', 'add-to-list', 'scrape', 'back']
+type ActionFocus = 'favorite' | 'add-to-list' | 'scrape' | 'random-again' | 'back'
 
 const REGION_FLAGS: Record<string, string> = {
   USA: '🇺🇸',
@@ -84,7 +86,11 @@ function RomRow({
   )
 }
 
-export function GameDetail({ game: initialGame, user, onBack }: Props) {
+export function GameDetail({ game: initialGame, user, onBack, fromRandom = false, onRandomAgain }: Props) {
+  // "Random Again" only appears when we arrived here from a random pick.
+  const ACTIONS: ActionFocus[] = fromRandom
+    ? ['favorite', 'add-to-list', 'scrape', 'random-again', 'back']
+    : ['favorite', 'add-to-list', 'scrape', 'back']
   const [detail, setDetail] = useState<GameWithRoms | null>(null)
   const [game, setGame] = useState<Game>(initialGame)
   const [isFavorite, setIsFavorite] = useState(false)
@@ -203,6 +209,7 @@ export function GameDetail({ game: initialGame, user, onBack }: Props) {
         if (act === 'favorite') void toggleFavorite()
         if (act === 'add-to-list') setAddToListOpen(true)
         if (act === 'scrape') void scrape()
+        if (act === 'random-again') onRandomAgain?.()
         if (act === 'back') onBack()
       }
     }
@@ -375,6 +382,7 @@ export function GameDetail({ game: initialGame, user, onBack }: Props) {
               ? (isFavorite ? 'Unfavorite' : 'Favorite')
               : act === 'add-to-list' ? 'Add to List'
               : act === 'scrape' ? (scraping ? 'Scraping…' : 'Scrape Metadata')
+              : act === 'random-again' ? '🎲 Random Again'
               : 'Back'
             return (
               <button
@@ -384,6 +392,7 @@ export function GameDetail({ game: initialGame, user, onBack }: Props) {
                   if (act === 'favorite') void toggleFavorite()
                   if (act === 'add-to-list') setAddToListOpen(true)
                   if (act === 'scrape') void scrape()
+                  if (act === 'random-again') onRandomAgain?.()
                   if (act === 'back') onBack()
                 }}
                 className={[

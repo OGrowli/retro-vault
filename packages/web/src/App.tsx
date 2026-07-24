@@ -70,6 +70,9 @@ export function App() {
   const [listView, setListView] = useState<{ sources: ListSource[]; activeKey: string } | null>(null)
   // Where game-detail was opened from, so Back returns there (home or a list view).
   const [gameDetailFrom, setGameDetailFrom] = useState<Screen>('home')
+  // True when the current game-detail was reached via Pick Random Game — enables
+  // a "Random Again" button on the page to re-roll without going back.
+  const [fromRandom, setFromRandom] = useState(false)
   const [systems, setSystems] = useState<string[]>([])
   const [genres, setGenres] = useState<string[]>([])
   // Lifted out of Home so it survives Home's unmount/remount when launching a game.
@@ -127,9 +130,26 @@ export function App() {
 
   const handleGameSelect = (game: Game) => {
     setGameDetailFrom(screen === 'list-view' ? 'list-view' : 'home')
+    setFromRandom(false)
     setSelectedGame(game)
     setScreen('game-detail')
   }
+
+  // Viewing a random pick: back returns home, and the detail page offers a
+  // "Random Again" button.
+  const handleRandomView = (game: Game) => {
+    setGameDetailFrom('home')
+    setFromRandom(true)
+    setSelectedGame(game)
+    setScreen('game-detail')
+  }
+
+  const handleRandomAgain = useCallback(() => {
+    if (!currentUser) return
+    api.games.random(filter, currentUser.id)
+      .then(game => setSelectedGame(game))
+      .catch(() => {})
+  }, [filter, currentUser])
 
   const handleShowMore = (sources: ListSource[], activeKey: string) => {
     setListView({ sources, activeKey })
@@ -140,6 +160,7 @@ export function App() {
     setScreen(s => {
       if (s === 'game-detail') {
         setSelectedGame(null)
+        setFromRandom(false)
         return gameDetailFrom
       }
       const parent = SCREEN_PARENT[s]
@@ -161,6 +182,7 @@ export function App() {
           homePrefs={homePrefs}
           onFilterChange={setFilter}
           onGameSelect={handleGameSelect}
+          onRandomView={handleRandomView}
           onSwitchUser={goBack}
           onSettings={() => setScreen('settings')}
           onShowMore={handleShowMore}
@@ -179,9 +201,12 @@ export function App() {
       )}
       {screen === 'game-detail' && currentUser && selectedGame && (
         <GameDetail
+          key={selectedGame.id}
           game={selectedGame}
           user={currentUser}
           onBack={goBack}
+          fromRandom={fromRandom}
+          onRandomAgain={handleRandomAgain}
         />
       )}
       {screen === 'settings' && (
