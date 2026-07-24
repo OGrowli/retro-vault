@@ -45,6 +45,11 @@ function saveFilter(userId: number, filter: GameFilter) {
   } catch { /* storage full / disabled — filter just won't persist */ }
 }
 
+// Whether the current game-detail came from a random pick. Persisted (not
+// per-user) so the "Random Again" button survives the kiosk teardown when a
+// game is launched and quit, then restored alongside the resumed game.
+const FROM_RANDOM_KEY = 'retrovault:from-random'
+
 const homePrefsKey = (userId: number) => `retrovault:home-prefs:${userId}`
 const DEFAULT_HOME_PREFS: HomePrefs = { hiddenKeys: [] }
 
@@ -73,6 +78,15 @@ export function App() {
   // True when the current game-detail was reached via Pick Random Game — enables
   // a "Random Again" button on the page to re-roll without going back.
   const [fromRandom, setFromRandom] = useState(false)
+
+  // Mirror fromRandom to localStorage so it survives a kiosk relaunch.
+  const persistFromRandom = useCallback((v: boolean) => {
+    setFromRandom(v)
+    try {
+      if (v) localStorage.setItem(FROM_RANDOM_KEY, '1')
+      else localStorage.removeItem(FROM_RANDOM_KEY)
+    } catch { /* storage disabled — button just won't persist across relaunch */ }
+  }, [])
   const [systems, setSystems] = useState<string[]>([])
   const [genres, setGenres] = useState<string[]>([])
   // Lifted out of Home so it survives Home's unmount/remount when launching a game.
@@ -119,6 +133,7 @@ export function App() {
           setCurrentUser(user)
           setSelectedGame(game)
           setScreen('game-detail')
+          try { if (localStorage.getItem(FROM_RANDOM_KEY) === '1') setFromRandom(true) } catch { /* ignore */ }
         })
     }).catch(() => {})
   }, [])
@@ -130,7 +145,7 @@ export function App() {
 
   const handleGameSelect = (game: Game) => {
     setGameDetailFrom(screen === 'list-view' ? 'list-view' : 'home')
-    setFromRandom(false)
+    persistFromRandom(false)
     setSelectedGame(game)
     setScreen('game-detail')
   }
@@ -139,7 +154,7 @@ export function App() {
   // "Random Again" button.
   const handleRandomView = (game: Game) => {
     setGameDetailFrom('home')
-    setFromRandom(true)
+    persistFromRandom(true)
     setSelectedGame(game)
     setScreen('game-detail')
   }
@@ -160,13 +175,13 @@ export function App() {
     setScreen(s => {
       if (s === 'game-detail') {
         setSelectedGame(null)
-        setFromRandom(false)
+        persistFromRandom(false)
         return gameDetailFrom
       }
       const parent = SCREEN_PARENT[s]
       return parent ?? s
     })
-  }, [gameDetailFrom])
+  }, [gameDetailFrom, persistFromRandom])
 
   return (
     <>
