@@ -7,7 +7,6 @@ import type { RailDef } from '../hooks/useSpatialNav'
 import { Rail, RAIL_CAP } from '../components/Rail'
 import { VirtualGrid, GRID_COLS } from '../components/VirtualGrid'
 import { FilterDrawer } from '../components/FilterDrawer'
-import type { DrawerRowKind } from '../components/FilterDrawer'
 import { RandomGameModal } from '../components/RandomGameModal'
 import { VirtualKeyboard } from '../components/VirtualKeyboard'
 import { Glyph } from '../components/Glyph'
@@ -155,49 +154,6 @@ export function Home({ user, systems, genres, filter, homePrefs, onFilterChange,
     }
   }, [filter, user.id, onLibraryChange])
 
-  // Drawer nav rows: chip sections first (only when non-empty), then search + action buttons.
-  // Must mirror FilterDrawer's render order.
-  const drawerRows = useMemo(() => {
-    const rows: { kind: DrawerRowKind; count: number }[] = []
-    if (systems.length > 0) rows.push({ kind: 'systems', count: systems.length })
-    if (genres.length > 0) rows.push({ kind: 'genres', count: genres.length })
-    rows.push({ kind: 'players', count: 3 })
-    rows.push({ kind: 'options', count: 3 })
-    rows.push({ kind: 'search', count: 1 })
-    rows.push({ kind: 'apply', count: 1 })
-    rows.push({ kind: 'random', count: 1 })
-    rows.push({ kind: 'import', count: 1 })
-    return rows
-  }, [systems, genres])
-
-  const toggleDrawerChip = (kind: DrawerRowKind, col: number) => {
-    if (kind === 'systems') {
-      const s = systems[col]
-      if (!s) return
-      onFilterChange(f => {
-        const cur = f.systems ?? []
-        return { ...f, systems: cur.includes(s) ? cur.filter(x => x !== s) : [...cur, s] }
-      })
-    }
-    if (kind === 'genres') {
-      const g = genres[col]
-      if (!g) return
-      onFilterChange(f => {
-        const cur = f.genres ?? []
-        return { ...f, genres: cur.includes(g) ? cur.filter(x => x !== g) : [...cur, g] }
-      })
-    }
-    if (kind === 'players') {
-      const p = [1, 2, 4][col]
-      onFilterChange(f => ({ ...f, players: f.players === p ? undefined : p }))
-    }
-    if (kind === 'options') {
-      if (col === 0) onFilterChange(f => ({ ...f, favoritesOnly: !f.favoritesOnly }))
-      if (col === 1) onFilterChange(f => ({ ...f, neverPlayed: !f.neverPlayed }))
-      if (col === 2) onFilterChange(f => ({ ...f, noMetadata: !f.noMetadata }))
-    }
-  }
-
   function applyFilters() {
     void refreshGames()
     nav.resetIndex('all-games')
@@ -260,23 +216,14 @@ export function Home({ user, systems, genres, filter, homePrefs, onFilterChange,
     rails: navRails,
     allGamesCount: allGames.length,
     gridCols: GRID_COLS,
-    filterDrawerRowCounts: drawerRows.map(r => r.count),
+    // The FilterDrawer owns its own gamepad nav now; spatial-nav only needs to
+    // know the drawer is open (so it stops snapping the home region) and how to
+    // toggle it via the Options button.
+    filterDrawerRowCounts: [],
     filterDrawerOpen: filterOpen,
     onToggleFilter: () => setFilterOpen(v => !v),
     onSettings,
     onConfirm: (region, row, col) => {
-      if (filterOpen) {
-        const rowDef = drawerRows[row]
-        if (!rowDef) return
-        switch (rowDef.kind) {
-          case 'search': setSearchVkOpen(true); break
-          case 'apply': applyFilters(); break
-          case 'random': setFilterOpen(false); void handleRandom(); break
-          case 'import': void handleImport(); break
-          default: toggleDrawerChip(rowDef.kind, col)
-        }
-        return
-      }
       if (region === 'all-games') {
         const game = allGames[row * GRID_COLS + col]
         if (game) onGameSelect(game)
@@ -314,7 +261,8 @@ export function Home({ user, systems, genres, filter, homePrefs, onFilterChange,
     nav.handleAction(action)
   }, [nav, onSettings])
 
-  useGamepad(handleAction, inputActive && !randomGame && !randomLoading && !searchVkOpen)
+  // Drawer open → the FilterDrawer's own gamepad handler takes over.
+  useGamepad(handleAction, inputActive && !randomGame && !randomLoading && !searchVkOpen && !filterOpen)
 
   // Rail cards scroll into view with block:'nearest', which pins the topmost
   // rail's card to the viewport top and leaves the header hidden above it.
@@ -328,7 +276,6 @@ export function Home({ user, systems, genres, filter, homePrefs, onFilterChange,
   }, [nav.region, topRegion, filterOpen])
 
   const gridIdx = nav.getIndex('all-games')
-  const drawerIdx = nav.getIndex('filter-drawer')
 
   const getContinueLabel = useCallback((game: Game) => {
     const entry = rawHistory.find(r => r.id === game.id)
@@ -448,19 +395,18 @@ export function Home({ user, systems, genres, filter, homePrefs, onFilterChange,
 
       <FilterDrawer
         open={filterOpen}
+        gamepadActive={filterOpen && !searchVkOpen}
         filter={filter}
         onChange={(f) => onFilterChange(() => f)}
         onApply={applyFilters}
         onRandom={() => { setFilterOpen(false); void handleRandom() }}
         onImport={() => void handleImport()}
+        onSearch={() => setSearchVkOpen(true)}
         importLoading={importLoading}
         importMessage={importMessage}
         onClose={() => setFilterOpen(false)}
         systems={systems}
         genres={genres}
-        focus={filterOpen && drawerRows[drawerIdx.row]
-          ? { kind: drawerRows[drawerIdx.row].kind, col: drawerIdx.col }
-          : null}
       />
 
       <RandomGameModal
