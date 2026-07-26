@@ -9,11 +9,13 @@ interface Props {
   game: Game
   user: User
   onClose: () => void
+  /** Fires with the new list's id after creation, so the home layout can default it hidden. */
+  onListCreated?: (listId: number) => void
 }
 
 const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v))
 
-export function AddToListModal({ game, user, onClose }: Props) {
+export function AddToListModal({ game, user, onClose, onListCreated }: Props) {
   const [step, setStep] = useState<'browse' | 'create'>('browse')
   const [lists, setLists] = useState<GameList[]>([])
   const [loading, setLoading] = useState(true)
@@ -57,6 +59,7 @@ export function AddToListModal({ game, user, onClose }: Props) {
     try {
       const created = await api.lists.create(user.id, name)
       await api.lists.toggle(created.id, game.id)
+      onListCreated?.(created.id)
       setLists(prev => [{ ...created, game_count: 1, included: true }, ...prev])
       setFocusIdx(0)
       setStep('browse')
@@ -65,7 +68,7 @@ export function AddToListModal({ game, user, onClose }: Props) {
     } catch {
       showToast('Could not create list')
     }
-  }, [user.id, game.id, game.name, showToast])
+  }, [user.id, game.id, game.name, showToast, onListCreated])
 
   const rowCount = lists.length + 1 // + "New List" row
 

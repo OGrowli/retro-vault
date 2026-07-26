@@ -166,6 +166,16 @@ export function App() {
       .catch(() => {})
   }, [filter, currentUser])
 
+  // New lists default to hidden on the home screen — user opts them in via
+  // Settings → Home Screen. Mark the key hidden as soon as the list is created.
+  const handleListCreated = useCallback((listId: number) => {
+    setHomePrefs(p => {
+      const key = `list-${listId}`
+      if (p.hiddenKeys.includes(key)) return p
+      return { ...p, hiddenKeys: [...p.hiddenKeys, key] }
+    })
+  }, [])
+
   const handleShowMore = (sources: ListSource[], activeKey: string) => {
     setListView({ sources, activeKey })
     setScreen('list-view')
@@ -222,6 +232,7 @@ export function App() {
           onBack={goBack}
           fromRandom={fromRandom}
           onRandomAgain={handleRandomAgain}
+          onListCreated={handleListCreated}
         />
       )}
       {screen === 'settings' && (

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import type { Game, GameWithRoms, Rom, User } from '@retro-vault/shared'
 import { api, bgVariant } from '../api/client'
 import { useGamepad } from '../hooks/useGamepad'
@@ -13,6 +13,8 @@ interface Props {
   /** Set when reached via Pick Random Game — shows a "Random Again" action. */
   fromRandom?: boolean
   onRandomAgain?: () => void
+  /** Called after a new list is created from this game — id of the new list. */
+  onListCreated?: (listId: number) => void
 }
 
 type ActionFocus = 'favorite' | 'add-to-list' | 'scrape' | 'random-again' | 'back'
@@ -38,11 +40,13 @@ function RomRow({
   focused,
   launching,
   onLaunch,
+  rowRef,
 }: {
   rom: Rom
   focused: boolean
   launching: boolean
   onLaunch: (rom: Rom) => void
+  rowRef?: (el: HTMLDivElement | null) => void
 }) {
   const lastPlayed = rom.last_played
     ? new Date(rom.last_played).toLocaleDateString()
@@ -50,6 +54,7 @@ function RomRow({
 
   return (
     <div
+      ref={rowRef}
       data-focusable="true"
       onClick={() => onLaunch(rom)}
       className={[
@@ -86,7 +91,7 @@ function RomRow({
   )
 }
 
-export function GameDetail({ game: initialGame, user, onBack, fromRandom = false, onRandomAgain }: Props) {
+export function GameDetail({ game: initialGame, user, onBack, fromRandom = false, onRandomAgain, onListCreated }: Props) {
   // "Random Again" only appears when we arrived here from a random pick.
   const ACTIONS: ActionFocus[] = fromRandom
     ? ['favorite', 'add-to-list', 'scrape', 'random-again', 'back']
@@ -105,6 +110,8 @@ export function GameDetail({ game: initialGame, user, onBack, fromRandom = false
   const [scraping, setScraping] = useState(false)
   const [scrapeError, setScrapeError] = useState<string | null>(null)
   const [addToListOpen, setAddToListOpen] = useState(false)
+  // versionRefs[i] — keeps the gamepad-focused ROM row visible as focus moves.
+  const versionRefs = useRef<(HTMLDivElement | null)[]>([])
 
   useEffect(() => {
     api.games.get(game.id).then(d => {
@@ -119,6 +126,13 @@ export function GameDetail({ game: initialGame, user, onBack, fromRandom = false
 
   const roms = detail?.roms ?? []
   const singleRom = roms.length === 1
+
+  // Follow the focused version past the scroll bounds.
+  useEffect(() => {
+    if (focusSection === 'versions') {
+      versionRefs.current[versionIdx]?.scrollIntoView({ block: 'nearest' })
+    }
+  }, [focusSection, versionIdx])
 
   const doLaunch = useCallback(async (rom: Rom, fresh: boolean) => {
     setContinueRom(null)
@@ -364,6 +378,7 @@ export function GameDetail({ game: initialGame, user, onBack, fromRandom = false
                       focused={focusSection === 'versions' && versionIdx === i}
                       launching={launching === rom.id}
                       onLaunch={(r) => void launch(r)}
+                      rowRef={(el) => { versionRefs.current[i] = el }}
                     />
                   ))}
                 </div>
@@ -415,7 +430,7 @@ export function GameDetail({ game: initialGame, user, onBack, fromRandom = false
       </div>
 
       {addToListOpen && (
-        <AddToListModal game={game} user={user} onClose={() => setAddToListOpen(false)} />
+        <AddToListModal game={game} user={user} onClose={() => setAddToListOpen(false)} onListCreated={onListCreated} />
       )}
 
       {continueRom && (

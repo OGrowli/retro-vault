@@ -23,7 +23,7 @@ interface Props {
 
 // Focus order top-to-bottom. The first four open a dropdown checklist; the rest
 // are direct actions. (Year Range stays mouse-only, rendered outside the flow.)
-type RowId = 'system' | 'genre' | 'players' | 'options' | 'search' | 'apply' | 'random' | 'import'
+type RowId = 'system' | 'genre' | 'players' | 'options' | 'search' | 'apply' | 'clear' | 'random' | 'import'
 const DROPDOWN_ROWS = new Set<RowId>(['system', 'genre', 'players', 'options'])
 
 type OptionKey = 'favoritesOnly' | 'neverPlayed' | 'noMetadata'
@@ -65,8 +65,17 @@ export function FilterDrawer({
   const rows: RowId[] = [
     ...(systems.length ? (['system'] as RowId[]) : []),
     ...(genres.length ? (['genre'] as RowId[]) : []),
-    'players', 'options', 'search', 'apply', 'random', 'import',
+    'players', 'options', 'search', 'apply', 'clear', 'random', 'import',
   ]
+
+  // Whether anything is set — gates the Clear Filters action.
+  const hasActiveFilters =
+    (filter.systems?.length ?? 0) > 0 ||
+    (filter.genres?.length ?? 0) > 0 ||
+    filter.players !== undefined ||
+    filter.yearRange !== undefined ||
+    !!filter.favoritesOnly || !!filter.neverPlayed || !!filter.noMetadata ||
+    !!filter.query
 
   // Reset navigation each time the drawer opens.
   useEffect(() => {
@@ -100,6 +109,7 @@ export function FilterDrawer({
     if (DROPDOWN_ROWS.has(row)) { setDropdown(row); setDropdownFocus(0); return }
     if (row === 'search') onSearch()
     if (row === 'apply') onApply()
+    if (row === 'clear') { if (hasActiveFilters) { onChange({}); onApply() } }
     if (row === 'random') onRandom()
     if (row === 'import') onImport()
   }
@@ -159,7 +169,7 @@ export function FilterDrawer({
     )
   }
 
-  const actionRow = (row: 'search' | 'apply' | 'random' | 'import') => {
+  const actionRow = (row: 'search' | 'apply' | 'clear' | 'random' | 'import') => {
     const i = rows.indexOf(row)
     const focused = focusedRow === i && !dropdown
     if (row === 'search') {
@@ -181,19 +191,23 @@ export function FilterDrawer({
       )
     }
     const primary = row === 'apply'
-    const label = row === 'apply' ? 'Apply Filters' : row === 'random' ? 'Pick Random Game' : (importLoading ? 'Scanning ROMs…' : 'Update Library')
+    const label = row === 'apply' ? 'Apply Filters'
+      : row === 'clear' ? 'Clear Filters'
+      : row === 'random' ? 'Pick Random Game'
+      : (importLoading ? 'Scanning ROMs…' : 'Update Library')
+    const disabled = (row === 'import' && importLoading) || (row === 'clear' && !hasActiveFilters)
     return (
       <button
         key={row}
         ref={el => { rowRefs.current[i] = el }}
         onClick={() => { setFocusedRow(i); activateRow(row) }}
         onMouseEnter={() => setFocusedRow(i)}
-        disabled={row === 'import' && importLoading}
+        disabled={disabled}
         className={[
           'w-full py-3 rounded-xl font-bold text-white uppercase tracking-wide text-sm',
           primary ? 'bg-vault-accent' : 'bg-vault-surface border border-vault-muted',
           focused ? 'ring-2 ring-white' : '',
-          row === 'import' && importLoading ? 'opacity-50 cursor-not-allowed' : '',
+          disabled ? 'opacity-50 cursor-not-allowed' : '',
         ].join(' ')}
       >
         {label}
@@ -252,6 +266,7 @@ export function FilterDrawer({
 
         <div className="p-6 border-t border-vault-surface space-y-3">
           {actionRow('apply')}
+          {actionRow('clear')}
           {actionRow('random')}
           {actionRow('import')}
           {importMessage && <p className="text-vault-accent text-xs text-center">{importMessage}</p>}

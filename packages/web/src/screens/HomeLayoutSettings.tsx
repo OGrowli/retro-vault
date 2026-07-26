@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import type { User, GameList, HomePrefs } from '@retro-vault/shared'
 import { api } from '../api/client'
 import { useGamepad } from '../hooks/useGamepad'
@@ -26,10 +26,17 @@ const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(ma
 export function HomeLayoutSettings({ user, prefs, onChange, onBack }: Props) {
   const [lists, setLists] = useState<GameList[]>([])
   const [focused, setFocused] = useState(0)
+  // itemRefs[0..rows.length] — trailing entry is the Back button.
+  const itemRefs = useRef<(HTMLElement | null)[]>([])
 
   useEffect(() => {
     api.lists.forUser(user.id).then(setLists).catch(() => {})
   }, [user.id])
+
+  // Keep the focused row in view as it moves past the scroll bounds.
+  useEffect(() => {
+    itemRefs.current[focused]?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+  }, [focused])
 
   const rows: Row[] = [
     { key: 'recently-played', label: 'Recently Played', subtitle: 'Always shown', locked: true },
@@ -84,6 +91,7 @@ export function HomeLayoutSettings({ user, prefs, onChange, onBack }: Props) {
             return (
               <button
                 key={row.key}
+                ref={el => { itemRefs.current[i] = el }}
                 onClick={() => toggle(row)}
                 onMouseEnter={() => setFocused(i)}
                 disabled={row.locked}
@@ -114,6 +122,7 @@ export function HomeLayoutSettings({ user, prefs, onChange, onBack }: Props) {
 
       <div className="px-[5%] py-4 border-t border-vault-surface flex items-center gap-4">
         <button
+          ref={el => { itemRefs.current[backIdx] = el }}
           onClick={onBack}
           onMouseEnter={() => setFocused(backIdx)}
           className={[
