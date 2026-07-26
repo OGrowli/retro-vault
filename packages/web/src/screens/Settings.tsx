@@ -13,6 +13,9 @@ function UpdateProgressModal({ startOffset, onClose }: { startOffset: number; on
   const offsetRef = useRef(startOffset)
   const failsRef = useRef(0)
   const feedRef = useRef<HTMLPreElement>(null)
+  // Only auto-follow the tail while the user is scrolled to the bottom, so
+  // scrolling up to read earlier output isn't yanked back down each poll.
+  const stickToBottomRef = useRef(true)
 
   const complete = /==> Deploy complete\./.test(log)
 
@@ -39,11 +42,18 @@ function UpdateProgressModal({ startOffset, onClose }: { startOffset: number; on
     return () => { active = false; clearInterval(id) }
   }, [])
 
-  // Follow the tail as new lines arrive.
+  // Follow the tail as new lines arrive — unless the user scrolled up.
   useEffect(() => {
     const el = feedRef.current
-    if (el) el.scrollTop = el.scrollHeight
+    if (el && stickToBottomRef.current) el.scrollTop = el.scrollHeight
   }, [log])
+
+  const onFeedScroll = () => {
+    const el = feedRef.current
+    if (!el) return
+    // Within a few px of the bottom counts as "following the tail".
+    stickToBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 8
+  }
 
   useGamepad((action) => {
     if (action === 'back' || action === 'confirm') onClose()
@@ -69,6 +79,7 @@ function UpdateProgressModal({ startOffset, onClose }: { startOffset: number; on
 
           <pre
             ref={feedRef}
+            onScroll={onFeedScroll}
             className="h-72 overflow-y-auto rounded-xl bg-black/60 border border-vault-surface p-4 text-[0.72rem] leading-relaxed text-[#c8f7d0] font-mono whitespace-pre-wrap break-words"
             style={{ scrollbarWidth: 'thin' }}
           >

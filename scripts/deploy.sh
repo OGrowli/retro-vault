@@ -49,7 +49,10 @@ if [ -d .git ]; then
 fi
 
 echo "==> Installing dependencies..."
-npm install
+# The API service runs with NODE_ENV=production, which npm inherits here and
+# would use to skip devDependencies — but the build needs tsc/vite from them.
+# --include=dev forces them in without making the build itself a dev build.
+npm install --include=dev
 
 echo "==> Building shared + api + web..."
 npm run build
