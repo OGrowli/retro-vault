@@ -72,7 +72,15 @@ EOF
 
 sudo systemctl daemon-reload
 sudo systemctl enable retrovault-api
-sudo systemctl restart retrovault-api || sudo systemctl start retrovault-api
+# When run as part of deploy.sh, the deploy ends in a reboot which starts the
+# new API anyway. Restarting here is fatal: this script runs inside the
+# retrovault-api systemd cgroup, so `systemctl restart` tears down that cgroup
+# and kills the in-flight deploy (KillMode=control-group). Skip it in that case.
+if [ "${SKIP_API_RESTART:-}" = "1" ]; then
+  echo "Skipping API restart (deploy will reboot to apply)."
+else
+  sudo systemctl restart retrovault-api || sudo systemctl start retrovault-api
+fi
 
 # 3. Make kiosk scripts executable
 chmod +x "$INSTALL_DIR/scripts/retrovault-kiosk.sh"

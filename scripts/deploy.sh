@@ -58,7 +58,10 @@ echo "==> Building shared + api + web..."
 npm run build
 
 echo "==> Updating startup service + autostart..."
-bash scripts/install-startup.sh
+# Don't restart the API here — this deploy runs inside the retrovault-api
+# systemd cgroup, so a restart would kill this script mid-run. The reboot below
+# applies the new build and service file.
+SKIP_API_RESTART=1 bash scripts/install-startup.sh
 
 if [ "${1:-}" = "--import" ]; then
   echo "==> Importing games from EmulationStation gamelists..."
