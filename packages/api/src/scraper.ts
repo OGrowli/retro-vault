@@ -349,6 +349,24 @@ export async function scrapeGame(gameId: number, username: string, password: str
     if (pick.text) gameName = pick.text
   }
 
+  // games has UNIQUE(name, system): two library entries (e.g. regional dumps or
+  // a "(Sample)" variant) can scrape to the same canonical title and collide.
+  // Keep our existing name in that case — still apply the rest of the metadata —
+  // rather than letting the UPDATE throw a UNIQUE constraint 500.
+  if (gameName !== game.name) {
+    const clash = db.prepare(
+      'SELECT id FROM games WHERE name = ? AND system = ? AND id != ?'
+    ).get(gameName, game.system, game.id)
+    if (clash) {
+      logEvent({
+        level: 'warn', category: 'scrape',
+        message: `Kept name "${game.name}" — "${gameName}" already used by another ${game.system} game`,
+        gameId: game.id, detail: { system: game.system, romPath: game.rom_path },
+      })
+      gameName = game.name
+    }
+  }
+
   // Genre
   const genres = jeu['genres'] as Array<{ noms: Array<{ langue: string; text: string }> }> | undefined
   let genre: string | null = null
