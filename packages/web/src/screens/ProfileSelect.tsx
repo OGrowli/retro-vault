@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import type { User } from '@retro-vault/shared'
 import { api } from '../api/client'
 import { useGamepad } from '../hooks/useGamepad'
@@ -25,6 +25,7 @@ export function ProfileSelect({ onSelect }: Props) {
   const [colorIdx, setColorIdx] = useState(0)
   const [loading, setLoading] = useState(true)
   const [createError, setCreateError] = useState<string | null>(null)
+  const itemRefs = useRef<(HTMLDivElement | null)[]>([])
 
   useEffect(() => {
     api.users.list().then(u => {
@@ -34,6 +35,11 @@ export function ProfileSelect({ onSelect }: Props) {
   }, [])
 
   const items = [...users, { id: -1, username: '+ New Profile', avatar_color: '#444', created_at: '' }]
+
+  // Keep the focused avatar visible when there are enough profiles to scroll.
+  useEffect(() => {
+    if (!creating) itemRefs.current[focusedIndex]?.scrollIntoView({ block: 'nearest' })
+  }, [focusedIndex, creating])
 
   useGamepad((action) => {
     if (action === 'left') setFocusedIndex(i => Math.max(0, i - 1))
@@ -83,13 +89,14 @@ export function ProfileSelect({ onSelect }: Props) {
           ))}
         </div>
       ) : (
-        <div className="grid grid-cols-4 gap-8 px-[5%]">
+        <div className="grid grid-cols-4 gap-8 px-[5%] max-h-[68vh] overflow-y-auto py-2" style={{ scrollbarWidth: 'none' }}>
           {items.map((item, i) => {
             const focused = focusedIndex === i
             const isNew = item.id === -1
             return (
               <div
                 key={item.id}
+                ref={el => { itemRefs.current[i] = el }}
                 className="flex flex-col items-center gap-3 cursor-pointer"
                 onMouseEnter={() => setFocusedIndex(i)}
                 onClick={() => {

@@ -167,15 +167,13 @@ export function ListView({ sources, activeKey: initialKey, onBack, onGameSelect,
   const [dropdownFocus, setDropdownFocus] = useState(0)
   const [scrape, setScrape] = useState<ScrapeProgress | null>(null)
   const rowRefs = useRef<(HTMLDivElement | null)[]>([])
+  const dropdownRefs = useRef<(HTMLButtonElement | null)[]>([])
   // Set true to stop the sequential scrape between games.
   const cancelRef = useRef(false)
 
   const activeSource = sources.find(s => s.key === activeKey) ?? sources[0]
   const games = activeSource?.games ?? []
   const title = activeSource?.label ?? 'List'
-
-  // Lowest reachable focus index — the Scrape button only exists when non-empty.
-  const minIndex = games.length > 0 ? SCRAPE_INDEX : SELECTOR_INDEX
 
   // Scrape every game in the active collection, one at a time so we don't
   // hammer ScreenScraper. Individual failures are counted, not fatal.
@@ -236,14 +234,27 @@ export function ListView({ sources, activeKey: initialKey, onBack, onGameSelect,
       if (focusedGame) onGameSelect(focusedGame)
       return
     }
-    if (action === 'up') setFocusedIndex(i => clamp(i - 1, minIndex, games.length - 1))
-    if (action === 'down') setFocusedIndex(i => clamp(i + 1, minIndex, games.length - 1))
+    // The header holds two side-by-side controls: the list switcher (SELECTOR)
+    // and, when the list is non-empty, Scrape (SCRAPE). Up from the rows lands
+    // on the switcher; left/right hops between the header controls; down drops
+    // back into the list.
+    if (action === 'up') setFocusedIndex(i => (i > 0 ? i - 1 : i === 0 ? SELECTOR_INDEX : i))
+    if (action === 'down') setFocusedIndex(i => (i < 0 ? (games.length > 0 ? 0 : i) : clamp(i + 1, 0, games.length - 1)))
+    if (action === 'left' || action === 'right') {
+      if (focusedIndex === SELECTOR_INDEX && games.length > 0) setFocusedIndex(SCRAPE_INDEX)
+      else if (focusedIndex === SCRAPE_INDEX) setFocusedIndex(SELECTOR_INDEX)
+    }
   }, inputActive)
 
   useEffect(() => {
     if (!inputActive || focusedIndex < 0) return
     rowRefs.current[focusedIndex]?.scrollIntoView({ block: 'nearest' })
   }, [focusedIndex, inputActive])
+
+  // Keep the focused row visible inside the open list-switcher dropdown.
+  useEffect(() => {
+    if (dropdownOpen) dropdownRefs.current[dropdownFocus]?.scrollIntoView({ block: 'nearest' })
+  }, [dropdownFocus, dropdownOpen])
 
   const bgSrc = focusedGame?.box_art_path ? bgVariant(focusedGame.box_art_path) : null
   const selectorFocused = focusedIndex === SELECTOR_INDEX && !dropdownOpen
@@ -288,6 +299,7 @@ export function ListView({ sources, activeKey: initialKey, onBack, onGameSelect,
                 {sources.map((src, i) => (
                   <button
                     key={src.key}
+                    ref={el => { dropdownRefs.current[i] = el }}
                     onClick={() => selectSource(src.key)}
                     onMouseEnter={() => setDropdownFocus(i)}
                     className={[
@@ -352,7 +364,7 @@ export function ListView({ sources, activeKey: initialKey, onBack, onGameSelect,
 
       <footer className="relative flex-shrink-0 px-[5%] pb-4 pt-3 bg-gradient-to-t from-vault-bg to-transparent">
         <p className="text-vault-muted text-xs uppercase tracking-wide flex items-center gap-1.5 flex-wrap">
-          <Glyph type="cross" /> {dropdownOpen ? 'Choose list' : 'Select'}  ·  <Glyph type="circle" /> Back  ·  ↑↓ / D-Pad to move focus  ·  <Glyph type="triangle" /> Scrape List
+          <Glyph type="cross" /> {dropdownOpen ? 'Choose list' : 'Select'}  ·  <Glyph type="circle" /> Back  ·  ↑↓ Move focus  ·  ↑ then ← → for Scrape List
         </p>
       </footer>
 
