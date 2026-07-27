@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import type { Game, ListSource } from '@retro-vault/shared'
-import { bgVariant } from '../api/client'
+import { api, bgVariant } from '../api/client'
 import { useGamepad } from '../hooks/useGamepad'
 import { Clock } from '../components/Clock'
 import { Glyph } from '../components/Glyph'
@@ -13,8 +13,17 @@ interface Props {
   inputActive?: boolean
 }
 
-// -1 focuses the list-switcher dropdown that sits above the rows.
-const SELECTOR_INDEX = -1
+// Negative focus indices target the header controls above the rows.
+const SELECTOR_INDEX = -1 // list-switcher dropdown
+const SCRAPE_INDEX = -2    // "Scrape List" button
+
+interface ScrapeProgress {
+  total: number
+  done: number
+  failed: number
+  current: string | null
+  running: boolean
+}
 
 const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v))
 
@@ -156,11 +165,39 @@ export function ListView({ sources, activeKey: initialKey, onBack, onGameSelect,
   const [focusedIndex, setFocusedIndex] = useState(0)
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [dropdownFocus, setDropdownFocus] = useState(0)
+  const [scrape, setScrape] = useState<ScrapeProgress | null>(null)
   const rowRefs = useRef<(HTMLDivElement | null)[]>([])
+  // Set true to stop the sequential scrape between games.
+  const cancelRef = useRef(false)
 
   const activeSource = sources.find(s => s.key === activeKey) ?? sources[0]
   const games = activeSource?.games ?? []
   const title = activeSource?.label ?? 'List'
+
+  // Lowest reachable focus index — the Scrape button only exists when non-empty.
+  const minIndex = games.length > 0 ? SCRAPE_INDEX : SELECTOR_INDEX
+
+  // Scrape every game in the active collection, one at a time so we don't
+  // hammer ScreenScraper. Individual failures are counted, not fatal.
+  const runScrape = async () => {
+    if (!games.length || scrape?.running) return
+    cancelRef.current = false
+    setScrape({ total: games.length, done: 0, failed: 0, current: null, running: true })
+    let done = 0
+    let failed = 0
+    for (const g of games) {
+      if (cancelRef.current) break
+      setScrape(s => (s ? { ...s, current: g.name } : s))
+      try {
+        await api.games.scrape(g.id)
+      } catch {
+        failed++
+      }
+      done++
+      setScrape(s => (s ? { ...s, done, failed } : s))
+    }
+    setScrape(s => (s ? { ...s, running: false, current: null } : s))
+  }
 
   const focusedGame = focusedIndex >= 0 ? (games[focusedIndex] ?? null) : null
 
@@ -176,6 +213,12 @@ export function ListView({ sources, activeKey: initialKey, onBack, onGameSelect,
   }
 
   useGamepad((action) => {
+    if (scrape) {
+      // Running: Back stops early. Done: Back/Confirm dismisses the summary.
+      if (scrape.running) { if (action === 'back') cancelRef.current = true; return }
+      if (action === 'back' || action === 'confirm') setScrape(null)
+      return
+    }
     if (dropdownOpen) {
       if (action === 'back') { setDropdownOpen(false); return }
       if (action === 'up') setDropdownFocus(i => clamp(i - 1, 0, sources.length - 1))
@@ -188,12 +231,13 @@ export function ListView({ sources, activeKey: initialKey, onBack, onGameSelect,
     }
     if (action === 'back') { onBack(); return }
     if (action === 'confirm') {
+      if (focusedIndex === SCRAPE_INDEX) { void runScrape(); return }
       if (focusedIndex === SELECTOR_INDEX) { openDropdown(); return }
       if (focusedGame) onGameSelect(focusedGame)
       return
     }
-    if (action === 'up') setFocusedIndex(i => clamp(i - 1, SELECTOR_INDEX, games.length - 1))
-    if (action === 'down') setFocusedIndex(i => clamp(i + 1, SELECTOR_INDEX, games.length - 1))
+    if (action === 'up') setFocusedIndex(i => clamp(i - 1, minIndex, games.length - 1))
+    if (action === 'down') setFocusedIndex(i => clamp(i + 1, minIndex, games.length - 1))
   }, inputActive)
 
   useEffect(() => {
@@ -264,7 +308,25 @@ export function ListView({ sources, activeKey: initialKey, onBack, onGameSelect,
           </div>
           <span className="text-vault-muted text-xs uppercase tracking-widest">{games.length} titles</span>
         </div>
-        <Clock />
+        <div className="flex items-center gap-4">
+          {games.length > 0 && (
+            <button
+              onClick={() => void runScrape()}
+              onMouseEnter={() => setFocusedIndex(SCRAPE_INDEX)}
+              className={[
+                'px-4 py-2 rounded-xl text-sm font-bold uppercase tracking-wide inline-flex items-center gap-2',
+                'border transition-colors duration-150 motion-reduce:transition-none',
+                focusedIndex === SCRAPE_INDEX && !dropdownOpen
+                  ? 'ring-2 ring-white border-vault-accent bg-vault-surface text-white'
+                  : 'border-vault-muted text-vault-muted hover:text-white',
+              ].join(' ')}
+              title="Scrape metadata for every game in this list"
+            >
+              <Glyph type="triangle" /> Scrape List
+            </button>
+          )}
+          <Clock />
+        </div>
       </header>
 
       <main className="relative flex-1 flex gap-10 px-[5%] pb-6 min-h-0">
@@ -290,9 +352,53 @@ export function ListView({ sources, activeKey: initialKey, onBack, onGameSelect,
 
       <footer className="relative flex-shrink-0 px-[5%] pb-4 pt-3 bg-gradient-to-t from-vault-bg to-transparent">
         <p className="text-vault-muted text-xs uppercase tracking-wide flex items-center gap-1.5 flex-wrap">
-          <Glyph type="cross" /> {dropdownOpen ? 'Choose list' : 'Select'}  ·  <Glyph type="circle" /> Back  ·  ↑↓ / D-Pad to move focus  ·  Focus title + <Glyph type="cross" /> to switch list
+          <Glyph type="cross" /> {dropdownOpen ? 'Choose list' : 'Select'}  ·  <Glyph type="circle" /> Back  ·  ↑↓ / D-Pad to move focus  ·  <Glyph type="triangle" /> Scrape List
         </p>
       </footer>
+
+      {scrape && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-6">
+          <div className="absolute inset-0 bg-black/75" />
+          <div className="relative bg-vault-card rounded-2xl p-8 w-full max-w-md space-y-5" style={{ boxShadow: '0 24px 64px rgba(0,0,0,0.6)' }}>
+            <div className="flex items-center gap-3">
+              {scrape.running && (
+                <span className="w-4 h-4 rounded-full border-2 border-vault-muted border-t-vault-accent animate-spin motion-reduce:animate-none" />
+              )}
+              <h2 className="text-white text-xl font-bold">
+                {scrape.running ? `Scraping ${title}` : 'Scrape complete'}
+              </h2>
+            </div>
+
+            <div>
+              <div className="h-2 rounded-full bg-vault-surface overflow-hidden">
+                <div
+                  className="h-full bg-vault-accent transition-[width] duration-200 motion-reduce:transition-none"
+                  style={{ width: `${scrape.total ? (scrape.done / scrape.total) * 100 : 0}%` }}
+                />
+              </div>
+              <p className="text-vault-muted text-sm mt-2">
+                {scrape.done} / {scrape.total} scraped{scrape.failed > 0 ? ` · ${scrape.failed} failed` : ''}
+              </p>
+              {scrape.running && scrape.current && (
+                <p className="text-vault-muted text-xs mt-1 truncate">Current: {scrape.current}</p>
+              )}
+            </div>
+
+            {scrape.running ? (
+              <p className="text-vault-muted text-xs uppercase tracking-wide text-center">
+                <Glyph type="circle" /> Back to stop
+              </p>
+            ) : (
+              <button
+                onClick={() => setScrape(null)}
+                className="w-full py-3 rounded-xl font-bold text-sm uppercase tracking-wide bg-vault-accent text-white inline-flex items-center justify-center gap-2"
+              >
+                <Glyph type="cross" /> Done
+              </button>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
