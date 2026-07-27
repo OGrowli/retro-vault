@@ -1,0 +1,5 @@
+id,created_at,level,category,message,detail,game_id
+1,2026-07-27 04:25:26,error,scrape,TypeError: fetch failed,"{""system"":""snes"",""romPath"":""/home/pi/RetroPie/roms/snes/Pocky & Rocky (Europe) (Sample).zip""}",11910
+2,2026-07-27 04:25:31,error,scrape,TypeError: fetch failed,"{""system"":""snes"",""romPath"":""/home/pi/RetroPie/roms/snes/Pocky & Rocky (Europe) (Sample).zip""}",11910
+3,2026-07-27 04:26:03,error,scrape,TypeError: fetch failed,"{""system"":""mastersystem"",""romPath"":""/home/pi/RetroPie/roms/mastersystem/Home Alone (Europe).zip""}",4376
+4,2026-07-27 04:53:21,error,scrape,TypeError: fetch failed,"{""system"":""snes"",""romPath"":""/home/pi/RetroPie/roms/snes/Judge Dredd (Europe).zip""}",11152

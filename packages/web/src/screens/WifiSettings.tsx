@@ -137,9 +137,11 @@ export function WifiSettings({ onBack }: Props) {
 
   const statusLine = status?.connected
     ? `Connected to ${status.ssid}${status.ip ? ` · ${status.ip}` : ''}`
-    : status?.enabled === false
-      ? 'Wi-Fi is turned off'
-      : 'Not connected'
+    : status?.ip
+      ? `Online · ${status.ip}`
+      : status?.enabled === false
+        ? 'Wi-Fi is turned off'
+        : 'Not connected'
 
   return (
     <div className="fixed inset-0 bg-vault-bg flex flex-col">

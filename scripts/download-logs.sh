@@ -10,6 +10,8 @@ set -euo pipefail
 #   bash scripts/download-logs.sh --category scrape   # only scrape events
 #   bash scripts/download-logs.sh --level error       # only errors
 #   bash scripts/download-logs.sh --out /tmp/logs.csv # explicit output path
+#   bash scripts/download-logs.sh --ip 192.168.1.50   # target a device by IP (port 3000)
+#   bash scripts/download-logs.sh --url http://retropie.local:3000
 #   API_URL=http://retropie.local:3000 bash scripts/download-logs.sh
 #
 # created_at is stored UTC (sqlite datetime('now')), so the window is computed in UTC.
@@ -29,9 +31,10 @@ while [ $# -gt 0 ]; do
     --category)      CATEGORY="$2"; shift 2 ;;
     --level)         LEVEL="$2"; shift 2 ;;
     --url)           API_URL="$2"; shift 2 ;;
+    --ip)            API_URL="http://$2:${PORT:-3000}"; shift 2 ;;
     --out|-o)        OUT="$2"; shift 2 ;;
     -h|--help)
-      sed -n '3,20p' "$0"; exit 0 ;;
+      sed -n '4,17p' "$0"; exit 0 ;;
     *)
       echo "Unknown option: $1" >&2; exit 2 ;;
   esac

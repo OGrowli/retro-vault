@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
+import os from 'node:os'
 import type { WifiNetwork, WifiStatus } from '@retro-vault/shared'
 
 const pExecFile = promisify(execFile)
@@ -12,9 +13,10 @@ const isLinux = process.platform === 'linux'
 // Thin wrapper around nmcli. Reads run as the API user; changes (connect,
 // disconnect) go through sudo so they work regardless of polkit setup — the
 // device already relies on passwordless sudo for the update flow.
-async function nmcli(args: string[], opts: { sudo?: boolean; timeout?: number } = {}): Promise<string> {
-  const file = opts.sudo ? 'sudo' : 'nmcli'
-  const argv = opts.sudo ? ['nmcli', ...args] : args
+async function nmcli(args: string[], opts: { sudo?: boolean; timeout?: number; file?: string } = {}): Promise<string> {
+  const bin = opts.file ?? 'nmcli'
+  const file = opts.sudo ? 'sudo' : bin
+  const argv = opts.sudo ? [bin, ...args] : args
   const { stdout } = await pExecFile(file, argv, { timeout: opts.timeout ?? 15_000 })
   return stdout
 }
@@ -52,6 +54,21 @@ async function wifiDevice(): Promise<string | null> {
   return null
 }
 
+// Local LAN IP straight from the OS — works regardless of whether the active
+// connection is managed by NetworkManager or dhcpcd. Prefer wireless interfaces.
+function localIp(): string | null {
+  const ifaces = os.networkInterfaces()
+  const names = Object.keys(ifaces).sort(
+    (a, b) => (b.startsWith('wl') ? 1 : 0) - (a.startsWith('wl') ? 1 : 0)
+  )
+  for (const name of names) {
+    for (const addr of ifaces[name] ?? []) {
+      if (addr.family === 'IPv4' && !addr.internal) return addr.address
+    }
+  }
+  return null
+}
+
 async function savedNames(): Promise<Set<string>> {
   try {
     const out = await nmcli(['-t', '-f', 'NAME', 'connection', 'show'])
@@ -62,33 +79,30 @@ async function savedNames(): Promise<Set<string>> {
 }
 
 wifiRouter.get('/status', async (c) => {
-  if (!isLinux) return c.json({ enabled: false, connected: false, ssid: null, ip: null } satisfies WifiStatus)
+  // IP comes from the OS, so it's reported even when nmcli is absent or the
+  // link is managed by dhcpcd. Each nmcli lookup is best-effort — a failure
+  // never blanks the whole status.
+  const ip = isLinux ? localIp() : null
+  if (!isLinux) return c.json({ enabled: false, connected: false, ssid: null, ip } satisfies WifiStatus)
+
+  let enabled = false
+  try { enabled = (await nmcli(['radio', 'wifi'])).trim() === 'enabled' } catch { /* older nmcli / dhcpcd */ }
+
+  let ssid: string | null = null
   try {
-    let enabled = false
-    try { enabled = (await nmcli(['radio', 'wifi'])).trim() === 'enabled' } catch { /* older nmcli */ }
+    const list = await nmcli(['-t', '-f', 'ACTIVE,SSID', 'device', 'wifi'])
+    for (const line of list.split('\n')) {
+      const [active, s] = splitTerse(line)
+      if (active === 'yes' && s) { ssid = s; break }
+    }
+  } catch { /* no active AP / nmcli unavailable */ }
 
-    const dev = await wifiDevice()
-    if (!dev) return c.json({ enabled, connected: false, ssid: null, ip: null } satisfies WifiStatus)
-
-    let ssid: string | null = null
-    try {
-      const list = await nmcli(['-t', '-f', 'ACTIVE,SSID', 'device', 'wifi'])
-      for (const line of list.split('\n')) {
-        const [active, s] = splitTerse(line)
-        if (active === 'yes' && s) { ssid = s; break }
-      }
-    } catch { /* no active AP */ }
-
-    let ip: string | null = null
-    try {
-      const raw = (await nmcli(['-g', 'IP4.ADDRESS', 'device', 'show', dev])).split('\n')[0]?.trim()
-      if (raw) ip = raw.split('/')[0] ?? null
-    } catch { /* no lease */ }
-
-    return c.json({ enabled, connected: !!ssid, ssid, ip } satisfies WifiStatus)
-  } catch (e) {
-    return c.json({ error: nmcliError(e) }, 500)
+  // Fall back to iwgetid for the SSID when NetworkManager isn't in play.
+  if (!ssid) {
+    try { ssid = (await nmcli(['-r'], { file: 'iwgetid' })).trim() || null } catch { /* not connected */ }
   }
+
+  return c.json({ enabled, connected: !!ssid, ssid, ip } satisfies WifiStatus)
 })
 
 wifiRouter.get('/scan', async (c) => {
