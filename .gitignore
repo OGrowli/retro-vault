@@ -12,3 +12,7 @@ test.ps1
 
 # Local prompt / design scratch
 claude-prompts/
+
+# Downloaded event log exports (scripts/download-logs.sh)
+retrovault-events-*.csv
+retrovault-events-*.ndjson
