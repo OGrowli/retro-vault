@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
-import { db, buildFilterClause, parseFilter } from '../db.js'
-import { scrapeGame } from '../scraper.js'
+import { db, buildFilterClause, parseFilter, logEvent } from '../db.js'
+import { scrapeGame, describeError } from '../scraper.js'
 
 export const gamesRouter = new Hono()
 
@@ -109,14 +109,22 @@ gamesRouter.get('/:id/sessions', (c) => {
 gamesRouter.post('/:id/scrape', async (c) => {
   const id = parseInt(c.req.param('id'), 10)
   const body = await c.req.json<{ username?: string; password?: string }>().catch(() => ({}))
-  const result = await scrapeGame(
-    id,
-    (body as { username?: string }).username ?? '',
-    (body as { password?: string }).password ?? ''
-  )
-  if (!result.success) {
-    return c.json({ error: result.error }, 422)
+  try {
+    const result = await scrapeGame(
+      id,
+      (body as { username?: string }).username ?? '',
+      (body as { password?: string }).password ?? ''
+    )
+    if (!result.success) {
+      return c.json({ error: result.error }, 422)
+    }
+    const game = db.prepare('SELECT * FROM games WHERE id = ?').get(id)
+    return c.json(game)
+  } catch (e) {
+    // Anything scrapeGame didn't handle itself (DB/image failures, etc.) —
+    // log it so the event feed captures the 500 instead of only the journal.
+    const error = describeError(e)
+    logEvent({ level: 'error', category: 'scrape', message: error, gameId: id })
+    return c.json({ error }, 500)
   }
-  const game = db.prepare('SELECT * FROM games WHERE id = ?').get(id)
-  return c.json(game)
 })

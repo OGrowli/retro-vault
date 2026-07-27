@@ -76,6 +76,20 @@ type ScrapeSuccess = { success: true; name: string }
 type ScrapeFailure = { success: false; error: string }
 type ScrapeResult = ScrapeSuccess | ScrapeFailure
 
+// Node's fetch throws a generic "TypeError: fetch failed" and hides the real
+// reason on `error.cause` (e.g. getaddrinfo ENOTFOUND, ETIMEDOUT, cert errors).
+// Surface it so logs say *why* the request failed, not just that it did.
+export function describeError(e: unknown): string {
+  if (!(e instanceof Error)) return String(e)
+  const cause = (e as { cause?: unknown }).cause
+  if (cause instanceof Error) {
+    const code = (cause as { code?: string }).code
+    return `${e.message}: ${cause.message}${code ? ` [${code}]` : ''}`
+  }
+  if (cause) return `${e.message}: ${String(cause)}`
+  return e.message
+}
+
 async function saveBoxArt(buf: Buffer, system: string, gameId: number): Promise<string> {
   const dir = path.join(MEDIA_DIR, system)
   fs.mkdirSync(dir, { recursive: true })
@@ -163,7 +177,7 @@ async function scrapeLibretroThumb(game: SSGameRow): Promise<ScrapeResult> {
     try {
       res = await fetch(url)
     } catch (e) {
-      return { success: false, error: `Network error: ${e}` }
+      return { success: false, error: `Network error: ${describeError(e)}` }
     }
     if (!res.ok) continue
 
@@ -206,10 +220,19 @@ async function fetchSS(params: URLSearchParams): Promise<Response> {
   return res
 }
 
-// Returns the jeu object, null if not found (404/500 → retry with hash), throws on other errors.
-async function fetchSSJeu(params: URLSearchParams): Promise<Record<string, unknown> | null> {
+// jeu is null when SS has no match (404/500 → retry with hash). `note` carries
+// the reason for an empty 404/500 so the caller can log it if the whole scrape
+// fails — SS returns 500 for both "not found" and server/quota problems, and
+// its body (e.g. "quota dépassé") is the only way to tell them apart.
+type SSJeuResult = { jeu: Record<string, unknown> | null; note?: string }
+
+async function fetchSSJeu(params: URLSearchParams): Promise<SSJeuResult> {
   const res = await fetchSS(params)
-  if (res.status === 404 || res.status === 500) return null
+  if (res.status === 404) return { jeu: null, note: 'ScreenScraper 404 (not found)' }
+  if (res.status === 500) {
+    const body = (await res.text().catch(() => '')).trim().replace(/\s+/g, ' ').slice(0, 200)
+    return { jeu: null, note: `ScreenScraper 500${body ? `: ${body}` : ''}` }
+  }
   if (!res.ok) {
     const text = (await res.text().catch(() => '')).trim().slice(0, 200)
     throw new Error(`ScreenScraper ${res.status}${text ? `: ${text}` : ''}`)
@@ -217,7 +240,7 @@ async function fetchSSJeu(params: URLSearchParams): Promise<Record<string, unkno
   let raw: unknown
   try { raw = await res.json() } catch { throw new Error('Invalid JSON from ScreenScraper') }
   const response = (raw as Record<string, unknown>)?.['response'] as Record<string, unknown> | undefined
-  return (response?.['jeu'] as Record<string, unknown> | undefined) ?? null
+  return { jeu: (response?.['jeu'] as Record<string, unknown> | undefined) ?? null }
 }
 
 function hashParams(romPath: string): URLSearchParams | null {
@@ -288,24 +311,34 @@ export async function scrapeGame(gameId: number, username: string, password: str
 
   // Step 1: romnom lookup
   let jeu: Record<string, unknown> | null = null
+  // Last SS "empty" reason (404/500 body) — surfaced only if both steps miss.
+  let ssNote: string | undefined
   try {
-    jeu = await fetchSSJeu(mergeParams(new URLSearchParams({ romnom: path.basename(game.rom_path) })))
+    const r = await fetchSSJeu(mergeParams(new URLSearchParams({ romnom: path.basename(game.rom_path) })))
+    jeu = r.jeu
+    ssNote = r.note
   } catch (e) {
-    logEvent({ category: 'scrape', message: String(e), gameId: game.id, detail: { system: game.system, romPath: game.rom_path } })
-    return { success: false, error: String(e) }
+    const error = describeError(e)
+    logEvent({ category: 'scrape', message: error, gameId: game.id, detail: { system: game.system, romPath: game.rom_path } })
+    return { success: false, error }
   }
 
   // Step 2: hash fallback (ZIP → CRC from header; others → MD5)
   if (!jeu) {
     const hp = hashParams(game.rom_path)
     if (hp) {
-      try { jeu = await fetchSSJeu(mergeParams(hp)) } catch { /* fall through to error below */ }
+      try {
+        const r = await fetchSSJeu(mergeParams(hp))
+        jeu = r.jeu
+        if (r.note) ssNote = r.note
+      } catch { /* fall through to error below */ }
     }
   }
 
   if (!jeu) {
-    logEvent({ category: 'scrape', message: 'No game data in ScreenScraper response', gameId: game.id, detail: { system: game.system, romPath: game.rom_path } })
-    return { success: false, error: 'No game data in ScreenScraper response' }
+    const error = ssNote ? `No match — ${ssNote}` : 'No game data in ScreenScraper response'
+    logEvent({ category: 'scrape', message: error, gameId: game.id, detail: { system: game.system, romPath: game.rom_path } })
+    return { success: false, error }
   }
 
   // Name
