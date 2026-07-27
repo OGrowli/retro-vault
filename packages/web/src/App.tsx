@@ -7,12 +7,13 @@ import { GameDetail } from './screens/GameDetail'
 import { ListView } from './screens/ListView'
 import { Settings } from './screens/Settings'
 import { HomeLayoutSettings } from './screens/HomeLayoutSettings'
+import { WifiSettings } from './screens/WifiSettings'
 import { ScrapeSettings } from './screens/ScrapeSettings'
 import { ControllerSettings } from './screens/ControllerSettings'
 import { EmulatorSettings } from './screens/EmulatorSettings'
 import { AudioSettings } from './screens/AudioSettings'
 
-type Screen = 'profile-select' | 'home' | 'game-detail' | 'settings' | 'list-view' | 'home-settings' | 'scrape-settings' | 'controller-settings' | 'emulator-settings' | 'audio-settings'
+type Screen = 'profile-select' | 'home' | 'game-detail' | 'settings' | 'list-view' | 'home-settings' | 'wifi-settings' | 'scrape-settings' | 'controller-settings' | 'emulator-settings' | 'audio-settings'
 
 // Navigation hierarchy: back always goes to the screen's parent.
 const SCREEN_PARENT: Record<Screen, Screen | null> = {
@@ -22,6 +23,7 @@ const SCREEN_PARENT: Record<Screen, Screen | null> = {
   'settings': 'home',
   'list-view': 'home',
   'home-settings': 'settings',
+  'wifi-settings': 'settings',
   'scrape-settings': 'settings',
   'controller-settings': 'settings',
   'emulator-settings': 'settings',
@@ -239,6 +241,7 @@ export function App() {
         <Settings
           onBack={goBack}
           onOpenHome={() => setScreen('home-settings')}
+          onOpenWifi={() => setScreen('wifi-settings')}
           onOpenScraping={() => setScreen('scrape-settings')}
           onOpenControllers={() => setScreen('controller-settings')}
           onOpenHotkeys={() => setScreen('emulator-settings')}
@@ -252,6 +255,9 @@ export function App() {
           onChange={setHomePrefs}
           onBack={goBack}
         />
+      )}
+      {screen === 'wifi-settings' && (
+        <WifiSettings onBack={goBack} />
       )}
       {screen === 'scrape-settings' && (
         <ScrapeSettings systems={systems} onBack={goBack} />

@@ -105,13 +105,14 @@ function UpdateProgressModal({ startOffset, onClose }: { startOffset: number; on
 interface Props {
   onBack: () => void
   onOpenHome: () => void
+  onOpenWifi: () => void
   onOpenScraping: () => void
   onOpenControllers: () => void
   onOpenHotkeys: () => void
   onOpenAudio: () => void
 }
 
-const FOCUS_ITEMS = ['home', 'scraping', 'controllers', 'hotkeys', 'audio', 'update', 'back'] as const
+const FOCUS_ITEMS = ['home', 'wifi', 'scraping', 'controllers', 'hotkeys', 'audio', 'update', 'back'] as const
 type FocusItem = (typeof FOCUS_ITEMS)[number]
 
 // Rebooting the device is disruptive — gate the update behind an explicit
@@ -171,7 +172,7 @@ function UpdateConfirmModal({ updating, onConfirm, onCancel }: {
   )
 }
 
-export function Settings({ onBack, onOpenHome, onOpenScraping, onOpenControllers, onOpenHotkeys, onOpenAudio }: Props) {
+export function Settings({ onBack, onOpenHome, onOpenWifi, onOpenScraping, onOpenControllers, onOpenHotkeys, onOpenAudio }: Props) {
   const [focused, setFocused] = useState<FocusItem>('home')
   const [updateOpen, setUpdateOpen] = useState(false)
   const [updating, setUpdating] = useState(false)
@@ -203,13 +204,14 @@ export function Settings({ onBack, onOpenHome, onOpenScraping, onOpenControllers
 
   const activate = useCallback((item: FocusItem) => {
     if (item === 'home') onOpenHome()
+    if (item === 'wifi') onOpenWifi()
     if (item === 'scraping') onOpenScraping()
     if (item === 'controllers') onOpenControllers()
     if (item === 'hotkeys') onOpenHotkeys()
     if (item === 'audio') onOpenAudio()
     if (item === 'update') setUpdateOpen(true)
     if (item === 'back') onBack()
-  }, [onOpenHome, onOpenScraping, onOpenControllers, onOpenHotkeys, onOpenAudio, onBack])
+  }, [onOpenHome, onOpenWifi, onOpenScraping, onOpenControllers, onOpenHotkeys, onOpenAudio, onBack])
 
   useGamepad((action) => {
     if (action === 'back') { onBack(); return }
@@ -223,6 +225,7 @@ export function Settings({ onBack, onOpenHome, onOpenScraping, onOpenControllers
 
   const menu: { item: FocusItem; title: string; subtitle: string }[] = [
     { item: 'home', title: 'Home Screen', subtitle: 'Choose which lists appear on the home page' },
+    { item: 'wifi', title: 'Wi-Fi', subtitle: 'Connect to a network & view your IP address' },
     { item: 'scraping', title: 'Scraping', subtitle: 'ScreenScraper credentials & metadata' },
     { item: 'controllers', title: 'Controller Settings', subtitle: 'Remap buttons per system' },
     { item: 'hotkeys', title: 'Emulator Hotkeys', subtitle: 'Save states, fast-forward, reset — all systems' },

@@ -2,6 +2,7 @@ import type {
   Game, GameFilter, GameWithRoms, Rom, User,
   HistoryEntry, SessionWithRom, GameList,
   ControllerConfig, HotkeyConfig, AudioConfig,
+  WifiNetwork, WifiStatus,
 } from '@retro-vault/shared'
 
 function filterToParams(filter: GameFilter, userId?: number): string {
@@ -157,6 +158,14 @@ export const api = {
     run: () => post<ImportResult>('/import'),
   },
 
+  wifi: {
+    status: () => get<WifiStatus>('/wifi/status'),
+    scan: () => get<WifiNetwork[]>('/wifi/scan'),
+    connect: (ssid: string, password?: string) =>
+      post<{ connected: boolean; error?: string }>('/wifi/connect', { ssid, password }),
+    disconnect: () => post<{ ok: boolean; error?: string }>('/wifi/disconnect'),
+  },
+
   system: {
     update: () => post<{ started: boolean; offset: number }>('/system/update'),
     updateLog: (offset: number) =>
@@ -181,5 +190,5 @@ export const api = {
   },
 }
 
-export type { Game, GameWithRoms, Rom, User, GameFilter, HistoryEntry, SessionWithRom, GameList, ControllerConfig, HotkeyConfig, AudioConfig }
+export type { Game, GameWithRoms, Rom, User, GameFilter, HistoryEntry, SessionWithRom, GameList, ControllerConfig, HotkeyConfig, AudioConfig, WifiNetwork, WifiStatus }
 export { del }

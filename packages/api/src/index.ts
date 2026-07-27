@@ -19,6 +19,7 @@ import { controllerSettingsRouter } from './routes/controller-settings.js'
 import { hotkeySettingsRouter } from './routes/hotkey-settings.js'
 import { audioSettingsRouter } from './routes/audio-settings.js'
 import { systemRouter } from './routes/system.js'
+import { wifiRouter } from './routes/wifi.js'
 import { ensureBgVariant } from './scraper.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -41,6 +42,7 @@ app.route('/controller-settings', controllerSettingsRouter)
 app.route('/hotkey-settings', hotkeySettingsRouter)
 app.route('/audio-settings', audioSettingsRouter)
 app.route('/system', systemRouter)
+app.route('/wifi', wifiRouter)
 
 const DATA_DIR = process.env['RETROVAULT_DATA_DIR'] ?? path.join(os.homedir(), '.retrovault')
 

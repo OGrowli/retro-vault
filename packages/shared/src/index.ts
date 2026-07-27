@@ -140,6 +140,25 @@ export interface HotkeyConfig {
   fastForwardRatio?: number
 }
 
+// A Wi-Fi network as seen by a scan. `security` is null for open networks;
+// `saved` means a NetworkManager profile already exists (connects without a
+// password prompt). `signal` is 0–100.
+export interface WifiNetwork {
+  ssid: string
+  signal: number
+  security: string | null
+  active: boolean
+  saved: boolean
+}
+
+// Current Wi-Fi connection state for the header of the settings panel.
+export interface WifiStatus {
+  enabled: boolean
+  connected: boolean
+  ssid: string | null
+  ip: string | null
+}
+
 export interface GameWithRoms extends Game {
   roms: Rom[]
   total_play_count: number
