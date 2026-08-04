@@ -8,6 +8,8 @@ export type GameFilter = {
   noMetadata?: boolean
   query?: string
   userId?: string
+  /** Scope results to a premade list — search & random operate within it. */
+  listId?: number
 }
 
 export interface User {

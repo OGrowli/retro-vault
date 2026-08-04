@@ -294,6 +294,11 @@ export function buildFilterClause(filter: GameFilter, userId?: number): FilterCl
     conditions.push(`g.scraped_at IS NULL`)
   }
 
+  if (filter.listId !== undefined) {
+    conditions.push(`EXISTS (SELECT 1 FROM list_games lg WHERE lg.game_id = g.id AND lg.list_id = ?)`)
+    params.push(filter.listId)
+  }
+
   return {
     where: conditions.length ? `WHERE ${conditions.join(' AND ')}` : '',
     params,
@@ -327,6 +332,12 @@ export function parseFilter(query: Record<string, string | string[]>): GameFilte
 
   const userId = query['userId']
   if (userId) filter.userId = userId as string
+
+  const listId = query['listId']
+  if (listId) {
+    const n = parseInt(listId as string, 10)
+    if (!Number.isNaN(n)) filter.listId = n
+  }
 
   return filter
 }

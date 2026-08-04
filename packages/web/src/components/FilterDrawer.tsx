@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import type { GameFilter } from '@retro-vault/shared'
+import type { GameFilter, GameList } from '@retro-vault/shared'
 import { useGamepad } from '../hooks/useGamepad'
 import { Glyph } from './Glyph'
 
@@ -22,12 +22,13 @@ interface Props {
   onClose: () => void
   systems: string[]
   genres: string[]
+  lists: GameList[]
 }
 
 // Focus order top-to-bottom. The first four open a dropdown checklist; the rest
 // are direct actions. (Year Range stays mouse-only, rendered outside the flow.)
-type RowId = 'system' | 'genre' | 'players' | 'options' | 'search' | 'apply' | 'addToList' | 'clear' | 'random' | 'import'
-const DROPDOWN_ROWS = new Set<RowId>(['system', 'genre', 'players', 'options'])
+type RowId = 'list' | 'system' | 'genre' | 'players' | 'options' | 'search' | 'apply' | 'addToList' | 'clear' | 'random' | 'import'
+const DROPDOWN_ROWS = new Set<RowId>(['list', 'system', 'genre', 'players', 'options'])
 
 type OptionKey = 'favoritesOnly' | 'neverPlayed' | 'noMetadata'
 const OPTION_DEFS: { key: OptionKey; label: string }[] = [
@@ -55,7 +56,7 @@ function Chip({ children }: { children: ReactNode }) {
 
 export function FilterDrawer({
   open, gamepadActive, filter, onChange, onApply, onRandom, onImport, onSearch, onAddToList,
-  resultCount, importLoading, importMessage, onClose, systems, genres,
+  resultCount, importLoading, importMessage, onClose, systems, genres, lists,
 }: Props) {
   const [focusedRow, setFocusedRow] = useState(0)
   const [dropdown, setDropdown] = useState<RowId | null>(null)
@@ -64,8 +65,9 @@ export function FilterDrawer({
   const rowRefs = useRef<(HTMLElement | null)[]>([])
   const itemRefs = useRef<(HTMLElement | null)[]>([])
 
-  // Focus order — System/Genre only when there's something to filter on.
+  // Focus order — List/System/Genre only when there's something to filter on.
   const rows: RowId[] = [
+    ...(lists.length ? (['list'] as RowId[]) : []),
     ...(systems.length ? (['system'] as RowId[]) : []),
     ...(genres.length ? (['genre'] as RowId[]) : []),
     'players', 'options', 'search', 'apply', 'addToList', 'clear', 'random', 'import',
@@ -77,6 +79,7 @@ export function FilterDrawer({
     (filter.genres?.length ?? 0) > 0 ||
     filter.players !== undefined ||
     filter.yearRange !== undefined ||
+    filter.listId !== undefined ||
     !!filter.favoritesOnly || !!filter.neverPlayed || !!filter.noMetadata ||
     !!filter.query
 
@@ -92,6 +95,7 @@ export function FilterDrawer({
 
   // The checklist items for the currently open dropdown.
   const dropdownItems = (row: RowId | null): CheckItem[] => {
+    if (row === 'list') return lists.map(l => ({ id: `list-${l.id}`, label: l.name, active: filter.listId === l.id, toggle: () => onChange({ ...filter, listId: filter.listId === l.id ? undefined : l.id }) }))
     if (row === 'system') return systems.map(s => ({ id: s, label: s, active: (filter.systems ?? []).includes(s), toggle: () => toggleValue('systems', s) }))
     if (row === 'genre') return genres.map(g => ({ id: g, label: g, active: (filter.genres ?? []).includes(g), toggle: () => toggleValue('genres', g) }))
     if (row === 'players') return [1, 2, 4].map(n => ({ id: String(n), label: `${n} Player${n > 1 ? 's' : ''}`, active: filter.players === n, toggle: () => onChange({ ...filter, players: filter.players === n ? undefined : n }) }))
@@ -101,6 +105,7 @@ export function FilterDrawer({
 
   // Active-selection chips shown under each category row.
   const chipsFor = (row: RowId): string[] => {
+    if (row === 'list') { const l = lists.find(x => x.id === filter.listId); return l ? [l.name] : [] }
     if (row === 'system') return filter.systems ?? []
     if (row === 'genre') return filter.genres ?? []
     if (row === 'players') return filter.players ? [`${filter.players} Player${filter.players > 1 ? 's' : ''}`] : []
@@ -141,7 +146,7 @@ export function FilterDrawer({
     if (dropdown) itemRefs.current[dropdownFocus]?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
   }, [dropdownFocus, dropdown])
 
-  const CATEGORY_LABELS: Record<string, string> = { system: 'System', genre: 'Genre', players: 'Players', options: 'Options' }
+  const CATEGORY_LABELS: Record<string, string> = { list: 'List', system: 'System', genre: 'Genre', players: 'Players', options: 'Options' }
 
   const categoryRow = (row: RowId) => {
     const i = rows.indexOf(row)
@@ -241,6 +246,7 @@ export function FilterDrawer({
         </div>
 
         <div className="flex-1 overflow-y-auto p-6 space-y-3">
+          {lists.length > 0 && categoryRow('list')}
           {systems.length > 0 && categoryRow('system')}
           {genres.length > 0 && categoryRow('genre')}
           {categoryRow('players')}

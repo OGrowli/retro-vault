@@ -416,6 +416,7 @@ export function Home({ user, systems, genres, filter, homePrefs, onFilterChange,
         onClose={() => setFilterOpen(false)}
         systems={systems}
         genres={genres}
+        lists={lists}
       />
 
       <RandomGameModal
