@@ -12,6 +12,7 @@ import { ScrapeSettings } from './screens/ScrapeSettings'
 import { ControllerSettings } from './screens/ControllerSettings'
 import { EmulatorSettings } from './screens/EmulatorSettings'
 import { AudioSettings } from './screens/AudioSettings'
+import { useIdleReload } from './hooks/useIdleReload'
 
 type Screen = 'profile-select' | 'home' | 'game-detail' | 'settings' | 'list-view' | 'home-settings' | 'wifi-settings' | 'scrape-settings' | 'controller-settings' | 'emulator-settings' | 'audio-settings'
 
@@ -103,6 +104,9 @@ export function App() {
   }, [])
 
   useEffect(() => { refreshMeta() }, [refreshMeta])
+
+  // Reclaim Chromium memory on the Pi by reloading after a long idle stretch.
+  useIdleReload()
 
   // Hydrate the filter from localStorage whenever the active user changes, so it
   // survives a full page reload / kiosk relaunch, not just in-app navigation.
