@@ -13,6 +13,10 @@ echo "Checking X and kiosk packages..."
 PKGS_NEEDED=""
 command -v Xorg   > /dev/null 2>&1 || PKGS_NEEDED="$PKGS_NEEDED xserver-xorg xinit x11-xserver-utils"
 command -v unclutter > /dev/null 2>&1 || PKGS_NEEDED="$PKGS_NEEDED unclutter"
+command -v python3 > /dev/null 2>&1 || PKGS_NEEDED="$PKGS_NEEDED python3"
+# jstest (from the joystick package) is optional but the recovery-chord setup
+# needs it to read the controller's button indices.
+command -v jstest > /dev/null 2>&1 || PKGS_NEEDED="$PKGS_NEEDED joystick"
 if ! command -v chromium-browser > /dev/null 2>&1 && ! command -v chromium > /dev/null 2>&1; then
   PKGS_NEEDED="$PKGS_NEEDED chromium-browser"
 fi
@@ -82,10 +86,36 @@ else
   sudo systemctl restart retrovault-api || sudo systemctl start retrovault-api
 fi
 
+# 3a. Controller recovery watchdog — reads the gamepad from the kernel so the
+# recovery chord works even when the Chromium kiosk is frozen. Runs as root to
+# manage getty@tty1, free the VT, and reboot. Safe to restart here (it is not
+# the cgroup running this deploy).
+echo "Installing recovery watchdog service..."
+sudo tee /etc/systemd/system/retrovault-watchdog.service > /dev/null << EOF
+[Unit]
+Description=RetroVault controller recovery watchdog
+After=multi-user.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 $INSTALL_DIR/scripts/retrovault-watchdog.py
+Restart=always
+RestartSec=2
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+EOF
+sudo systemctl daemon-reload
+sudo systemctl enable retrovault-watchdog
+sudo systemctl restart retrovault-watchdog || sudo systemctl start retrovault-watchdog
+
 # 3. Make kiosk scripts executable
 chmod +x "$INSTALL_DIR/scripts/retrovault-kiosk.sh"
 chmod +x "$INSTALL_DIR/scripts/launch-chromium.sh"
 chmod +x "$INSTALL_DIR/scripts/launch-game.sh"
+chmod +x "$INSTALL_DIR/scripts/retrovault-watchdog.py"
 
 # 4. Configure console autologin for tty1 (idempotent)
 echo "Configuring console autologin..."
@@ -130,3 +160,5 @@ echo "Useful commands:"
 echo "  sudo systemctl status retrovault-api        # API status"
 echo "  sudo journalctl -u retrovault-api -f        # API logs"
 echo "  sudo systemctl restart retrovault-api       # restart API"
+echo "  sudo journalctl -u retrovault-watchdog -f   # recovery watchdog logs"
+echo "  jstest --normal /dev/input/js0              # find PS/Options button indices"
