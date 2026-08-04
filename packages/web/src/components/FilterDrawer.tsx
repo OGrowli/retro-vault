@@ -14,6 +14,9 @@ interface Props {
   onRandom: () => void
   onImport: () => void
   onSearch: () => void
+  onAddToList: () => void
+  /** How many games the current (applied) filter yields — gates Add to List. */
+  resultCount: number
   importLoading: boolean
   importMessage: string | null
   onClose: () => void
@@ -23,7 +26,7 @@ interface Props {
 
 // Focus order top-to-bottom. The first four open a dropdown checklist; the rest
 // are direct actions. (Year Range stays mouse-only, rendered outside the flow.)
-type RowId = 'system' | 'genre' | 'players' | 'options' | 'search' | 'apply' | 'clear' | 'random' | 'import'
+type RowId = 'system' | 'genre' | 'players' | 'options' | 'search' | 'apply' | 'addToList' | 'clear' | 'random' | 'import'
 const DROPDOWN_ROWS = new Set<RowId>(['system', 'genre', 'players', 'options'])
 
 type OptionKey = 'favoritesOnly' | 'neverPlayed' | 'noMetadata'
@@ -51,8 +54,8 @@ function Chip({ children }: { children: ReactNode }) {
 }
 
 export function FilterDrawer({
-  open, gamepadActive, filter, onChange, onApply, onRandom, onImport, onSearch,
-  importLoading, importMessage, onClose, systems, genres,
+  open, gamepadActive, filter, onChange, onApply, onRandom, onImport, onSearch, onAddToList,
+  resultCount, importLoading, importMessage, onClose, systems, genres,
 }: Props) {
   const [focusedRow, setFocusedRow] = useState(0)
   const [dropdown, setDropdown] = useState<RowId | null>(null)
@@ -65,7 +68,7 @@ export function FilterDrawer({
   const rows: RowId[] = [
     ...(systems.length ? (['system'] as RowId[]) : []),
     ...(genres.length ? (['genre'] as RowId[]) : []),
-    'players', 'options', 'search', 'apply', 'clear', 'random', 'import',
+    'players', 'options', 'search', 'apply', 'addToList', 'clear', 'random', 'import',
   ]
 
   // Whether anything is set — gates the Clear Filters action.
@@ -109,6 +112,7 @@ export function FilterDrawer({
     if (DROPDOWN_ROWS.has(row)) { setDropdown(row); setDropdownFocus(0); return }
     if (row === 'search') onSearch()
     if (row === 'apply') onApply()
+    if (row === 'addToList') { if (resultCount > 0) onAddToList() }
     if (row === 'clear') { if (hasActiveFilters) { onChange({}); onApply() } }
     if (row === 'random') onRandom()
     if (row === 'import') onImport()
@@ -169,7 +173,7 @@ export function FilterDrawer({
     )
   }
 
-  const actionRow = (row: 'search' | 'apply' | 'clear' | 'random' | 'import') => {
+  const actionRow = (row: 'search' | 'apply' | 'addToList' | 'clear' | 'random' | 'import') => {
     const i = rows.indexOf(row)
     const focused = focusedRow === i && !dropdown
     if (row === 'search') {
@@ -192,10 +196,11 @@ export function FilterDrawer({
     }
     const primary = row === 'apply'
     const label = row === 'apply' ? 'Apply Filters'
+      : row === 'addToList' ? (resultCount > 0 ? `Add Results to List (${resultCount})` : 'Add Results to List')
       : row === 'clear' ? 'Clear Filters'
       : row === 'random' ? 'Pick Random Game'
       : (importLoading ? 'Scanning ROMs…' : 'Update Library')
-    const disabled = (row === 'import' && importLoading) || (row === 'clear' && !hasActiveFilters)
+    const disabled = (row === 'import' && importLoading) || (row === 'clear' && !hasActiveFilters) || (row === 'addToList' && resultCount === 0)
     return (
       <button
         key={row}
@@ -266,6 +271,7 @@ export function FilterDrawer({
 
         <div className="p-6 border-t border-vault-surface space-y-3">
           {actionRow('apply')}
+          {actionRow('addToList')}
           {actionRow('clear')}
           {actionRow('random')}
           {actionRow('import')}

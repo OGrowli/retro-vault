@@ -123,6 +123,8 @@ export const api = {
     games: (listId: number) => get<Game[]>(`/lists/${listId}/games`),
     toggle: (listId: number, gameId: number) =>
       post<{ included: boolean }>(`/lists/${listId}/games/${gameId}/toggle`),
+    addGames: (listId: number, gameIds: number[]) =>
+      post<{ added: number }>(`/lists/${listId}/games`, { gameIds }),
     remove: (listId: number) => del<{ deleted: boolean }>(`/lists/${listId}`),
   },
 

@@ -7,6 +7,7 @@ import type { RailDef } from '../hooks/useSpatialNav'
 import { Rail, RAIL_CAP } from '../components/Rail'
 import { VirtualGrid, GRID_COLS } from '../components/VirtualGrid'
 import { FilterDrawer } from '../components/FilterDrawer'
+import { AddResultsToListModal } from '../components/AddResultsToListModal'
 import { RandomGameModal } from '../components/RandomGameModal'
 import { VirtualKeyboard } from '../components/VirtualKeyboard'
 import { Glyph } from '../components/Glyph'
@@ -26,6 +27,7 @@ interface Props {
   onSettings: () => void
   onShowMore: (sources: ListSource[], activeKey: string) => void
   onLibraryChange?: () => void
+  onListCreated?: (listId: number) => void
   inputActive?: boolean
 }
 
@@ -34,7 +36,7 @@ const CONTINUE_THRESHOLD = 5 * 60
 // Focusable columns in a rail: visible cards (capped) plus a Show More tile when there's overflow.
 const railColCount = (len: number) => Math.min(len, RAIL_CAP) + (len > RAIL_CAP ? 1 : 0)
 
-export function Home({ user, systems, genres, filter, homePrefs, onFilterChange, onGameSelect, onRandomView, onSwitchUser, onSettings, onShowMore, onLibraryChange, inputActive = true }: Props) {
+export function Home({ user, systems, genres, filter, homePrefs, onFilterChange, onGameSelect, onRandomView, onSwitchUser, onSettings, onShowMore, onLibraryChange, onListCreated, inputActive = true }: Props) {
   const [recent, setRecent] = useState<Game[]>([])
   const [favorites, setFavorites] = useState<Game[]>([])
   const [allGames, setAllGames] = useState<Game[]>([])
@@ -52,6 +54,7 @@ export function Home({ user, systems, genres, filter, homePrefs, onFilterChange,
   const [importMessage, setImportMessage] = useState<string | null>(null)
   const [rawHistory, setRawHistory] = useState<HistoryEntry[]>([])
   const [searchVkOpen, setSearchVkOpen] = useState(false)
+  const [addToListOpen, setAddToListOpen] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
 
   const historyToGames = (history: HistoryEntry[]): Game[] =>
@@ -263,7 +266,7 @@ export function Home({ user, systems, genres, filter, homePrefs, onFilterChange,
   }, [nav, onSettings])
 
   // Drawer open → the FilterDrawer's own gamepad handler takes over.
-  useGamepad(handleAction, inputActive && !randomGame && !randomLoading && !searchVkOpen && !filterOpen)
+  useGamepad(handleAction, inputActive && !randomGame && !randomLoading && !searchVkOpen && !filterOpen && !addToListOpen)
 
   // Rail cards scroll into view with block:'nearest', which pins the topmost
   // rail's card to the viewport top and leaves the header hidden above it.
@@ -403,6 +406,8 @@ export function Home({ user, systems, genres, filter, homePrefs, onFilterChange,
         onRandom={() => { setFilterOpen(false); void handleRandom() }}
         onImport={() => void handleImport()}
         onSearch={() => setSearchVkOpen(true)}
+        onAddToList={() => { setFilterOpen(false); setAddToListOpen(true) }}
+        resultCount={allGames.length}
         importLoading={importLoading}
         importMessage={importMessage}
         onClose={() => setFilterOpen(false)}
@@ -417,6 +422,16 @@ export function Home({ user, systems, genres, filter, homePrefs, onFilterChange,
         onView={(game) => { setRandomGame(null); (onRandomView ?? onGameSelect)(game) }}
         onAnother={() => void handleRandom()}
       />
+
+      {addToListOpen && (
+        <AddResultsToListModal
+          games={allGames}
+          user={user}
+          onClose={() => setAddToListOpen(false)}
+          onListCreated={onListCreated}
+          onChanged={loadLists}
+        />
+      )}
 
       {searchVkOpen && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[60] px-4">

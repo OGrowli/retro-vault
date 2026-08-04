@@ -214,6 +214,7 @@ export function App() {
           onSettings={() => setScreen('settings')}
           onShowMore={handleShowMore}
           onLibraryChange={refreshMeta}
+          onListCreated={handleListCreated}
           inputActive={screen === 'home'}
         />
       )}
