@@ -13,6 +13,7 @@ import { ControllerSettings } from './screens/ControllerSettings'
 import { EmulatorSettings } from './screens/EmulatorSettings'
 import { AudioSettings } from './screens/AudioSettings'
 import { useIdleReload } from './hooks/useIdleReload'
+import { DEFAULT_HOME_PREFS, loadHomePrefs, saveHomePrefs } from './prefs'
 
 type Screen = 'profile-select' | 'home' | 'game-detail' | 'settings' | 'list-view' | 'home-settings' | 'wifi-settings' | 'scrape-settings' | 'controller-settings' | 'emulator-settings' | 'audio-settings'
 
@@ -52,24 +53,6 @@ function saveFilter(userId: number, filter: GameFilter) {
 // per-user) so the "Random Again" button survives the kiosk teardown when a
 // game is launched and quit, then restored alongside the resumed game.
 const FROM_RANDOM_KEY = 'retrovault:from-random'
-
-const homePrefsKey = (userId: number) => `retrovault:home-prefs:${userId}`
-const DEFAULT_HOME_PREFS: HomePrefs = { hiddenKeys: [] }
-
-function loadHomePrefs(userId: number): HomePrefs {
-  try {
-    const raw = localStorage.getItem(homePrefsKey(userId))
-    return raw ? (JSON.parse(raw) as HomePrefs) : DEFAULT_HOME_PREFS
-  } catch {
-    return DEFAULT_HOME_PREFS
-  }
-}
-
-function saveHomePrefs(userId: number, prefs: HomePrefs) {
-  try {
-    localStorage.setItem(homePrefsKey(userId), JSON.stringify(prefs))
-  } catch { /* storage full / disabled — prefs just won't persist */ }
-}
 
 export function App() {
   const [screen, setScreen] = useState<Screen>('profile-select')

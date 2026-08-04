@@ -4,6 +4,7 @@ import { api } from '../api/client'
 import { useGamepad } from '../hooks/useGamepad'
 import { Glyph } from './Glyph'
 import { VirtualKeyboard } from './VirtualKeyboard'
+import { loadHomePrefs, listOrderOf } from '../prefs'
 
 interface Props {
   /** The current search/filter results to add. */
@@ -36,7 +37,7 @@ export function AddResultsToListModal({ games, user, onClose, onListCreated, onC
   const gameIds = games.map(g => g.id)
 
   useEffect(() => {
-    api.lists.forUser(user.id)
+    api.lists.forUser(user.id, undefined, listOrderOf(loadHomePrefs(user.id)))
       .then(ls => { setLists(ls); setLoading(false) })
       .catch(() => setLoading(false))
   }, [user.id])

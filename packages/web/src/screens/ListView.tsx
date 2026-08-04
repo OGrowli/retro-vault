@@ -251,6 +251,13 @@ export function ListView({ sources, activeKey: initialKey, onBack, onGameSelect,
     rowRefs.current[focusedIndex]?.scrollIntoView({ block: 'nearest' })
   }, [focusedIndex, inputActive])
 
+  // Opening a custom list counts as viewing it — bumps its recency so the
+  // "Recently Viewed" list order floats it to the top next time.
+  useEffect(() => {
+    const m = /^list-(\d+)$/.exec(activeKey)
+    if (m) api.lists.view(Number(m[1])).catch(() => {})
+  }, [activeKey])
+
   // Keep the focused row visible inside the open list-switcher dropdown.
   useEffect(() => {
     if (dropdownOpen) dropdownRefs.current[dropdownFocus]?.scrollIntoView({ block: 'nearest' })

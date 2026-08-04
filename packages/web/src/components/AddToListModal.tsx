@@ -4,6 +4,7 @@ import { api } from '../api/client'
 import { useGamepad } from '../hooks/useGamepad'
 import { Glyph } from './Glyph'
 import { VirtualKeyboard } from './VirtualKeyboard'
+import { loadHomePrefs, listOrderOf } from '../prefs'
 
 interface Props {
   game: Game
@@ -26,7 +27,7 @@ export function AddToListModal({ game, user, onClose, onListCreated }: Props) {
   const rowRefs = useRef<(HTMLDivElement | null)[]>([])
 
   useEffect(() => {
-    api.lists.forUser(user.id, game.id)
+    api.lists.forUser(user.id, game.id, listOrderOf(loadHomePrefs(user.id)))
       .then(ls => { setLists(ls); setLoading(false) })
       .catch(() => setLoading(false))
   }, [user.id, game.id])

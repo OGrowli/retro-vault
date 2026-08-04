@@ -69,16 +69,30 @@ export interface GameList {
   user_id: number
   name: string
   created_at: string
+  /** Bumped when the list is opened in List View or a game is added to it. */
+  last_viewed_at: string
   game_count: number
   /** Present when the list query is scoped to a specific game (add-to-list modal) */
   included?: boolean
 }
+
+// How the user's lists are ordered (add-to-list menus, list switcher, home rails).
+export type ListOrder = 'recent' | 'created' | 'name' | 'size'
+// How games inside a list / Favorites are ordered.
+export type GameSort = 'recent' | 'name' | 'year' | 'added' | 'system'
+
+export const DEFAULT_LIST_ORDER: ListOrder = 'recent'
+export const DEFAULT_GAME_SORT: GameSort = 'recent'
 
 // Per-user home screen layout prefs. Recently Played and All Games are always
 // shown; everything else (Favorites, custom lists) can be hidden. Stored keys
 // match the home rail region keys: 'favorites', 'list-<id>'.
 export interface HomePrefs {
   hiddenKeys: string[]
+  /** Order of the lists themselves. Defaults to DEFAULT_LIST_ORDER. */
+  listOrder?: ListOrder
+  /** Order of games within a list / Favorites. Defaults to DEFAULT_GAME_SORT. */
+  gameSort?: GameSort
 }
 
 // A selectable collection in the full-screen list view. Games are preloaded so

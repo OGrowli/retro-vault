@@ -12,6 +12,7 @@ import { RandomGameModal } from '../components/RandomGameModal'
 import { VirtualKeyboard } from '../components/VirtualKeyboard'
 import { Glyph } from '../components/Glyph'
 import { Clock } from '../components/Clock'
+import { listOrderOf, gameSortOf } from '../prefs'
 import type { GamepadAction } from '../hooks/useGamepad'
 
 interface Props {
@@ -66,23 +67,25 @@ export function Home({ user, systems, genres, filter, homePrefs, onFilterChange,
         box_art_path: h.box_art_path, scraped_at: h.scraped_at,
       } as Game))
 
-  // Fetch a user's custom lists and the games inside each non-empty one.
+  // Fetch a user's custom lists (ordered per the list-order pref) and the games
+  // inside each non-empty one (ordered per the game-sort pref).
   const loadLists = useCallback(async () => {
     try {
-      const userLists = await api.lists.forUser(user.id)
+      const userLists = await api.lists.forUser(user.id, undefined, listOrderOf(homePrefs))
       setLists(userLists)
+      const sort = gameSortOf(homePrefs)
       const withGames = userLists.filter(l => l.game_count > 0)
       const entries = await Promise.all(
-        withGames.map(async l => [l.id, await api.lists.games(l.id)] as const)
+        withGames.map(async l => [l.id, await api.lists.games(l.id, { userId: user.id, sort })] as const)
       )
       setListGames(Object.fromEntries(entries))
     } catch { /* lists are non-critical */ }
-  }, [user.id])
+  }, [user.id, homePrefs])
 
   useEffect(() => {
     Promise.all([
       api.users.history(user.id),
-      api.users.favorites(user.id),
+      api.users.favorites(user.id, gameSortOf(homePrefs)),
       api.games.list(filter, user.id),
     ]).then(([history, favs, games]) => {
       const recentGames = historyToGames(history)
@@ -108,7 +111,7 @@ export function Home({ user, systems, genres, filter, homePrefs, onFilterChange,
   const prevActiveRef = useRef(inputActive)
   useEffect(() => {
     if (inputActive && !prevActiveRef.current) {
-      Promise.all([api.users.history(user.id), api.users.favorites(user.id)])
+      Promise.all([api.users.history(user.id), api.users.favorites(user.id, gameSortOf(homePrefs))])
         .then(([history, favs]) => {
           setRecent(historyToGames(history))
           setRawHistory(history.slice(0, 40))

@@ -1,6 +1,6 @@
 import type {
   Game, GameFilter, GameWithRoms, Rom, User,
-  HistoryEntry, SessionWithRom, GameList,
+  HistoryEntry, SessionWithRom, GameList, ListOrder, GameSort,
   ControllerConfig, HotkeyConfig, AudioConfig,
   WifiNetwork, WifiStatus,
 } from '@retro-vault/shared'
@@ -111,20 +111,33 @@ export const api = {
     list: () => get<User[]>('/users'),
     create: (username: string, avatar_color: string) =>
       post<User>('/users', { username, avatar_color }),
-    favorites: (userId: number) => get<Game[]>(`/users/${userId}/favorites`),
+    favorites: (userId: number, sort?: GameSort) =>
+      get<Game[]>(`/users/${userId}/favorites${sort ? `?sort=${sort}` : ''}`),
     history: (userId: number) => get<HistoryEntry[]>(`/users/${userId}/history`),
   },
 
   lists: {
-    forUser: (userId: number, gameId?: number) =>
-      get<GameList[]>(`/users/${userId}/lists${gameId !== undefined ? `?gameId=${gameId}` : ''}`),
+    forUser: (userId: number, gameId?: number, sort?: ListOrder) => {
+      const p = new URLSearchParams()
+      if (gameId !== undefined) p.set('gameId', String(gameId))
+      if (sort) p.set('sort', sort)
+      const qs = p.toString()
+      return get<GameList[]>(`/users/${userId}/lists${qs ? `?${qs}` : ''}`)
+    },
     create: (userId: number, name: string) =>
       post<GameList>(`/users/${userId}/lists`, { name }),
-    games: (listId: number) => get<Game[]>(`/lists/${listId}/games`),
+    games: (listId: number, opts?: { userId?: number; sort?: GameSort }) => {
+      const p = new URLSearchParams()
+      if (opts?.userId !== undefined) p.set('userId', String(opts.userId))
+      if (opts?.sort) p.set('sort', opts.sort)
+      const qs = p.toString()
+      return get<Game[]>(`/lists/${listId}/games${qs ? `?${qs}` : ''}`)
+    },
     toggle: (listId: number, gameId: number) =>
       post<{ included: boolean }>(`/lists/${listId}/games/${gameId}/toggle`),
     addGames: (listId: number, gameIds: number[]) =>
       post<{ added: number }>(`/lists/${listId}/games`, { gameIds }),
+    view: (listId: number) => post<{ ok: boolean }>(`/lists/${listId}/view`),
     remove: (listId: number) => del<{ deleted: boolean }>(`/lists/${listId}`),
   },
 

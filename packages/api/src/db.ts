@@ -2,7 +2,7 @@ import Database, { type Database as DatabaseType } from 'better-sqlite3'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import type { GameFilter } from '@retro-vault/shared'
+import type { GameFilter, GameSort, ListOrder } from '@retro-vault/shared'
 
 const DATA_DIR = process.env['RETROVAULT_DATA_DIR'] ?? path.join(os.homedir(), '.retrovault')
 const DB_PATH = process.env['RETROVAULT_DB_PATH'] ?? path.join(DATA_DIR, 'retrovault.db')
@@ -142,7 +142,8 @@ db.exec(`
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     name TEXT NOT NULL,
-    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    last_viewed_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
   CREATE TABLE IF NOT EXISTS list_games (
@@ -219,6 +220,15 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_events_created ON events(created_at);
   CREATE INDEX IF NOT EXISTS idx_events_category ON events(category);
 `)
+
+// Idempotent column add for DBs created before lists.last_viewed_at existed.
+const listCols = new Set(
+  (db.prepare('PRAGMA table_info(lists)').all() as Array<{ name: string }>).map(r => r.name)
+)
+if (!listCols.has('last_viewed_at')) {
+  db.exec(`ALTER TABLE lists ADD COLUMN last_viewed_at TEXT`)
+  db.exec(`UPDATE lists SET last_viewed_at = created_at WHERE last_viewed_at IS NULL`)
+}
 
 if (schemaVersion < 2) {
   db.exec('PRAGMA user_version = 2')
@@ -319,6 +329,56 @@ export function parseFilter(query: Record<string, string | string[]>): GameFilte
   if (userId) filter.userId = userId as string
 
   return filter
+}
+
+// --- Collection ordering ---------------------------------------------------
+
+// ORDER BY body for games in a list / Favorites. `addedCol` is the column that
+// encodes insert order (lg.id for lists, f.id for favorites). For 'recent' a
+// play_sessions join is added; its params bind before the query's WHERE params
+// since the JOIN precedes WHERE in the SQL text.
+export function gamesOrderSql(
+  sort: GameSort,
+  opts: { userId?: number; addedCol: string }
+): { join: string; joinParams: number[]; orderBy: string } {
+  const nameTie = 'g.name COLLATE NOCASE ASC'
+  switch (sort) {
+    case 'recent':
+      if (opts.userId === undefined) return { join: '', joinParams: [], orderBy: nameTie }
+      return {
+        join: 'LEFT JOIN play_sessions ps ON ps.game_id = g.id AND ps.user_id = ?',
+        joinParams: [opts.userId],
+        orderBy: `(MAX(ps.started_at) IS NULL), MAX(ps.started_at) DESC, ${nameTie}`,
+      }
+    case 'year':
+      return { join: '', joinParams: [], orderBy: `(g.year IS NULL), g.year DESC, ${nameTie}` }
+    case 'added':
+      return { join: '', joinParams: [], orderBy: `${opts.addedCol} DESC` }
+    case 'system':
+      return { join: '', joinParams: [], orderBy: `g.system COLLATE NOCASE ASC, ${nameTie}` }
+    case 'name':
+    default:
+      return { join: '', joinParams: [], orderBy: nameTie }
+  }
+}
+
+export function listOrderSql(order: ListOrder): string {
+  switch (order) {
+    case 'created': return 'l.created_at DESC'
+    case 'name': return 'l.name COLLATE NOCASE ASC'
+    case 'size': return 'game_count DESC, l.name COLLATE NOCASE ASC'
+    case 'recent':
+    default: return "COALESCE(l.last_viewed_at, l.created_at) DESC"
+  }
+}
+
+export function parseGameSort(v: string | undefined): GameSort {
+  return (['recent', 'name', 'year', 'added', 'system'] as const).includes(v as GameSort)
+    ? (v as GameSort) : 'recent'
+}
+export function parseListOrder(v: string | undefined): ListOrder {
+  return (['recent', 'created', 'name', 'size'] as const).includes(v as ListOrder)
+    ? (v as ListOrder) : 'recent'
 }
 
 export interface LogEventInput {

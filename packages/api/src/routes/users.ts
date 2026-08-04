@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { db } from '../db.js'
+import { db, gamesOrderSql, listOrderSql, parseGameSort, parseListOrder } from '../db.js'
 
 export const usersRouter = new Hono()
 
@@ -26,15 +26,18 @@ usersRouter.post('/', async (c) => {
 
 usersRouter.get('/:id/favorites', (c) => {
   const userId = parseInt(c.req.param('id'), 10)
+  const sort = parseGameSort(c.req.query('sort'))
+  const { join, joinParams, orderBy } = gamesOrderSql(sort, { userId, addedCol: 'f.id' })
   const rows = db.prepare(`
-    SELECT g.*, COUNT(r.id) as rom_count
+    SELECT g.*, COUNT(DISTINCT r.id) as rom_count
     FROM games g
     JOIN favorites f ON f.game_id = g.id
     LEFT JOIN roms r ON r.game_id = g.id
+    ${join}
     WHERE f.user_id = ?
     GROUP BY g.id
-    ORDER BY g.name ASC
-  `).all(userId)
+    ORDER BY ${orderBy}
+  `).all(...joinParams, userId)
   return c.json(rows)
 })
 
@@ -45,6 +48,7 @@ usersRouter.get('/:id/lists', (c) => {
   const userId = parseInt(c.req.param('id'), 10)
   const gameIdParam = c.req.query('gameId')
   const gameId = gameIdParam ? parseInt(gameIdParam, 10) : undefined
+  const order = listOrderSql(parseListOrder(c.req.query('sort')))
 
   if (gameId !== undefined && !Number.isNaN(gameId)) {
     const rows = db.prepare(`
@@ -55,7 +59,7 @@ usersRouter.get('/:id/lists', (c) => {
       LEFT JOIN list_games lg ON lg.list_id = l.id
       WHERE l.user_id = ?
       GROUP BY l.id
-      ORDER BY l.created_at ASC
+      ORDER BY ${order}
     `).all(gameId, userId) as Array<Record<string, unknown>>
     return c.json(rows.map(r => ({ ...r, included: Boolean(r['included']) })))
   }
@@ -66,7 +70,7 @@ usersRouter.get('/:id/lists', (c) => {
     LEFT JOIN list_games lg ON lg.list_id = l.id
     WHERE l.user_id = ?
     GROUP BY l.id
-    ORDER BY l.created_at ASC
+    ORDER BY ${order}
   `).all(userId)
   return c.json(rows)
 })
