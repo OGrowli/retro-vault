@@ -40,6 +40,11 @@ fi
 echo "==> Using node $(node --version 2>/dev/null || echo '?') / npm $(npm --version 2>/dev/null || echo '?')"
 
 if [ -d .git ]; then
+  # install-startup.sh chmods the kiosk/watchdog scripts +x on every deploy. If
+  # git tracks executable bits, those become "modifications" that make the tree
+  # look dirty and (below) silently skip the pull — freezing the Pi on an old
+  # commit while still rebuilding. Ignoring file-mode changes prevents that.
+  git config core.fileMode false
   if [ -n "$(git status --porcelain)" ]; then
     echo "==> Uncommitted changes present — skipping git pull. Commit or stash to pull latest." >&2
   else
