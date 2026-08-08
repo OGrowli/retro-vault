@@ -12,10 +12,11 @@ import { ScrapeSettings } from './screens/ScrapeSettings'
 import { ControllerSettings } from './screens/ControllerSettings'
 import { EmulatorSettings } from './screens/EmulatorSettings'
 import { AudioSettings } from './screens/AudioSettings'
+import { RomAudit } from './screens/RomAudit'
 import { useIdleReload } from './hooks/useIdleReload'
 import { DEFAULT_HOME_PREFS, loadHomePrefs, saveHomePrefs } from './prefs'
 
-type Screen = 'profile-select' | 'home' | 'game-detail' | 'settings' | 'list-view' | 'home-settings' | 'wifi-settings' | 'scrape-settings' | 'controller-settings' | 'emulator-settings' | 'audio-settings'
+type Screen = 'profile-select' | 'home' | 'game-detail' | 'settings' | 'list-view' | 'home-settings' | 'wifi-settings' | 'scrape-settings' | 'controller-settings' | 'emulator-settings' | 'audio-settings' | 'rom-audit'
 
 // Navigation hierarchy: back always goes to the screen's parent.
 const SCREEN_PARENT: Record<Screen, Screen | null> = {
@@ -30,6 +31,7 @@ const SCREEN_PARENT: Record<Screen, Screen | null> = {
   'controller-settings': 'settings',
   'emulator-settings': 'settings',
   'audio-settings': 'settings',
+  'rom-audit': 'settings',
 }
 
 const filterKey = (userId: number) => `retrovault:filter:${userId}`
@@ -234,6 +236,7 @@ export function App() {
           onOpenControllers={() => setScreen('controller-settings')}
           onOpenHotkeys={() => setScreen('emulator-settings')}
           onOpenAudio={() => setScreen('audio-settings')}
+          onOpenRomAudit={() => setScreen('rom-audit')}
         />
       )}
       {screen === 'home-settings' && currentUser && (
@@ -258,6 +261,9 @@ export function App() {
       )}
       {screen === 'audio-settings' && (
         <AudioSettings onBack={goBack} />
+      )}
+      {screen === 'rom-audit' && (
+        <RomAudit onBack={goBack} />
       )}
     </>
   )

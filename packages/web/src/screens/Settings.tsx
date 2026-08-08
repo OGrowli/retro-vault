@@ -110,9 +110,10 @@ interface Props {
   onOpenControllers: () => void
   onOpenHotkeys: () => void
   onOpenAudio: () => void
+  onOpenRomAudit: () => void
 }
 
-const FOCUS_ITEMS = ['home', 'wifi', 'scraping', 'controllers', 'hotkeys', 'audio', 'update', 'back'] as const
+const FOCUS_ITEMS = ['home', 'wifi', 'scraping', 'controllers', 'hotkeys', 'audio', 'rom-audit', 'update', 'back'] as const
 type FocusItem = (typeof FOCUS_ITEMS)[number]
 
 // Rebooting the device is disruptive — gate the update behind an explicit
@@ -172,7 +173,7 @@ function UpdateConfirmModal({ updating, onConfirm, onCancel }: {
   )
 }
 
-export function Settings({ onBack, onOpenHome, onOpenWifi, onOpenScraping, onOpenControllers, onOpenHotkeys, onOpenAudio }: Props) {
+export function Settings({ onBack, onOpenHome, onOpenWifi, onOpenScraping, onOpenControllers, onOpenHotkeys, onOpenAudio, onOpenRomAudit }: Props) {
   const [focused, setFocused] = useState<FocusItem>('home')
   const [updateOpen, setUpdateOpen] = useState(false)
   const [updating, setUpdating] = useState(false)
@@ -209,6 +210,7 @@ export function Settings({ onBack, onOpenHome, onOpenWifi, onOpenScraping, onOpe
     if (item === 'controllers') onOpenControllers()
     if (item === 'hotkeys') onOpenHotkeys()
     if (item === 'audio') onOpenAudio()
+    if (item === 'rom-audit') onOpenRomAudit()
     if (item === 'update') setUpdateOpen(true)
     if (item === 'back') onBack()
   }, [onOpenHome, onOpenWifi, onOpenScraping, onOpenControllers, onOpenHotkeys, onOpenAudio, onBack])
@@ -230,6 +232,7 @@ export function Settings({ onBack, onOpenHome, onOpenWifi, onOpenScraping, onOpe
     { item: 'controllers', title: 'Controller Settings', subtitle: 'Remap buttons per system' },
     { item: 'hotkeys', title: 'Emulator Hotkeys', subtitle: 'Save states, fast-forward, reset — all systems' },
     { item: 'audio', title: 'Audio', subtitle: 'RetroArch audio config — volume, resampler, sync & more' },
+    { item: 'rom-audit', title: 'ROM Audit', subtitle: 'Find missing ROMs by checksum vs No-Intro' },
     { item: 'update', title: 'Update RetroVault', subtitle: 'Pull latest, rebuild, and reboot' },
   ]
 

@@ -158,6 +158,33 @@ db.exec(`
     value TEXT NOT NULL
   );
 
+  -- Canonical ROM sets parsed from DAT files (No-Intro etc.), one row per rom.
+  CREATE TABLE IF NOT EXISTS dat_entries (
+    system TEXT NOT NULL,
+    name TEXT NOT NULL,
+    name_key TEXT NOT NULL,
+    region TEXT,
+    crc TEXT,
+    md5 TEXT,
+    sha1 TEXT,
+    size INTEGER
+  );
+
+  CREATE TABLE IF NOT EXISTS dat_meta (
+    system TEXT PRIMARY KEY,
+    family TEXT NOT NULL,
+    source TEXT NOT NULL,
+    imported_at TEXT NOT NULL,
+    entry_count INTEGER NOT NULL
+  );
+
+  -- Latest audit result per system (JSON blob), so the UI survives a reload.
+  CREATE TABLE IF NOT EXISTS audit_report (
+    system TEXT PRIMARY KEY,
+    json TEXT NOT NULL,
+    ran_at TEXT NOT NULL
+  );
+
   CREATE TABLE IF NOT EXISTS events (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
@@ -219,6 +246,8 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_list_games_list ON list_games(list_id);
   CREATE INDEX IF NOT EXISTS idx_events_created ON events(created_at);
   CREATE INDEX IF NOT EXISTS idx_events_category ON events(category);
+  CREATE INDEX IF NOT EXISTS idx_dat_entries_crc ON dat_entries(system, crc);
+  CREATE INDEX IF NOT EXISTS idx_dat_entries_name ON dat_entries(system, name_key);
 `)
 
 // Idempotent column add for DBs created before lists.last_viewed_at existed.
@@ -228,6 +257,14 @@ const listCols = new Set(
 if (!listCols.has('last_viewed_at')) {
   db.exec(`ALTER TABLE lists ADD COLUMN last_viewed_at TEXT`)
   db.exec(`UPDATE lists SET last_viewed_at = created_at WHERE last_viewed_at IS NULL`)
+}
+
+// Cached CRC32 (uppercase hex) per ROM, computed during a collection audit.
+const romCols = new Set(
+  (db.prepare('PRAGMA table_info(roms)').all() as Array<{ name: string }>).map(r => r.name)
+)
+if (!romCols.has('crc')) {
+  db.exec(`ALTER TABLE roms ADD COLUMN crc TEXT`)
 }
 
 if (schemaVersion < 2) {
@@ -390,6 +427,19 @@ export function parseGameSort(v: string | undefined): GameSort {
 export function parseListOrder(v: string | undefined): ListOrder {
   return (['recent', 'created', 'name', 'size'] as const).includes(v as ListOrder)
     ? (v as ListOrder) : 'recent'
+}
+
+// Normalized title key for name-based DAT matching: lowercased, tags/brackets
+// and disc/track suffixes stripped, whitespace collapsed.
+export function nameKey(name: string): string {
+  return name
+    .replace(/\.[a-z0-9]{1,4}$/i, '')       // trailing file extension, if any
+    .replace(/\([^)]*\)/g, ' ')             // (USA), (Rev 1), (Proto)…
+    .replace(/\[[^\]]*\]/g, ' ')            // [!], [b], …
+    .replace(/\b(disc|disk|track)\s*\d+\b/gi, ' ')
+    .replace(/[^a-z0-9]+/gi, ' ')
+    .trim()
+    .toLowerCase()
 }
 
 export interface LogEventInput {

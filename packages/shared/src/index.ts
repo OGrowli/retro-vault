@@ -105,6 +105,42 @@ export interface ListSource {
   games: Game[]
 }
 
+// --- ROM collection audit (checksum vs No-Intro DATs) ---
+
+export type AuditStrategy = 'crc' | 'name'
+
+// One title in a DAT the user is missing, or an owned ROM not in any DAT.
+export interface AuditEntry {
+  name: string
+  region: string | null
+}
+
+export interface AuditSystemSummary {
+  system: string
+  displayName: string
+  family: string          // 'no-intro' | 'redump' | 'mame'
+  strategy: AuditStrategy  // 'crc' (exact) | 'name' (approximate)
+  total: number            // entries in the DAT
+  have: number             // DAT entries owned
+  missingCount: number
+  unknownCount: number     // owned ROMs not in the DAT
+  ran_at: string
+}
+
+export interface AuditSystemReport extends AuditSystemSummary {
+  missing: AuditEntry[]
+  unknown: AuditEntry[]
+}
+
+export interface AuditStatus {
+  running: boolean
+  done: number
+  total: number
+  currentSystem: string | null
+  currentFile: string | null
+  error?: string
+}
+
 // Per-system controller remap. `bindings` maps a RetroArch input suffix
 // (e.g. 'a', 'b', 'start', 'l2') to the RAW joypad button index captured live
 // from the Gamepad API — indices vary by controller/driver, never hardcoded.

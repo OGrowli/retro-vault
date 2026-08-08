@@ -3,6 +3,7 @@ import type {
   HistoryEntry, SessionWithRom, GameList, ListOrder, GameSort,
   ControllerConfig, HotkeyConfig, AudioConfig,
   WifiNetwork, WifiStatus,
+  AuditStatus, AuditSystemSummary, AuditSystemReport,
 } from '@retro-vault/shared'
 
 function filterToParams(filter: GameFilter, userId?: number): string {
@@ -186,6 +187,13 @@ export const api = {
     update: () => post<{ started: boolean; offset: number }>('/system/update'),
     updateLog: (offset: number) =>
       get<{ content: string; offset: number; size: number }>(`/system/update/log?offset=${offset}`),
+  },
+
+  audit: {
+    run: (systems?: string[]) => post<{ started: boolean; running?: boolean }>('/audit/run', systems ? { systems } : {}),
+    status: () => get<AuditStatus>('/audit/status'),
+    report: () => get<AuditSystemSummary[]>('/audit/report'),
+    system: (system: string) => get<AuditSystemReport>(`/audit/report/${system}`),
   },
 
   scrape: {
