@@ -1,5 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
+import type { RomKind } from '@retro-vault/shared'
 import { db } from './db.js'
 
 const ROMS_DIR = '/home/pi/RetroPie/roms'
@@ -25,6 +26,19 @@ export interface ParsedRom {
   region: string | null
   revision: string | null
   full_name: string
+  kind: RomKind
+}
+
+// Classify a ROM by its parenthetical tags. First match wins, so translations
+// (which are the point of interest here) take priority over the generic "hack"
+// catch-all, and prototypes/homebrew are separated from official dumps.
+function classifyKind(tags: string[]): RomKind {
+  const joined = tags.join(' ')
+  if (/translat/i.test(joined)) return 'translation'
+  if (/prototype|proto|beta|sample|demo/i.test(joined)) return 'prototype'
+  if (/homebrew|aftermarket|unl\b|unlicensed|pirate/i.test(joined)) return 'homebrew'
+  if (/\bhack\b/i.test(joined)) return 'hack'
+  return 'official'
 }
 
 export function parseRomFilename(filename: string): ParsedRom {
@@ -51,7 +65,9 @@ export function parseRomFilename(filename: string): ParsedRom {
     if (/^(Beta|Proto|Sample|Demo|Hack|Unl|Pirate)/i.test(tag)) { revision = tag; break }
   }
 
-  return { base_name, region, revision, full_name }
+  const kind = classifyKind(tags)
+
+  return { base_name, region, revision, full_name, kind }
 }
 
 const upsertGame = db.prepare(`
@@ -63,10 +79,25 @@ const upsertGame = db.prepare(`
 const findGame = db.prepare(`SELECT id FROM games WHERE name = ? AND system = ?`)
 
 const upsertRom = db.prepare(`
-  INSERT INTO roms (game_id, system, rom_path, region, revision, full_name)
-  VALUES (@game_id, @system, @rom_path, @region, @revision, @full_name)
+  INSERT INTO roms (game_id, system, rom_path, region, revision, full_name, kind)
+  VALUES (@game_id, @system, @rom_path, @region, @revision, @full_name, @kind)
   ON CONFLICT(rom_path) DO NOTHING
 `)
+
+// One-time reclassification of ROMs imported before `kind` existed. runImport's
+// ON CONFLICT(rom_path) DO NOTHING means re-importing won't touch these, so we
+// recompute kind from full_name for any row missing it. Idempotent + cheap.
+export function backfillRomKinds(): number {
+  const rows = db.prepare('SELECT id, full_name FROM roms WHERE kind IS NULL').all() as
+    Array<{ id: number; full_name: string }>
+  if (rows.length === 0) return 0
+  const update = db.prepare('UPDATE roms SET kind = ? WHERE id = ?')
+  const run = db.transaction((items: typeof rows) => {
+    for (const r of items) update.run(parseRomFilename(r.full_name).kind, r.id)
+  })
+  run(rows)
+  return rows.length
+}
 
 export interface ImportResult {
   games_created: number
@@ -105,7 +136,7 @@ export function runImport(): ImportResult {
           if (!fs.statSync(rom_path).isFile()) continue
         } catch { continue }
 
-        const { base_name, region, revision, full_name } = parseRomFilename(filename)
+        const { base_name, region, revision, full_name, kind } = parseRomFilename(filename)
 
         const gameInsert = upsertGame.run({ name: base_name, system })
         if (gameInsert.changes > 0) result.games_created++
@@ -113,7 +144,7 @@ export function runImport(): ImportResult {
         const game = findGame.get(base_name, system) as { id: number } | undefined
         if (!game) continue
 
-        const romInsert = upsertRom.run({ game_id: game.id, system, rom_path, region, revision, full_name })
+        const romInsert = upsertRom.run({ game_id: game.id, system, rom_path, region, revision, full_name, kind })
         if (romInsert.changes > 0) {
           result.roms_created++
           if (gameInsert.changes === 0) gamesWithNewRoms.add(game.id)

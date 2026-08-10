@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
-import type { Game, GameWithRoms, Rom, User } from '@retro-vault/shared'
+import { Fragment, useState, useEffect, useCallback, useRef } from 'react'
+import type { Game, GameWithRoms, Rom, RomKind, User } from '@retro-vault/shared'
 import { api, bgVariant } from '../api/client'
 import { useGamepad } from '../hooks/useGamepad'
 import { Glyph } from '../components/Glyph'
@@ -35,6 +35,25 @@ function regionFlag(region: string | null): string {
   return REGION_FLAGS[region] ?? '🌐'
 }
 
+// Badge label + colour per variant. Falls back to 'official' for any older row
+// that predates the kind column.
+const KIND_META: Record<RomKind, { label: string; cls: string }> = {
+  official: { label: 'Official', cls: 'bg-emerald-500/15 text-emerald-300' },
+  translation: { label: 'Translation', cls: 'bg-sky-500/15 text-sky-300' },
+  hack: { label: 'Hack', cls: 'bg-amber-500/15 text-amber-300' },
+  prototype: { label: 'Prototype', cls: 'bg-purple-500/15 text-purple-300' },
+  homebrew: { label: 'Homebrew', cls: 'bg-slate-500/20 text-slate-300' },
+}
+
+function kindMeta(kind: RomKind | undefined) {
+  return KIND_META[kind ?? 'official'] ?? KIND_META.official
+}
+
+// Leading glyph: translations read better with a speech glyph than a region flag.
+function romGlyph(rom: Rom): string {
+  return rom.kind === 'translation' ? '🗣' : regionFlag(rom.region)
+}
+
 function RomRow({
   rom,
   focused,
@@ -65,9 +84,19 @@ function RomRow({
           : 'bg-vault-card hover:bg-vault-surface',
       ].join(' ')}
     >
-      <span className="text-2xl flex-shrink-0">{regionFlag(rom.region)}</span>
+      <span className="text-2xl flex-shrink-0">{romGlyph(rom)}</span>
       <div className="flex-1 min-w-0">
-        <p className="text-white text-sm font-semibold truncate">{rom.full_name}</p>
+        <div className="flex items-center gap-2 min-w-0">
+          <p className="text-white text-sm font-semibold truncate">{rom.full_name}</p>
+          <span
+            className={[
+              'flex-shrink-0 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide',
+              kindMeta(rom.kind).cls,
+            ].join(' ')}
+          >
+            {kindMeta(rom.kind).label}
+          </span>
+        </div>
         <p className="text-vault-muted text-xs mt-0.5 uppercase tracking-wide">
           {[rom.region, rom.revision].filter(Boolean).join(' · ') || 'No region info'}
         </p>
@@ -116,7 +145,10 @@ export function GameDetail({ game: initialGame, user, onBack, fromRandom = false
   useEffect(() => {
     api.games.get(game.id).then(d => {
       setDetail(d)
-      if (d.roms.length === 1) setVersionIdx(0)
+      // Land on the first official release rather than index 0 (which, once
+      // sorted, is official anyway — but stays correct if a title is hacks-only).
+      const firstOfficial = d.roms.findIndex(r => r.kind === 'official')
+      setVersionIdx(firstOfficial >= 0 ? firstOfficial : 0)
     }).catch(() => {})
 
     api.users.favorites(user.id).then(favs => {
@@ -126,6 +158,10 @@ export function GameDetail({ game: initialGame, user, onBack, fromRandom = false
 
   const roms = detail?.roms ?? []
   const singleRom = roms.length === 1
+  // When a title has both official and non-official ROMs, split the list under
+  // two subheaders. roms arrive official-first from the API, so the boundary is
+  // just where kind flips.
+  const mixed = roms.some(r => r.kind === 'official') && roms.some(r => r.kind !== 'official')
 
   // Follow the focused version past the scroll bounds.
   useEffect(() => {
@@ -365,22 +401,39 @@ export function GameDetail({ game: initialGame, user, onBack, fromRandom = false
               <p className="text-vault-muted text-sm">No ROMs found for this game.</p>
             ) : (
               <div>
-                {!singleRom && (
+                {!singleRom && !mixed && (
                   <p className="text-vault-muted text-xs uppercase tracking-widest mb-2">
                     Versions — {roms.length} ROM{roms.length !== 1 ? 's' : ''}
                   </p>
                 )}
                 <div className="space-y-2 overflow-y-auto" style={{ maxHeight: '280px', scrollbarWidth: 'none' }}>
-                  {roms.map((rom, i) => (
-                    <RomRow
-                      key={rom.id}
-                      rom={rom}
-                      focused={focusSection === 'versions' && versionIdx === i}
-                      launching={launching === rom.id}
-                      onLaunch={(r) => void launch(r)}
-                      rowRef={(el) => { versionRefs.current[i] = el }}
-                    />
-                  ))}
+                  {roms.map((rom, i) => {
+                    // Subheaders only in mixed mode, emitted at each group boundary.
+                    const officialHdr = mixed && i === 0 && rom.kind === 'official'
+                    const otherHdr = mixed && rom.kind !== 'official'
+                      && (i === 0 || roms[i - 1]!.kind === 'official')
+                    return (
+                      <Fragment key={rom.id}>
+                        {officialHdr && (
+                          <p className="text-vault-muted text-xs uppercase tracking-widest mb-2">
+                            Official Releases
+                          </p>
+                        )}
+                        {otherHdr && (
+                          <p className="text-vault-muted text-xs uppercase tracking-widest mb-2 mt-4">
+                            Translations &amp; Hacks
+                          </p>
+                        )}
+                        <RomRow
+                          rom={rom}
+                          focused={focusSection === 'versions' && versionIdx === i}
+                          launching={launching === rom.id}
+                          onLaunch={(r) => void launch(r)}
+                          rowRef={(el) => { versionRefs.current[i] = el }}
+                        />
+                      </Fragment>
+                    )
+                  })}
                 </div>
               </div>
             )}

@@ -55,6 +55,7 @@ gamesRouter.get('/:id', (c) => {
     WHERE r.game_id = ?
     GROUP BY r.id
     ORDER BY
+      CASE r.kind WHEN 'official' THEN 0 WHEN 'translation' THEN 1 ELSE 2 END,
       CASE WHEN r.region IS NULL THEN 1 ELSE 0 END,
       r.region ASC,
       CASE WHEN r.revision IS NULL THEN 0 ELSE 1 END,

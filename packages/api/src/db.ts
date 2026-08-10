@@ -267,6 +267,12 @@ if (!romCols.has('crc')) {
   db.exec(`ALTER TABLE roms ADD COLUMN crc TEXT`)
 }
 
+// Variant classification (official/translation/hack/…) per ROM, derived from the
+// filename tags. Existing rows are backfilled at startup by backfillRomKinds().
+if (!romCols.has('kind')) {
+  db.exec(`ALTER TABLE roms ADD COLUMN kind TEXT`)
+}
+
 if (schemaVersion < 2) {
   db.exec('PRAGMA user_version = 2')
 }

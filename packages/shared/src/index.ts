@@ -32,6 +32,10 @@ export interface Game {
   rom_count?: number
 }
 
+// Variant classification derived from a ROM's filename tags. 'official' is the
+// default; the rest flag non-original dumps (fan translations, ROM hacks, etc.).
+export type RomKind = 'official' | 'translation' | 'hack' | 'prototype' | 'homebrew'
+
 export interface Rom {
   id: number
   game_id: number
@@ -40,6 +44,7 @@ export interface Rom {
   region: string | null
   revision: string | null
   full_name: string
+  kind: RomKind
   play_count?: number
   last_played?: string | null
 }

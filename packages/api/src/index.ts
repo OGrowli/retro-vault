@@ -21,10 +21,15 @@ import { audioSettingsRouter } from './routes/audio-settings.js'
 import { systemRouter } from './routes/system.js'
 import { wifiRouter } from './routes/wifi.js'
 import { auditRouter } from './routes/audit.js'
+import { backfillRomKinds } from './importer.js'
 import { ensureBgVariant } from './scraper.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const WEB_DIST = path.join(__dirname, '../../web/dist')
+
+// Classify any pre-existing ROMs that predate the `kind` column.
+const backfilled = backfillRomKinds()
+if (backfilled > 0) console.log(`Backfilled kind for ${backfilled} ROM(s)`)
 
 const app = new Hono()
 

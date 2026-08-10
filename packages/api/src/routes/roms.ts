@@ -133,11 +133,11 @@ romsRouter.post('/:id/launch', async (c) => {
   const overridePaths = existingOverridePaths(rom.system)
   const appendConfigArg = overridePaths.length ? `--appendconfig=${overridePaths.join(',')}` : null
 
+  const sysConfig = getSystemConfig(rom.system)
   let cmd: string
   let args: string[]
 
   if (process.platform === 'linux' && fs.existsSync(LAUNCH_WRAPPER)) {
-    const sysConfig = getSystemConfig(rom.system)
     cmd = 'bash'
     args = [LAUNCH_WRAPPER, rom.system, rom.rom_path]
     // Core path lets the wrapper fall back to direct retroarch on non-RetroPie setups
@@ -146,7 +146,6 @@ romsRouter.post('/:id/launch', async (c) => {
     if (appendConfigArg) args.push(appendConfigArg)
   } else {
     // Dev machines / no wrapper: direct retroarch
-    const sysConfig = getSystemConfig(rom.system)
     if (!sysConfig) {
       logEvent({
         category: 'rom_launch',
@@ -228,7 +227,30 @@ romsRouter.post('/:id/launch', async (c) => {
     child.on('exit', (code) => {
       if (!settled && code !== 0) {
         dropSession()
-        settle(c.json({ error: `Launcher exited with code ${code} — check ~/.retrovault/launch.log on the Pi` }, 500))
+        // A fast nonzero exit is a launch failure. Diagnose the likely cause so
+        // the UI shows something actionable instead of a bare exit code. On a
+        // real Pi runcommand may still launch via RetroPie's own emulator, so a
+        // missing core here is the probable — not certain — cause.
+        const coreMissing = !!sysConfig && !fs.existsSync(sysConfig.corePath)
+        let message: string
+        let status: 422 | 500
+        if (coreMissing) {
+          message = `Core not installed for "${rom.system}": ${sysConfig!.corePath}. Install it via RetroPie-Setup, then try again.`
+          status = 422
+        } else if (!sysConfig) {
+          message = `No core is configured for "${rom.system}" in RetroVault, and RetroPie's launcher could not start it (exit ${code}). See ~/.retrovault/launch.log.`
+          status = 422
+        } else {
+          message = `Launcher exited with code ${code} — check ~/.retrovault/launch.log on the Pi`
+          status = 500
+        }
+        logEvent({
+          category: 'rom_launch',
+          message,
+          gameId: rom.game_id,
+          detail: { system: rom.system, romPath: rom.rom_path, code, coreMissing, corePath: sysConfig?.corePath ?? null },
+        })
+        settle(c.json({ error: message }, status))
         return
       }
       finishSession()
