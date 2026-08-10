@@ -63,6 +63,18 @@ app.use('/media/*', async (c, next) => {
     } catch { /* fall through to 404 */ }
   }
   await next()
+  // Box art rarely changes and the kiosk reloads it on every Home view; cache a
+  // day so repeat loads hit the browser disk cache instead of re-decoding. Path
+  // is keyed by game id and overwritten on re-scrape, so keep it revalidatable
+  // rather than immutable.
+  if (c.res.ok) c.header('Cache-Control', 'public, max-age=86400')
+})
+
+// Vite content-hashes asset filenames, so a given /assets/* URL never changes
+// contents — cache it forever and skip the per-load revalidation round trip.
+app.use('/assets/*', async (c, next) => {
+  await next()
+  if (c.res.ok) c.header('Cache-Control', 'public, max-age=31536000, immutable')
 })
 
 app.use(
