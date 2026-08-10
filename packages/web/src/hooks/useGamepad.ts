@@ -67,6 +67,11 @@ export function useGamepad(
     const pads = navigator.getGamepads()
     for (const pad of pads) {
       if (!pad) continue
+      // A DualSense enumerates extra pseudo-gamepads on Linux/Chromium (motion
+      // sensors, touchpad) with mapping === ''. Their axes stream live gyro data
+      // that crosses AXIS_THRESHOLD constantly, causing phantom directional +
+      // random inputs. Only read the real, standard-mapped controller.
+      if (pad.mapping !== 'standard') continue
 
       if (pad.buttons[BTN.DPAD_UP]?.pressed) active.set('up', true)
       if (pad.buttons[BTN.DPAD_DOWN]?.pressed) active.set('down', true)
