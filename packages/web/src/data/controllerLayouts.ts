@@ -13,12 +13,25 @@ export interface BindRow {
   label: string
 }
 
+/** A selectable libretro port-1 device mode (cores with multiple pad modes). */
+export interface DeviceOption {
+  label: string
+  /** libretro device id → input_libretro_device_p1 */
+  value: number
+  /** Short description of what the pad does in this mode */
+  hint: string
+}
+
 export interface SystemLayout {
   label: string
   buttons: BindRow[]
   /** Analog stick → expose a deadzone slider (n64, psx) */
   hasDeadzone?: boolean
   presets: PresetKind[]
+  /** Cores with multiple pad modes (e.g. bluemsx MSX) → expose a device picker */
+  devices?: DeviceOption[]
+  /** Device selected when none saved yet */
+  defaultDevice?: number
 }
 
 const std = (label: string, buttons: BindRow[], opts: Partial<SystemLayout> = {}): SystemLayout => ({
@@ -26,6 +39,8 @@ const std = (label: string, buttons: BindRow[], opts: Partial<SystemLayout> = {}
   buttons,
   presets: opts.presets ?? ['default'],
   ...(opts.hasDeadzone ? { hasDeadzone: true } : {}),
+  ...(opts.devices ? { devices: opts.devices } : {}),
+  ...(opts.defaultDevice !== undefined ? { defaultDevice: opts.defaultDevice } : {}),
 })
 
 const nes: SystemLayout = std('NES', [
@@ -41,6 +56,17 @@ const gb: SystemLayout = std('Game Boy', [
   { key: 'start', label: 'Start' },
   { key: 'select', label: 'Select' },
 ], { presets: ['default', 'swapAB'] })
+
+// bluemsx port modes, shared by MSX and MSX2.
+const MSX_DEVICES: DeviceOption[] = [
+  { label: 'Joystick', value: 1, hint: 'D-pad + 2 fire buttons (joystick games)' },
+  { label: 'Keyboard Map', value: 513, hint: 'D-pad→arrows · A=Enter · B=Space · X=Ctrl · Y=Graph' },
+  { label: 'Keyboard', value: 3, hint: 'Physical / on-screen keyboard only' },
+]
+
+const msx: SystemLayout = std('MSX', [
+  { key: 'a', label: 'Trigger A' }, { key: 'b', label: 'Trigger B' },
+], { presets: ['default', 'swapAB'], devices: MSX_DEVICES, defaultDevice: 1 })
 
 const ngp: SystemLayout = std('Neo Geo Pocket', [
   { key: 'b', label: 'A' },
@@ -92,6 +118,8 @@ export const LAYOUTS: Record<string, SystemLayout> = {
   'sg-1000': std('SG-1000', [
     { key: 'b', label: 'Button 1' }, { key: 'a', label: 'Button 2' },
   ], { presets: ['default', 'swapAB'] }),
+  msx,
+  msx2: { ...msx, label: 'MSX2' },
   gamegear: std('Game Gear', [
     { key: 'b', label: 'Button 1' }, { key: 'a', label: 'Button 2' },
     { key: 'start', label: 'Start' },
@@ -138,7 +166,7 @@ export const LAYOUTS: Record<string, SystemLayout> = {
 // Order shown in the system picker rail.
 export const SYSTEM_ORDER: string[] = [
   'nes', 'snes', 'megadrive', 'mastersystem', 'gb', 'gbc', 'gba', 'n64', 'psx',
-  'fds', 'gamegear', 'neogeo', 'ngp', 'ngpc', 'pcengine', 'sg-1000', 'arcade',
+  'fds', 'gamegear', 'neogeo', 'ngp', 'ngpc', 'pcengine', 'sg-1000', 'msx', 'msx2', 'arcade',
   'atari5200', 'atari7800', 'atarilynx', 'vectrex',
 ]
 

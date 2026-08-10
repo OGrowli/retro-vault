@@ -153,6 +153,13 @@ export interface ControllerConfig {
   bindings: Record<string, number>
   /** 0..1 analog deadzone, for systems with an analog stick (n64, psx) */
   deadzone?: number
+  /**
+   * libretro port-1 device id, written as input_libretro_device_p1. Only used by
+   * systems whose core exposes multiple pad modes — e.g. bluemsx (MSX): 1 =
+   * Joystick, 513 = RetroPad Keyboard Map (D-pad→arrows, A=Enter, B=Space),
+   * 3 = Keyboard. Undefined leaves the core default.
+   */
+  device?: number
 }
 
 // Single global audio config applied to every launch. Mirrors RetroArch's

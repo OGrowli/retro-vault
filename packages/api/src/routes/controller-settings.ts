@@ -29,6 +29,7 @@ controllerSettingsRouter.put('/:system', async (c) => {
   const config: ControllerConfig = {
     bindings: body.bindings ?? {},
     ...(typeof body.deadzone === 'number' ? { deadzone: body.deadzone } : {}),
+    ...(typeof body.device === 'number' ? { device: body.device } : {}),
   }
 
   db.prepare(`

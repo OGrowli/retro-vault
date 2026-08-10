@@ -115,6 +115,10 @@ export function writeControllerOverride(system: string, config: ControllerConfig
   if (typeof config.deadzone === 'number' && config.deadzone >= 0) {
     lines.push(`input_player1_left_analog_deadzone = "${config.deadzone}"`)
   }
+  // libretro port-1 device (e.g. bluemsx MSX joystick vs keyboard-map mode).
+  if (typeof config.device === 'number' && Number.isInteger(config.device) && config.device >= 0) {
+    lines.push(`input_libretro_device_p1 = "${config.device}"`)
+  }
   for (const target of launchTargets(system)) {
     writeCfg(systemCfgPath(target), lines)
     // Mirror into RetroPie's per-system include chain so it applies via runcommand.

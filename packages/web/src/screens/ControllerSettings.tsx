@@ -14,6 +14,7 @@ interface Props {
 
 type FocusItem =
   | { kind: 'picker' }
+  | { kind: 'device' }
   | { kind: 'bind'; bindKey: string }
   | { kind: 'deadzone' }
   | { kind: 'presets' }
@@ -43,7 +44,7 @@ export function ControllerSettings({ onBack }: Props) {
   useEffect(() => {
     let cancelled = false
     api.controllerSettings.get(system)
-      .then(cfg => { if (!cancelled) setConfig({ bindings: cfg.bindings ?? {}, ...(cfg.deadzone !== undefined ? { deadzone: cfg.deadzone } : {}) }) })
+      .then(cfg => { if (!cancelled) setConfig({ bindings: cfg.bindings ?? {}, ...(cfg.deadzone !== undefined ? { deadzone: cfg.deadzone } : {}), ...(cfg.device !== undefined ? { device: cfg.device } : {}) }) })
       .catch(() => { if (!cancelled) setConfig({ bindings: {} }) })
     setFocusedIndex(0)
     setPresetIdx(0)
@@ -53,12 +54,27 @@ export function ControllerSettings({ onBack }: Props) {
 
   const focusItems = useMemo<FocusItem[]>(() => {
     const items: FocusItem[] = [{ kind: 'picker' }]
+    if (layout.devices?.length) items.push({ kind: 'device' })
     for (const b of layout.buttons) items.push({ kind: 'bind', bindKey: b.key })
     if (layout.hasDeadzone) items.push({ kind: 'deadzone' })
     if (layout.presets.length) items.push({ kind: 'presets' })
     items.push({ kind: 'save' })
     return items
   }, [layout])
+
+  // Currently-selected device option (saved value, else the layout default).
+  const deviceValue = config.device ?? layout.defaultDevice ?? layout.devices?.[0]?.value
+  const currentDevice = layout.devices?.find(d => d.value === deviceValue) ?? layout.devices?.[0]
+
+  const cycleDevice = useCallback((dir: 1 | -1) => {
+    const opts = layout.devices
+    if (!opts?.length) return
+    const cur = config.device ?? layout.defaultDevice ?? opts[0].value
+    let i = opts.findIndex(o => o.value === cur)
+    if (i < 0) i = 0
+    const next = opts[(i + dir + opts.length) % opts.length]
+    setConfig(c => ({ ...c, device: next.value }))
+  }, [layout, config.device])
 
   useButtonCapture(binding !== null, (btn) => {
     const key = binding
@@ -117,6 +133,9 @@ export function ControllerSettings({ onBack }: Props) {
     if (item.kind === 'picker') {
       if (action === 'left') changeSystem(-1)
       if (action === 'right') changeSystem(1)
+    } else if (item.kind === 'device') {
+      if (action === 'left') cycleDevice(-1)
+      if (action === 'right') cycleDevice(1)
     } else if (item.kind === 'deadzone') {
       if (action === 'left') setConfig(c => ({ ...c, deadzone: clampDeadzone((c.deadzone ?? 0) - 0.05) }))
       if (action === 'right') setConfig(c => ({ ...c, deadzone: clampDeadzone((c.deadzone ?? 0) + 0.05) }))
@@ -212,6 +231,27 @@ export function ControllerSettings({ onBack }: Props) {
 
           {/* Remap rows + deadzone + presets */}
           <div className="flex-1 min-w-[280px] space-y-2">
+            {!!layout.devices?.length && currentDevice && (() => {
+              const idx = focusItems.findIndex(f => f.kind === 'device')
+              const focused = isFocused('device')
+              return (
+                <div
+                  ref={el => { rowRefs.current[idx] = el }}
+                  onClick={() => { setFocusedIndex(idx); cycleDevice(1) }}
+                  className={[
+                    'px-4 py-3 rounded-xl cursor-pointer transition-colors mb-3',
+                    focused ? 'bg-vault-surface ring-2 ring-vault-accent' : 'bg-vault-card',
+                  ].join(' ')}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-white text-sm font-semibold">Input Device</span>
+                    <span className="text-vault-accent text-sm font-mono">◂ {currentDevice.label} ▸</span>
+                  </div>
+                  <p className="text-vault-muted text-[0.7rem] mt-1">{currentDevice.hint}</p>
+                </div>
+              )
+            })()}
+
             <p className="text-vault-muted text-xs uppercase tracking-widest mb-1">Button Mapping</p>
             {layout.buttons.map((b) => {
               const idx = focusItems.findIndex(f => f.kind === 'bind' && f.bindKey === b.key)
