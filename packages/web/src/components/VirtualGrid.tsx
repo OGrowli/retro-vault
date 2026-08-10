@@ -10,7 +10,12 @@ const VISIBLE_ROWS = 3
 const BUFFER_ROWS = 1
 
 interface Props {
-  games: Game[]
+  /** Total number of games in the (filtered) library — may exceed what's loaded. */
+  total: number
+  /** Resolve a game by absolute index; undefined if its page isn't loaded yet. */
+  getGame: (index: number) => Game | undefined
+  /** Called with the visible index window so the parent can fetch missing pages. */
+  onNeedRange?: (startIndex: number, endIndexExclusive: number) => void
   loading?: boolean
   focusedRow: number
   focusedCol: number
@@ -21,8 +26,8 @@ interface Props {
   title?: string
 }
 
-export function VirtualGrid({ games, loading, focusedRow, focusedCol, isActiveRegion, onFocusGame, onSelectGame, title = 'All Games' }: Props) {
-  const totalRows = Math.ceil(games.length / COLS)
+export function VirtualGrid({ total, getGame, onNeedRange, loading, focusedRow, focusedCol, isActiveRegion, onFocusGame, onSelectGame, title = 'All Games' }: Props) {
+  const totalRows = Math.ceil(total / COLS)
   const windowStartRef = useRef(0)
   const containerRef = useRef<HTMLDivElement>(null)
   const focusedCardRef = useRef<HTMLDivElement>(null)
@@ -42,12 +47,18 @@ export function VirtualGrid({ games, loading, focusedRow, focusedCol, isActiveRe
 
   const windowEnd = Math.min(totalRows, windowStart + VISIBLE_ROWS + BUFFER_ROWS * 2)
 
+  // Ask the parent to load whatever pages back the visible window.
+  useEffect(() => {
+    if (total === 0) return
+    onNeedRange?.(windowStart * COLS, Math.min(total, windowEnd * COLS))
+  }, [windowStart, windowEnd, total, onNeedRange])
+
   useEffect(() => {
     if (!isActiveRegion || !containerRef.current) return
-    const focusedGame = games[focusedRow * COLS + focusedCol]
+    const focusedGame = getGame(focusedRow * COLS + focusedCol)
     if (focusedGame) onFocusGame?.(focusedGame)
     focusedCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-  }, [focusedRow, focusedCol, isActiveRegion, games, onFocusGame])
+  }, [focusedRow, focusedCol, isActiveRegion, getGame, onFocusGame])
 
   const paddingTop = windowStart * (CARD_HEIGHT + GAP)
   const paddingBottom = Math.max(0, (totalRows - windowEnd) * (CARD_HEIGHT + GAP))
@@ -57,12 +68,14 @@ export function VirtualGrid({ games, loading, focusedRow, focusedCol, isActiveRe
     const rowItems = []
     for (let col = 0; col < COLS; col++) {
       const idx = row * COLS + col
-      if (idx >= games.length) break
-      const game = games[idx]
+      if (idx >= total) break
       const focused = isActiveRegion && focusedRow === row && focusedCol === col
+      const game = getGame(idx)
       rowItems.push(
-        <div key={game.id} ref={focused ? focusedCardRef : null}>
-          <GameCard game={game} focused={focused} onClick={onSelectGame} />
+        <div key={idx} ref={focused ? focusedCardRef : null}>
+          {game
+            ? <GameCard game={game} focused={focused} onClick={onSelectGame} />
+            : <SkeletonCard />}
         </div>
       )
     }
@@ -79,7 +92,7 @@ export function VirtualGrid({ games, loading, focusedRow, focusedCol, isActiveRe
         <h2 className="text-white text-lg font-semibold mb-3 tracking-wide">
           {title}
           {!loading && (
-            <span className="text-vault-muted text-sm font-normal"> · {games.length} titles</span>
+            <span className="text-vault-muted text-sm font-normal"> · {total} titles</span>
           )}
         </h2>
       )}
@@ -88,7 +101,7 @@ export function VirtualGrid({ games, loading, focusedRow, focusedCol, isActiveRe
           <div className="flex gap-4 flex-wrap">
             {Array.from({ length: COLS * 2 }, (_, i) => <SkeletonCard key={i} />)}
           </div>
-        ) : games.length === 0 ? (
+        ) : total === 0 ? (
           <p className="text-vault-muted text-sm py-8 text-center">
             No games match the current filters.
           </p>

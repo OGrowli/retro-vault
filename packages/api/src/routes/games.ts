@@ -10,15 +10,41 @@ gamesRouter.get('/', (c) => {
   const filter = parseFilter(query)
   const { where, params } = buildFilterClause(filter, userId)
 
+  // Paginated path: the home grid asks for a window with ?limit=&offset= and
+  // gets { total, items }. Avoids shipping the whole ~13k-row library (2.8 MB)
+  // on every view. rom_count is unused by the grid, so no roms join is needed.
+  const limitRaw = query['limit']
+  if (limitRaw !== undefined) {
+    const limit = Math.max(1, Math.min(1000, parseInt(limitRaw, 10) || 0))
+    const offset = Math.max(0, parseInt(query['offset'] ?? '0', 10) || 0)
+    const { total } = db.prepare(`SELECT COUNT(*) as total FROM games g ${where}`).get(...params) as { total: number }
+    const items = db.prepare(`
+      SELECT g.* FROM games g
+      ${where}
+      ORDER BY g.name ASC
+      LIMIT ? OFFSET ?
+    `).all(...params, limit, offset)
+    return c.json({ total, items })
+  }
+
+  // Unpaginated fallback (full array). Kept for compatibility; no roms join.
   const rows = db.prepare(`
-    SELECT g.*, COUNT(r.id) as rom_count
-    FROM games g
-    LEFT JOIN roms r ON r.game_id = g.id
+    SELECT g.* FROM games g
     ${where}
-    GROUP BY g.id
     ORDER BY g.name ASC
   `).all(...params)
   return c.json(rows)
+})
+
+// Just the matching game ids (ordered), for bulk actions like "add all results
+// to a list" that the paginated client no longer holds in memory.
+gamesRouter.get('/ids', (c) => {
+  const query = c.req.query() as Record<string, string>
+  const userId = query['userId'] ? parseInt(query['userId'], 10) : undefined
+  const filter = parseFilter(query)
+  const { where, params } = buildFilterClause(filter, userId)
+  const rows = db.prepare(`SELECT g.id FROM games g ${where} ORDER BY g.name ASC`).all(...params) as { id: number }[]
+  return c.json(rows.map(r => r.id))
 })
 
 // Must be before /:id so Hono doesn't treat "random" as an id param

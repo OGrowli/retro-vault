@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import type { Game, GameList, User } from '@retro-vault/shared'
+import type { GameList, User } from '@retro-vault/shared'
 import { api } from '../api/client'
 import { useGamepad } from '../hooks/useGamepad'
 import { Glyph } from './Glyph'
@@ -7,8 +7,8 @@ import { VirtualKeyboard } from './VirtualKeyboard'
 import { loadHomePrefs, listOrderOf } from '../prefs'
 
 interface Props {
-  /** The current search/filter results to add. */
-  games: Game[]
+  /** Ids of the current search/filter results to add. */
+  gameIds: number[]
   user: User
   onClose: () => void
   /** Fires with the new list's id after creation, so the home layout can default it hidden. */
@@ -23,7 +23,7 @@ const titles = (n: number) => `${n} title${n === 1 ? '' : 's'}`
 
 // Bulk sibling of AddToListModal: instead of toggling a single game, it adds the
 // whole result set to an existing list or a brand-new one.
-export function AddResultsToListModal({ games, user, onClose, onListCreated, onChanged }: Props) {
+export function AddResultsToListModal({ gameIds, user, onClose, onListCreated, onChanged }: Props) {
   const [step, setStep] = useState<'browse' | 'create'>('browse')
   const [lists, setLists] = useState<GameList[]>([])
   const [loading, setLoading] = useState(true)
@@ -33,8 +33,6 @@ export function AddResultsToListModal({ games, user, onClose, onListCreated, onC
   const [toast, setToast] = useState<string | null>(null)
   // rowRefs[0..lists.length] — last entry is the "New List" row.
   const rowRefs = useRef<(HTMLDivElement | null)[]>([])
-
-  const gameIds = games.map(g => g.id)
 
   useEffect(() => {
     api.lists.forUser(user.id, undefined, listOrderOf(loadHomePrefs(user.id)))
@@ -118,7 +116,7 @@ export function AddResultsToListModal({ games, user, onClose, onListCreated, onC
               <div>
                 <h2 className="text-white text-xl font-extrabold">Add Results to List</h2>
                 <p className="text-vault-accent-bright text-xs font-semibold uppercase tracking-wide mt-0.5">
-                  {titles(games.length)} from your search
+                  {titles(gameIds.length)} from your search
                 </p>
               </div>
 
@@ -189,7 +187,7 @@ export function AddResultsToListModal({ games, user, onClose, onListCreated, onC
               <div>
                 <h2 className="text-white text-xl font-extrabold">New List</h2>
                 <p className="text-vault-accent-bright text-xs font-semibold uppercase tracking-wide mt-0.5">
-                  {titles(games.length)} will be added automatically
+                  {titles(gameIds.length)} will be added automatically
                 </p>
               </div>
 

@@ -34,13 +34,22 @@ interface Props {
 
 const CONTINUE_THRESHOLD = 5 * 60
 
+// Grid page size: enough rows to cover several screens so scrolling rarely waits.
+const PAGE_SIZE = 120
+
 // Focusable columns in a rail: visible cards (capped) plus a Show More tile when there's overflow.
 const railColCount = (len: number) => Math.min(len, RAIL_CAP) + (len > RAIL_CAP ? 1 : 0)
 
 export function Home({ user, systems, genres, filter, homePrefs, onFilterChange, onGameSelect, onRandomView, onSwitchUser, onSettings, onShowMore, onLibraryChange, onListCreated, inputActive = true }: Props) {
   const [recent, setRecent] = useState<Game[]>([])
   const [favorites, setFavorites] = useState<Game[]>([])
-  const [allGames, setAllGames] = useState<Game[]>([])
+  // Paged "All Games" grid: total count + a sparse index→game store filled on
+  // demand as the grid scrolls, instead of holding the whole library in memory.
+  const [gamesTotal, setGamesTotal] = useState(0)
+  const [gamesStore, setGamesStore] = useState<Map<number, Game>>(new Map())
+  const requestedPagesRef = useRef<Set<number>>(new Set())
+  const filterRef = useRef(filter)
+  filterRef.current = filter
   const [lists, setLists] = useState<GameList[]>([])
   const [listGames, setListGames] = useState<Record<number, Game[]>>({})
   const [loading, setLoading] = useState(true)
@@ -56,6 +65,7 @@ export function Home({ user, systems, genres, filter, homePrefs, onFilterChange,
   const [rawHistory, setRawHistory] = useState<HistoryEntry[]>([])
   const [searchVkOpen, setSearchVkOpen] = useState(false)
   const [addToListOpen, setAddToListOpen] = useState(false)
+  const [resultIds, setResultIds] = useState<number[]>([])
   const scrollRef = useRef<HTMLDivElement>(null)
 
   const historyToGames = (history: HistoryEntry[]): Game[] =>
@@ -82,32 +92,55 @@ export function Home({ user, systems, genres, filter, homePrefs, onFilterChange,
     } catch { /* lists are non-critical */ }
   }, [user.id, homePrefs])
 
+  // Load whatever grid pages back the [start, end) index window, once each.
+  // Reads the current filter from a ref so its identity stays stable.
+  const ensureRange = useCallback((start: number, end: number) => {
+    const first = Math.floor(start / PAGE_SIZE)
+    const last = Math.floor(Math.max(start, end - 1) / PAGE_SIZE)
+    for (let pg = first; pg <= last; pg++) {
+      if (requestedPagesRef.current.has(pg)) continue
+      requestedPagesRef.current.add(pg)
+      api.games.page(filterRef.current, user.id, { limit: PAGE_SIZE, offset: pg * PAGE_SIZE })
+        .then(({ total, items }) => {
+          setGamesTotal(total)
+          setGamesStore(prev => {
+            const next = new Map(prev)
+            items.forEach((g, i) => next.set(pg * PAGE_SIZE + i, g))
+            return next
+          })
+        })
+        .catch(() => { requestedPagesRef.current.delete(pg) })
+    }
+  }, [user.id])
+
+  // Discard the grid and reload from page 0 (filter changed or library changed).
+  const resetGrid = useCallback(() => {
+    requestedPagesRef.current = new Set()
+    setGamesStore(new Map())
+    setGamesTotal(0)
+    ensureRange(0, PAGE_SIZE)
+  }, [ensureRange])
+
   useEffect(() => {
     Promise.all([
       api.users.history(user.id),
       api.users.favorites(user.id, gameSortOf(homePrefs)),
-      api.games.list(filter, user.id),
-    ]).then(([history, favs, games]) => {
+    ]).then(([history, favs]) => {
       const recentGames = historyToGames(history)
       setRecent(recentGames)
       setRawHistory(history.slice(0, 40))
       setFavorites(favs)
-      setAllGames(games)
       setLoading(false)
       if (recentGames[0]) setBgGame(recentGames[0])
     }).catch(() => setLoading(false))
     void loadLists()
-    // filter intentionally excluded — it drives refreshGames, not the initial load
-  }, [user.id, loadLists])
+    resetGrid()
+    // filter intentionally excluded — applyFilters drives grid reloads
+  }, [user.id, loadLists, resetGrid])
 
-  const refreshGames = useCallback(async () => {
-    try {
-      const games = await api.games.list(filter, user.id)
-      setAllGames(games)
-    } catch {}
-  }, [filter, user.id])
-
-  // Quiet refresh when returning from GameDetail/Settings (Home stays mounted)
+  // Quiet refresh when returning from GameDetail/Settings (Home stays mounted).
+  // Only history/favorites/lists change from playing a game — the library grid
+  // does not, so it's left cached (no full refetch = no stall on back).
   const prevActiveRef = useRef(inputActive)
   useEffect(() => {
     if (inputActive && !prevActiveRef.current) {
@@ -117,11 +150,10 @@ export function Home({ user, systems, genres, filter, homePrefs, onFilterChange,
           setRawHistory(history.slice(0, 40))
           setFavorites(favs)
         }).catch(() => {})
-      void refreshGames()
       void loadLists()
     }
     prevActiveRef.current = inputActive
-  }, [inputActive, user.id, refreshGames, loadLists])
+  }, [inputActive, user.id, loadLists])
 
   useEffect(() => {
     const art = bgGame?.box_art_path
@@ -151,18 +183,17 @@ export function Home({ user, systems, genres, filter, homePrefs, onFilterChange,
       const result = await api.import.run()
       const { games_created, games_updated, roms_created } = result
       setImportMessage(`+${games_created} games  +${games_updated} updated  +${roms_created} ROMs`)
-      const [games] = await Promise.all([api.games.list(filter, user.id)])
-      setAllGames(games)
+      resetGrid()
       onLibraryChange?.()
     } catch (e) {
       setImportMessage(e instanceof Error ? e.message : 'Import failed')
     } finally {
       setImportLoading(false)
     }
-  }, [filter, user.id, onLibraryChange])
+  }, [resetGrid, onLibraryChange])
 
   function applyFilters() {
-    void refreshGames()
+    resetGrid()
     nav.resetIndex('all-games')
     setFilterOpen(false)
   }
@@ -221,7 +252,7 @@ export function Home({ user, systems, genres, filter, homePrefs, onFilterChange,
 
   const nav = useSpatialNav({
     rails: navRails,
-    allGamesCount: allGames.length,
+    allGamesCount: gamesTotal,
     gridCols: GRID_COLS,
     // The FilterDrawer owns its own gamepad nav now; spatial-nav only needs to
     // know the drawer is open (so it stops snapping the home region) and how to
@@ -232,7 +263,7 @@ export function Home({ user, systems, genres, filter, homePrefs, onFilterChange,
     onSettings,
     onConfirm: (region, row, col) => {
       if (region === 'all-games') {
-        const game = allGames[row * GRID_COLS + col]
+        const game = gamesStore.get(row * GRID_COLS + col)
         if (game) onGameSelect(game)
         return
       }
@@ -249,7 +280,7 @@ export function Home({ user, systems, genres, filter, homePrefs, onFilterChange,
     onBack: onSwitchUser,
     onFavorite: (region, row, col) => {
       let game: Game | undefined
-      if (region === 'all-games') game = allGames[row * GRID_COLS + col]
+      if (region === 'all-games') game = gamesStore.get(row * GRID_COLS + col)
       else game = collectionFor(region)?.games[col]
       if (!game) return
       const g = game
@@ -388,8 +419,10 @@ export function Home({ user, systems, genres, filter, homePrefs, onFilterChange,
         })}
 
         <VirtualGrid
-          games={allGames}
-          loading={loading}
+          total={gamesTotal}
+          getGame={(i) => gamesStore.get(i)}
+          onNeedRange={ensureRange}
+          loading={loading && gamesStore.size === 0}
           focusedRow={gridIdx.row}
           focusedCol={gridIdx.col}
           isActiveRegion={nav.region === 'all-games' && !filterOpen}
@@ -409,8 +442,11 @@ export function Home({ user, systems, genres, filter, homePrefs, onFilterChange,
         onRandom={() => { setFilterOpen(false); void handleRandom() }}
         onImport={() => void handleImport()}
         onSearch={() => setSearchVkOpen(true)}
-        onAddToList={() => { setFilterOpen(false); setAddToListOpen(true) }}
-        resultCount={allGames.length}
+        onAddToList={() => {
+          setFilterOpen(false)
+          void api.games.ids(filter, user.id).then(ids => { setResultIds(ids); setAddToListOpen(true) })
+        }}
+        resultCount={gamesTotal}
         importLoading={importLoading}
         importMessage={importMessage}
         onClose={() => setFilterOpen(false)}
@@ -429,7 +465,7 @@ export function Home({ user, systems, genres, filter, homePrefs, onFilterChange,
 
       {addToListOpen && (
         <AddResultsToListModal
-          games={allGames}
+          gameIds={resultIds}
           user={user}
           onClose={() => setAddToListOpen(false)}
           onListCreated={onListCreated}

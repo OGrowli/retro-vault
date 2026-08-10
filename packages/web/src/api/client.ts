@@ -84,18 +84,46 @@ export interface ScrapeProgress {
   complete: boolean
 }
 
+// Cache for the paginated home grid. Keyed by filter+window; cleared whenever a
+// write could change library membership (import / favorite / scrape). Keeps
+// returning to Home and re-scrolling instant instead of re-fetching pages.
+export interface GamePage { total: number; items: Game[] }
+const gamesPageCache = new Map<string, GamePage>()
+export function invalidateGamesCache(): void { gamesPageCache.clear() }
+
 export const api = {
   games: {
     list: (filter: GameFilter = {}, userId?: number) =>
       get<Game[]>(`/games?${filterToParams(filter, userId)}`),
+    // Windowed fetch for the grid. Cached per filter+offset+limit.
+    page: async (filter: GameFilter = {}, userId: number | undefined, opts: { limit: number; offset: number }): Promise<GamePage> => {
+      const p = filterToParams(filter, userId)
+      const key = `${p}|${opts.offset}|${opts.limit}`
+      const cached = gamesPageCache.get(key)
+      if (cached) return cached
+      const sep = p ? '&' : ''
+      const res = await get<GamePage>(`/games?${p}${sep}limit=${opts.limit}&offset=${opts.offset}`)
+      gamesPageCache.set(key, res)
+      return res
+    },
+    // All matching ids (for bulk "add results to list").
+    ids: (filter: GameFilter = {}, userId?: number) =>
+      get<number[]>(`/games/ids?${filterToParams(filter, userId)}`),
     random: (filter: GameFilter = {}, userId?: number) =>
       get<Game>(`/games/random?${filterToParams(filter, userId)}`),
     get: (id: number) => get<GameWithRoms>(`/games/${id}`),
-    favorite: (id: number, userId: number) =>
-      post<{ favorited: boolean }>(`/games/${id}/favorite`, { userId }),
+    favorite: async (id: number, userId: number) => {
+      const res = await post<{ favorited: boolean }>(`/games/${id}/favorite`, { userId })
+      invalidateGamesCache() // favoritesOnly filter membership may change
+      return res
+    },
     sessions: (id: number) => get<SessionWithRom[]>(`/games/${id}/sessions`),
     // Credentials come from saved settings on the server
-    scrape: (id: number) => post<Game>(`/games/${id}/scrape`),
+    scrape: async (id: number) => {
+      const res = await post<Game>(`/games/${id}/scrape`)
+      invalidateGamesCache() // noMetadata filter + box art change
+      return res
+    },
   },
 
   roms: {
@@ -172,7 +200,11 @@ export const api = {
   },
 
   import: {
-    run: () => post<ImportResult>('/import'),
+    run: async () => {
+      const res = await post<ImportResult>('/import')
+      invalidateGamesCache() // library membership changed
+      return res
+    },
   },
 
   wifi: {
