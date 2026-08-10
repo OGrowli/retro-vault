@@ -6,6 +6,64 @@ import type { AudioConfig, ControllerConfig, HotkeyConfig } from '@retro-vault/s
 const DATA_DIR = process.env['RETROVAULT_DATA_DIR'] ?? path.join(os.homedir(), '.retrovault')
 export const OVERRIDES_DIR = path.join(DATA_DIR, 'retroarch-overrides')
 
+// RetroPie's runcommand.sh ignores the --appendconfig we pass on the CLI, so the
+// ~/.retrovault/retroarch-overrides/*.cfg files never load on a real Pi launch.
+// runcommand DOES include <configs>/<system>/retroarch.cfg (and all/retroarch.cfg)
+// and appends the per-system file to the END of the launch config, so lines there
+// win. Mirror our overrides into that include chain as a delimited, idempotent
+// block so custom controls/hotkeys/audio actually take effect on the Pi. The
+// appendconfig files stay as-is for the dev / direct-retroarch path.
+const RETROPIE_CONFIGS = process.env['RETROVAULT_RETROPIE_CONFIGS'] ?? '/opt/retropie/configs'
+
+function retropieAvailable(): boolean {
+  try {
+    return fs.statSync(RETROPIE_CONFIGS).isDirectory()
+  } catch {
+    return false
+  }
+}
+
+// Replace (or, when lines is empty, remove) a marker-delimited RetroVault block
+// inside an existing RetroPie retroarch.cfg without disturbing the rest of it.
+function writeManagedBlock(file: string, blockId: string, lines: string[]): void {
+  const begin = `# >>> RetroVault managed: ${blockId} >>>`
+  const end = `# <<< RetroVault managed: ${blockId} <<<`
+  let existing = ''
+  try { existing = fs.readFileSync(file, 'utf-8') } catch { /* new file */ }
+
+  // Strip any prior block (and the blank line before it) so writes don't stack up.
+  const stripped = existing.replace(
+    new RegExp(`\\n*${escapeRe(begin)}[\\s\\S]*?${escapeRe(end)}\\n?`, 'g'),
+    '\n'
+  ).replace(/\n{3,}/g, '\n\n')
+
+  if (lines.length === 0) {
+    // Nothing to write: leave the file with the block removed (or untouched).
+    if (stripped !== existing) {
+      fs.mkdirSync(path.dirname(file), { recursive: true })
+      fs.writeFileSync(file, stripped)
+    }
+    return
+  }
+
+  const block = `${begin}\n${lines.join('\n')}\n${end}\n`
+  const body = stripped.length && !stripped.endsWith('\n') ? stripped + '\n' : stripped
+  fs.mkdirSync(path.dirname(file), { recursive: true })
+  fs.writeFileSync(file, body + (body.trim() ? '\n' : '') + block)
+}
+
+function escapeRe(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+function systemRetroarchCfg(system: string): string {
+  return path.join(RETROPIE_CONFIGS, system.toLowerCase(), 'retroarch.cfg')
+}
+
+function allRetroarchCfg(): string {
+  return path.join(RETROPIE_CONFIGS, 'all', 'retroarch.cfg')
+}
+
 // Exit is deliberately NOT user-remappable: gated behind the enable-hotkey
 // modifier it becomes a two-button combo, so a bad rebind can't lock the kiosk.
 const EXIT_BTN_DEFAULT = 9      // Start
@@ -59,6 +117,8 @@ export function writeControllerOverride(system: string, config: ControllerConfig
   }
   for (const target of launchTargets(system)) {
     writeCfg(systemCfgPath(target), lines)
+    // Mirror into RetroPie's per-system include chain so it applies via runcommand.
+    if (retropieAvailable()) writeManagedBlock(systemRetroarchCfg(target), 'controller', lines)
   }
 }
 
@@ -88,6 +148,8 @@ export function writeHotkeyOverride(config: HotkeyConfig): void {
   }
 
   writeCfg(hotkeyCfgPath(), lines)
+  // Hotkeys are global — mirror into all/retroarch.cfg for the runcommand path.
+  if (retropieAvailable()) writeManagedBlock(allRetroarchCfg(), 'hotkeys', lines)
 }
 
 // Writes ~/.retrovault/retroarch-overrides/audio.cfg. Only emits keys the user
@@ -114,6 +176,8 @@ export function writeAudioOverride(config: AudioConfig): void {
   }
 
   writeCfg(audioCfgPath(), lines)
+  // Audio settings are global — mirror into all/retroarch.cfg for the runcommand path.
+  if (retropieAvailable()) writeManagedBlock(allRetroarchCfg(), 'audio', lines)
 }
 
 // Override files (hotkeys + audio first, then the system's) that actually
