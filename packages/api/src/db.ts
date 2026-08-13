@@ -277,6 +277,77 @@ if (schemaVersion < 2) {
   db.exec('PRAGMA user_version = 2')
 }
 
+// v3: collapse duplicate game rows that differ only by naming convention
+// ([!]/[b] tags, case, punctuation) and prune orphan games (no ROM files).
+// Games are grouped by nameKey(name); future imports also key on it (see
+// importer.ts), and a unique index enforces one game per (system, name_key).
+// Guarded by the name_key column so it runs exactly once (incl. fresh installs).
+{
+  const gamesCols2 = new Set(
+    (db.prepare('PRAGMA table_info(games)').all() as Array<{ name: string }>).map(r => r.name)
+  )
+  if (!gamesCols2.has('name_key')) {
+    db.exec('ALTER TABLE games ADD COLUMN name_key TEXT')
+
+    const romCount = db.prepare('SELECT COUNT(*) c FROM roms WHERE game_id = ?')
+    const setKey = db.prepare('UPDATE games SET name_key = ? WHERE id = ?')
+    const setName = db.prepare('UPDATE games SET name = ? WHERE id = ?')
+    const reassignRoms = db.prepare('UPDATE roms SET game_id = ? WHERE game_id = ?')
+    const reassignSessions = db.prepare('UPDATE play_sessions SET game_id = ? WHERE game_id = ?')
+    const moveFav = db.prepare('INSERT OR IGNORE INTO favorites (user_id, game_id) SELECT user_id, ? FROM favorites WHERE game_id = ?')
+    const delFav = db.prepare('DELETE FROM favorites WHERE game_id = ?')
+    const moveList = db.prepare('INSERT OR IGNORE INTO list_games (list_id, game_id) SELECT list_id, ? FROM list_games WHERE game_id = ?')
+    const delList = db.prepare('DELETE FROM list_games WHERE game_id = ?')
+    const delGame = db.prepare('DELETE FROM games WHERE id = ?')
+
+    const migrate = db.transaction(() => {
+      const rows = db.prepare('SELECT id, system, name FROM games').all() as Array<{ id: number; system: string; name: string }>
+      const clusters = new Map<string, Array<{ id: number; name: string }>>()
+      for (const g of rows) {
+        const key = nameKey(g.name) || g.name.toLowerCase()
+        setKey.run(key, g.id)
+        const ck = g.system + '|' + key
+        if (!clusters.has(ck)) clusters.set(ck, [])
+        clusters.get(ck)!.push({ id: g.id, name: g.name })
+      }
+
+      let merged = 0
+      for (const members of clusters.values()) {
+        if (members.length < 2) continue
+        // Canonical row: the one with the most ROMs (tie → lowest id).
+        let canonical = members[0]!.id, best = -1
+        for (const m of members) {
+          const c = (romCount.get(m.id) as { c: number }).c
+          if (c > best || (c === best && m.id < canonical)) { best = c; canonical = m.id }
+        }
+        // Prefer the cleanest display name (no [..]/(..), then shortest).
+        const clean = [...members].sort((a, b) => {
+          const ta = /[[\](]/.test(a.name) ? 1 : 0, tb = /[[\](]/.test(b.name) ? 1 : 0
+          return ta - tb || a.name.length - b.name.length
+        })[0]!.name
+        for (const m of members) {
+          if (m.id === canonical) continue
+          reassignRoms.run(canonical, m.id)
+          reassignSessions.run(canonical, m.id)
+          moveFav.run(canonical, m.id); delFav.run(m.id)
+          moveList.run(canonical, m.id); delList.run(m.id)
+          delGame.run(m.id)
+          merged++
+        }
+        // Rename only after siblings are gone (avoids UNIQUE(name,system) clash).
+        setName.run(clean, canonical)
+      }
+
+      const pruned = db.prepare('DELETE FROM games WHERE id NOT IN (SELECT DISTINCT game_id FROM roms)').run().changes
+      console.log(`DB v3 migration: merged ${merged} duplicate game rows, pruned ${pruned} orphan games`)
+    })
+    migrate()
+
+    // Enforce one game per (system, name_key) so imports can't re-fork dupes.
+    db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_games_system_namekey ON games(system, name_key)')
+  }
+}
+
 export function getSetting(key: string): string | null {
   const row = db.prepare('SELECT value FROM settings WHERE key = ?').get(key) as { value: string } | undefined
   return row?.value ?? null

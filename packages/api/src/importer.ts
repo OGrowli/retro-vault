@@ -1,7 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import type { RomKind } from '@retro-vault/shared'
-import { db } from './db.js'
+import { db, nameKey } from './db.js'
 
 const ROMS_DIR = '/home/pi/RetroPie/roms'
 
@@ -70,13 +70,15 @@ export function parseRomFilename(filename: string): ParsedRom {
   return { base_name, region, revision, full_name, kind }
 }
 
+// Games are grouped by nameKey so different naming conventions for the same
+// title ([!] tags, case, punctuation) collapse into one game.
 const upsertGame = db.prepare(`
-  INSERT INTO games (name, system)
-  VALUES (@name, @system)
-  ON CONFLICT(name, system) DO NOTHING
+  INSERT INTO games (name, system, name_key)
+  VALUES (@name, @system, @key)
+  ON CONFLICT(system, name_key) DO NOTHING
 `)
 
-const findGame = db.prepare(`SELECT id FROM games WHERE name = ? AND system = ?`)
+const findGame = db.prepare(`SELECT id FROM games WHERE system = ? AND name_key = ?`)
 
 const upsertRom = db.prepare(`
   INSERT INTO roms (game_id, system, rom_path, region, revision, full_name, kind)
@@ -137,11 +139,12 @@ export function runImport(): ImportResult {
         } catch { continue }
 
         const { base_name, region, revision, full_name, kind } = parseRomFilename(filename)
+        const key = nameKey(base_name) || base_name.toLowerCase()
 
-        const gameInsert = upsertGame.run({ name: base_name, system })
+        const gameInsert = upsertGame.run({ name: base_name, system, key })
         if (gameInsert.changes > 0) result.games_created++
 
-        const game = findGame.get(base_name, system) as { id: number } | undefined
+        const game = findGame.get(system, key) as { id: number } | undefined
         if (!game) continue
 
         const romInsert = upsertRom.run({ game_id: game.id, system, rom_path, region, revision, full_name, kind })
