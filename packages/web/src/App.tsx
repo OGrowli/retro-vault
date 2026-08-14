@@ -194,7 +194,7 @@ export function App() {
           user={currentUser}
           systems={systems}
           genres={genres}
-          filter={filter}
+          filter={{ ...filter, includeAdult: homePrefs.showAdult || undefined }}
           homePrefs={homePrefs}
           onFilterChange={setFilter}
           onGameSelect={handleGameSelect}
@@ -230,6 +230,8 @@ export function App() {
       {screen === 'settings' && (
         <Settings
           onBack={goBack}
+          homePrefs={homePrefs}
+          onHomePrefsChange={setHomePrefs}
           onOpenHome={() => setScreen('home-settings')}
           onOpenWifi={() => setScreen('wifi-settings')}
           onOpenScraping={() => setScreen('scrape-settings')}

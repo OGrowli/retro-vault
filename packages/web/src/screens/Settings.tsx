@@ -1,4 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
+import type { HomePrefs } from '@retro-vault/shared'
 import { api } from '../api/client'
 import { useGamepad } from '../hooks/useGamepad'
 import { Glyph } from '../components/Glyph'
@@ -104,6 +105,8 @@ function UpdateProgressModal({ startOffset, onClose }: { startOffset: number; on
 
 interface Props {
   onBack: () => void
+  homePrefs: HomePrefs
+  onHomePrefsChange: (prefs: HomePrefs) => void
   onOpenHome: () => void
   onOpenWifi: () => void
   onOpenScraping: () => void
@@ -113,7 +116,7 @@ interface Props {
   onOpenRomAudit: () => void
 }
 
-const FOCUS_ITEMS = ['home', 'wifi', 'scraping', 'controllers', 'hotkeys', 'audio', 'rom-audit', 'update', 'back'] as const
+const FOCUS_ITEMS = ['adult', 'home', 'wifi', 'scraping', 'controllers', 'hotkeys', 'audio', 'rom-audit', 'update', 'back'] as const
 type FocusItem = (typeof FOCUS_ITEMS)[number]
 
 // Rebooting the device is disruptive — gate the update behind an explicit
@@ -173,7 +176,7 @@ function UpdateConfirmModal({ updating, onConfirm, onCancel }: {
   )
 }
 
-export function Settings({ onBack, onOpenHome, onOpenWifi, onOpenScraping, onOpenControllers, onOpenHotkeys, onOpenAudio, onOpenRomAudit }: Props) {
+export function Settings({ onBack, homePrefs, onHomePrefsChange, onOpenHome, onOpenWifi, onOpenScraping, onOpenControllers, onOpenHotkeys, onOpenAudio, onOpenRomAudit }: Props) {
   const [focused, setFocused] = useState<FocusItem>('home')
   const [updateOpen, setUpdateOpen] = useState(false)
   const [updating, setUpdating] = useState(false)
@@ -203,7 +206,12 @@ export function Settings({ onBack, onOpenHome, onOpenWifi, onOpenScraping, onOpe
     }
   }, [])
 
+  const toggleAdult = useCallback(() => {
+    onHomePrefsChange({ ...homePrefs, showAdult: !homePrefs.showAdult })
+  }, [homePrefs, onHomePrefsChange])
+
   const activate = useCallback((item: FocusItem) => {
+    if (item === 'adult') toggleAdult()
     if (item === 'home') onOpenHome()
     if (item === 'wifi') onOpenWifi()
     if (item === 'scraping') onOpenScraping()
@@ -213,7 +221,7 @@ export function Settings({ onBack, onOpenHome, onOpenWifi, onOpenScraping, onOpe
     if (item === 'rom-audit') onOpenRomAudit()
     if (item === 'update') setUpdateOpen(true)
     if (item === 'back') onBack()
-  }, [onOpenHome, onOpenWifi, onOpenScraping, onOpenControllers, onOpenHotkeys, onOpenAudio, onBack])
+  }, [toggleAdult, onOpenHome, onOpenWifi, onOpenScraping, onOpenControllers, onOpenHotkeys, onOpenAudio, onOpenRomAudit, onBack])
 
   useGamepad((action) => {
     if (action === 'back') { onBack(); return }
@@ -245,6 +253,32 @@ export function Settings({ onBack, onOpenHome, onOpenWifi, onOpenScraping, onOpe
 
       <div className="flex-1 overflow-y-auto px-[5%] py-8" style={{ scrollbarWidth: 'none' }}>
         <div className="space-y-3 max-w-lg">
+          <button
+            ref={setRef('adult')}
+            onClick={toggleAdult}
+            onMouseEnter={() => setFocused('adult')}
+            className={[
+              'w-full py-4 rounded-xl text-left px-5 flex items-center gap-4',
+              'bg-vault-surface border border-vault-muted transition-colors duration-150 motion-reduce:transition-none',
+              isFocused('adult') ? 'ring-2 ring-white border-vault-accent' : '',
+            ].join(' ')}
+          >
+            <div className="flex-1 min-w-0">
+              <span className="block text-white font-bold uppercase tracking-wide text-sm">Show Adult Titles</span>
+              <span className="block text-vault-muted text-[0.7rem] font-normal normal-case tracking-normal mt-0.5">
+                Reveal adult-flagged games in the grid, search &amp; random
+              </span>
+            </div>
+            <span
+              className={[
+                'flex-shrink-0 w-12 h-7 rounded-full flex items-center px-1 transition-colors duration-150',
+                homePrefs.showAdult ? 'bg-vault-accent justify-end' : 'bg-vault-bg justify-start',
+              ].join(' ')}
+            >
+              <span className="w-5 h-5 rounded-full bg-white" />
+            </span>
+          </button>
+
           {menu.map(({ item, title, subtitle }) => (
             <button
               key={item}

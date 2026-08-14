@@ -103,6 +103,8 @@ export interface HomePrefs {
   listOrder?: ListOrder
   /** Order of games within a list / Favorites. Defaults to DEFAULT_GAME_SORT. */
   gameSort?: GameSort
+  /** Reveal adult-flagged titles in the grid, search, and random. Default false. */
+  showAdult?: boolean
 }
 
 // A selectable collection in the full-screen list view. Games are preloaded so
