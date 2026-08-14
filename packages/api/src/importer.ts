@@ -8,6 +8,8 @@ const ROMS_DIR = '/home/pi/RetroPie/roms'
 const EXCLUDE_EXTENSIONS = new Set([
   '.txt', '.xml', '.sh', '.cfg', '.srm', '.state', '.png', '.jpg',
   '.gif', '.bmp', '.mp3', '.ogg', '.db', '.dat', '.nfo', '.cue',
+  // MSU-1 audio + bsnes/higan manifests (Satellaview sets) — not games.
+  '.pcm', '.msu', '.bml', '.wav',
 ])
 
 const REGION_MAP: Record<string, string> = {

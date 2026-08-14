@@ -17,6 +17,11 @@ export const SYSTEMS: Record<string, SystemConfig> = {
     corePath: `${CORES_ROOT}/lr-snes9x/snes9x_libretro.so`,
     extensions: ['.smc', '.sfc', '.zip'],
   },
+  satellaview: {
+    displayName: 'Satellaview',
+    corePath: `${CORES_ROOT}/lr-snes9x/snes9x_libretro.so`,
+    extensions: ['.bs', '.sfc', '.smc', '.zip'],
+  },
   n64: {
     displayName: 'Nintendo 64',
     corePath: `${CORES_ROOT}/lr-mupen64plus-next/mupen64plus_next_libretro.so`,
