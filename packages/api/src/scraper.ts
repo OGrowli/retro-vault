@@ -34,6 +34,7 @@ export const SCREENSCRAPER_SYSTEM_IDS: Record<string, number> = {
   atarijaguar: 27,
   atarilynx: 28,
   amstradcpc: 65,
+  samcoupe: 213,
   coleco: 48,
   channelf: 80,
   intellivision: 115,
@@ -53,6 +54,7 @@ export const SCREENSCRAPER_SYSTEM_IDS: Record<string, number> = {
   wonderswan: 45,
   wonderswancolor: 46,
   sufami: 108,
+  satellaview: 107,
   // Extra aliases not in SYSTEMS but cheap to keep
   ngp: 25,
   ngpc: 82,
