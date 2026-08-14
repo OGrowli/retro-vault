@@ -273,6 +273,15 @@ if (!romCols.has('kind')) {
   db.exec(`ALTER TABLE roms ADD COLUMN kind TEXT`)
 }
 
+// Adult flag per game. Hidden from the grid, search, and random by default
+// (see buildFilterClause) unless the filter opts in with includeAdult.
+const gameColsAdult = new Set(
+  (db.prepare('PRAGMA table_info(games)').all() as Array<{ name: string }>).map(r => r.name)
+)
+if (!gameColsAdult.has('adult')) {
+  db.exec(`ALTER TABLE games ADD COLUMN adult INTEGER NOT NULL DEFAULT 0`)
+}
+
 if (schemaVersion < 2) {
   db.exec('PRAGMA user_version = 2')
 }
@@ -369,6 +378,10 @@ export function buildFilterClause(filter: GameFilter, userId?: number): FilterCl
   const conditions: string[] = []
   const params: (string | number)[] = []
 
+  // Adult titles are hidden everywhere (grid/search/random all build from here)
+  // unless the caller explicitly opts in.
+  if (!filter.includeAdult) conditions.push('g.adult = 0')
+
   if (filter.systems?.length) {
     conditions.push(`g.system IN (${filter.systems.map(() => '?').join(',')})`)
     params.push(...filter.systems)
@@ -452,6 +465,8 @@ export function parseFilter(query: Record<string, string | string[]>): GameFilte
     const n = parseInt(listId as string, 10)
     if (!Number.isNaN(n)) filter.listId = n
   }
+
+  if (query['includeAdult'] === 'true') filter.includeAdult = true
 
   return filter
 }

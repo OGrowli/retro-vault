@@ -18,6 +18,7 @@ function filterToParams(filter: GameFilter, userId?: number): string {
   if (filter.noMetadata) p.set('noMetadata', 'true')
   if (filter.query) p.set('query', filter.query)
   if (filter.listId !== undefined) p.set('listId', String(filter.listId))
+  if (filter.includeAdult) p.set('includeAdult', 'true')
   return p.toString()
 }
 

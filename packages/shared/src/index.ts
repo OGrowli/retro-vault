@@ -10,6 +10,9 @@ export type GameFilter = {
   userId?: string
   /** Scope results to a premade list — search & random operate within it. */
   listId?: number
+  /** Include adult-flagged games. Off by default → they're hidden from the
+   *  grid, search, and random unless the user explicitly opts in. */
+  includeAdult?: boolean
 }
 
 export interface User {
