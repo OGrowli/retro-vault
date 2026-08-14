@@ -282,6 +282,12 @@ if (!gameColsAdult.has('adult')) {
   db.exec(`ALTER TABLE games ADD COLUMN adult INTEGER NOT NULL DEFAULT 0`)
 }
 
+// Whether a ROM came from a trusted curated collection. Set out-of-band after a
+// curated import; used to rank it as a game's default variant (see routes/games).
+if (!romCols.has('curated')) {
+  db.exec(`ALTER TABLE roms ADD COLUMN curated INTEGER NOT NULL DEFAULT 0`)
+}
+
 if (schemaVersion < 2) {
   db.exec('PRAGMA user_version = 2')
 }
