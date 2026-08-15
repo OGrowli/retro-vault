@@ -8,7 +8,8 @@
 # relaunched kiosk boots to the landing/choice screen.
 #
 # Usage:
-#   launch-doom.sh iwad            # default IWAD, no custom WAD
+#   launch-doom.sh iwad            # default (auto-detected) IWAD, no custom WAD
+#   launch-doom.sh iwad <file>     # a specific base-game IWAD from $DOOM_DIR
 #   launch-doom.sh wad <file>      # custom PWAD from $DOOM_DIR on top of an IWAD
 #   launch-doom.sh online          # jump to the online server browser
 # Logs: ~/.retrovault/doom.log
@@ -50,20 +51,25 @@ find_iwad() {
   done
 }
 
+# $1 = explicit IWAD filename (optional), $2 = custom PWAD filename (optional)
 run_local() {
-  local port iwad
+  local iwad_name="$1" pwad_name="$2" port iwad
   port="$(find_port)"
   if [ -z "$port" ]; then
     echo "ERROR: no Doom port binary found. Install one (e.g. lzdoom via RetroPie-Setup) or set DOOM_PORT_BIN."
     exit 1
   fi
-  iwad="$(find_iwad)"
+  if [ -n "$iwad_name" ] && [ -f "$DOOM_DIR/$iwad_name" ]; then
+    iwad="$DOOM_DIR/$iwad_name"
+  else
+    iwad="$(find_iwad)"
+  fi
   if [ -z "$iwad" ]; then
     echo "ERROR: no IWAD in $DOOM_DIR (drop doom2.wad / freedoom2.wad there)."
     exit 1
   fi
   local args=(-iwad "$iwad" -fullscreen)
-  if [ -n "$WAD" ]; then args+=(-file "$DOOM_DIR/$WAD"); fi
+  if [ -n "$pwad_name" ]; then args+=(-file "$DOOM_DIR/$pwad_name"); fi
   echo "=== running: $port ${args[*]}"
   sudo openvt -c 1 -s -w -f -- sudo -u pi -H "$port" "${args[@]}"
   return $?
@@ -93,8 +99,9 @@ done
 sudo pkill -KILL -t tty1 2>/dev/null
 
 case "$MODE" in
-  online) run_online; RC=$? ;;
-  *)      run_local;  RC=$? ;;
+  online) run_online;      RC=$? ;;
+  wad)    run_local "" "$WAD"; RC=$? ;;   # $WAD is a custom PWAD
+  *)      run_local "$WAD" ""; RC=$? ;;   # iwad mode: $WAD is an optional base IWAD
 esac
 
 echo "=== $(date -Is) doom exited (code $RC)"

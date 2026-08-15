@@ -8,12 +8,32 @@ interface Props {
   onBack: () => void
 }
 
+type Item =
+  | { kind: 'online' }
+  | { kind: 'iwad'; name: string }
+  | { kind: 'wad'; name: string }
+
+// Friendly names for the recognised base games; falls back to the filename.
+const IWAD_LABELS: Record<string, string> = {
+  'doom.wad': 'Doom',
+  'doom1.wad': 'Doom (Shareware)',
+  'doom2.wad': 'Doom II',
+  'tnt.wad': 'Final Doom — TNT: Evilution',
+  'plutonia.wad': 'Final Doom — The Plutonia Experiment',
+  'freedoom1.wad': 'Freedoom: Phase 1',
+  'freedoom2.wad': 'Freedoom: Phase 2',
+  'heretic.wad': 'Heretic',
+  'hexen.wad': 'Hexen',
+  'strife1.wad': 'Strife',
+  'chex.wad': 'Chex Quest',
+}
+const iwadLabel = (f: string) => IWAD_LABELS[f.toLowerCase()] ?? f
+
 // Simple folder-listing launcher — NOT wired into the SQLite game/scrape
-// pipeline. Row 0 is always "Online" (server browser); the rest are custom
-// PWADs found in the Doom folder.
+// pipeline. Row order: Online (server browser), base games, then custom PWADs.
 export function Doom({ onBack }: Props) {
+  const [iwads, setIwads] = useState<string[]>([])
   const [wads, setWads] = useState<string[]>([])
-  const [hasIwad, setHasIwad] = useState(true)
   const [dir, setDir] = useState('')
   const [loading, setLoading] = useState(true)
   const [focus, setFocus] = useState(0)
@@ -23,26 +43,30 @@ export function Doom({ onBack }: Props) {
 
   useEffect(() => {
     api.doom.wads()
-      .then(r => { setWads(r.wads); setHasIwad(r.hasIwad); setDir(r.dir); setLoading(false) })
+      .then(r => { setIwads(r.iwads); setWads(r.wads); setDir(r.dir); setLoading(false) })
       .catch(() => setLoading(false))
   }, [])
 
-  // rows: [Online, ...wads]
-  const rowCount = 1 + wads.length
+  const items: Item[] = [
+    { kind: 'online' },
+    ...iwads.map(name => ({ kind: 'iwad', name } as const)),
+    ...wads.map(name => ({ kind: 'wad', name } as const)),
+  ]
+  const hasIwad = iwads.length > 0
 
   useEffect(() => {
     rowRefs.current[focus]?.scrollIntoView({ block: 'nearest' })
   }, [focus])
 
-  const launch = useCallback(async (opts: { online?: boolean; wad?: string }) => {
+  const launch = useCallback(async (opts: { online?: boolean; iwad?: string; wad?: string }) => {
     if (launching) return
     setLaunching(true)
     setError(null)
     try {
       await api.doom.launch(opts)
       // On success the kiosk tears down and Chromium relaunches to the landing
-      // screen; nothing more to do here. If we're still mounted after a moment,
-      // the launch didn't take the display (dev machine) — clear the spinner.
+      // screen; nothing more to do. If we're still here after a moment, the
+      // launch didn't take the display (dev machine) — clear the spinner.
       setTimeout(() => setLaunching(false), 4000)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Launch failed')
@@ -51,16 +75,18 @@ export function Doom({ onBack }: Props) {
   }, [launching])
 
   const activate = useCallback((idx: number) => {
-    if (idx === 0) { void launch({ online: true }); return }
-    const wad = wads[idx - 1]
-    if (wad) void launch({ wad })
-  }, [wads, launch])
+    const item = items[idx]
+    if (!item) return
+    if (item.kind === 'online') void launch({ online: true })
+    else if (item.kind === 'iwad') void launch({ iwad: item.name })
+    else void launch({ wad: item.name })
+  }, [items, launch])
 
   useGamepad((action) => {
     if (launching) return
     if (action === 'back') { onBack(); return }
     if (action === 'up') setFocus(i => Math.max(0, i - 1))
-    if (action === 'down') setFocus(i => Math.min(rowCount - 1, i + 1))
+    if (action === 'down') setFocus(i => Math.min(items.length - 1, i + 1))
     if (action === 'confirm') activate(focus)
   }, true)
 
@@ -86,6 +112,10 @@ export function Doom({ onBack }: Props) {
     )
   }
 
+  const Header = ({ text }: { text: string }) => (
+    <p className="text-vault-muted text-xs uppercase tracking-widest mt-4 mb-1 px-1">{text}</p>
+  )
+
   return (
     <div className="fixed inset-0 bg-vault-bg flex flex-col">
       <div className="flex items-center justify-between px-[5%] pt-[3%]">
@@ -104,16 +134,19 @@ export function Doom({ onBack }: Props) {
             <>
               <Row idx={0} label="Online — Server Browser" sub="Browse & join live public games" />
 
-              {wads.length > 0 && (
-                <p className="text-vault-muted text-xs uppercase tracking-widest mt-4 mb-1 px-1">Custom WADs</p>
-              )}
-              {wads.map((w, i) => (
-                <Row key={w} idx={i + 1} label={w} dim={!hasIwad} />
+              {iwads.length > 0 && <Header text="Base Games" />}
+              {iwads.map((f, i) => (
+                <Row key={f} idx={1 + i} label={iwadLabel(f)} sub={f} />
               ))}
 
-              {wads.length === 0 && (
+              {wads.length > 0 && <Header text="Custom WADs" />}
+              {wads.map((w, i) => (
+                <Row key={w} idx={1 + iwads.length + i} label={w} dim={!hasIwad} />
+              ))}
+
+              {iwads.length === 0 && wads.length === 0 && (
                 <p className="text-vault-muted text-sm text-center py-4">
-                  No custom WADs found. Drop .wad / .pk3 files in{dir ? ` ${dir}` : ' the Doom folder'} to list them here.
+                  No WADs found. Drop IWADs / .wad / .pk3 files in{dir ? ` ${dir}` : ' the Doom folder'} to list them here.
                 </p>
               )}
               {!hasIwad && wads.length > 0 && (

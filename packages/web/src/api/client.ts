@@ -230,8 +230,8 @@ export const api = {
   },
 
   doom: {
-    wads: () => get<{ dir: string; wads: string[]; hasIwad: boolean }>('/doom/wads'),
-    launch: (opts: { online?: boolean; wad?: string } = {}) =>
+    wads: () => get<{ dir: string; iwads: string[]; wads: string[] }>('/doom/wads'),
+    launch: (opts: { online?: boolean; iwad?: string; wad?: string } = {}) =>
       post<{ launched: boolean; pid?: number }>('/doom/launch', opts),
   },
 
