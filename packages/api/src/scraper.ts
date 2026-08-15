@@ -55,6 +55,7 @@ export const SCREENSCRAPER_SYSTEM_IDS: Record<string, number> = {
   wonderswancolor: 46,
   sufami: 108,
   satellaview: 107,
+  pico: 250,
   // Extra aliases not in SYSTEMS but cheap to keep
   ngp: 25,
   ngpc: 82,
@@ -81,6 +82,7 @@ const LIBRETRO_THUMB_SYSTEMS: Record<string, string> = {
   neogeo: 'SNK - Neo Geo',
   ngp: 'SNK - Neo Geo Pocket',
   ngpc: 'SNK - Neo Geo Pocket Color',
+  pico: 'Sega - PICO',
   arcade: 'FBNeo - Arcade Games',
   fba: 'FBNeo - Arcade Games',
   fbneo: 'FBNeo - Arcade Games',

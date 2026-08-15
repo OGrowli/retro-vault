@@ -179,6 +179,11 @@ export const SYSTEMS: Record<string, SystemConfig> = {
     corePath: `${CORES_ROOT}/lr-picodrive/picodrive_libretro.so`,
     extensions: ['.32x', '.bin', '.smd', '.zip'],
   },
+  pico: {
+    displayName: 'Sega Pico',
+    corePath: `${CORES_ROOT}/lr-picodrive/picodrive_libretro.so`,
+    extensions: ['.md', '.bin', '.zip'],
+  },
   gamegear: {
     displayName: 'Game Gear',
     corePath: `${CORES_ROOT}/lr-genesis-plus-gx/genesis_plus_gx_libretro.so`,
