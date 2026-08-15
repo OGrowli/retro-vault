@@ -20,10 +20,10 @@ export function AddToListModal({ game, user, onClose, onListCreated }: Props) {
   const [step, setStep] = useState<'browse' | 'create'>('browse')
   const [lists, setLists] = useState<GameList[]>([])
   const [loading, setLoading] = useState(true)
-  const [focusIdx, setFocusIdx] = useState(0) // 0..lists.length; last index = "New List"
+  const [focusIdx, setFocusIdx] = useState(0) // 0..lists.length; index 0 = "New List"
   const [newName, setNewName] = useState('')
   const [toast, setToast] = useState<string | null>(null)
-  // rowRefs[0..lists.length] — last entry is the "New List" row.
+  // rowRefs[0..lists.length] — index 0 is the "New List" row, 1..N are lists.
   const rowRefs = useRef<(HTMLDivElement | null)[]>([])
 
   useEffect(() => {
@@ -62,7 +62,7 @@ export function AddToListModal({ game, user, onClose, onListCreated }: Props) {
       await api.lists.toggle(created.id, game.id)
       onListCreated?.(created.id)
       setLists(prev => [{ ...created, game_count: 1, included: true }, ...prev])
-      setFocusIdx(0)
+      setFocusIdx(1) // land on the just-created list (index 0 is the "New List" row)
       setStep('browse')
       setNewName('')
       showToast(`Created "${name}" and added ${game.name}`)
@@ -84,8 +84,8 @@ export function AddToListModal({ game, user, onClose, onListCreated }: Props) {
     if (action === 'up') setFocusIdx(i => clamp(i - 1, 0, rowCount - 1))
     if (action === 'down') setFocusIdx(i => clamp(i + 1, 0, rowCount - 1))
     if (action === 'confirm') {
-      if (focusIdx === lists.length) { setStep('create'); return }
-      const list = lists[focusIdx]
+      if (focusIdx === 0) { setStep('create'); return }
+      const list = lists[focusIdx - 1]
       if (list) toggleList(list)
     }
   }, step === 'browse')
@@ -110,16 +110,35 @@ export function AddToListModal({ game, user, onClose, onListCreated }: Props) {
                   <p className="text-vault-muted text-sm text-center py-4">Loading lists…</p>
                 ) : (
                   <>
+                    <div
+                      ref={el => { rowRefs.current[0] = el }}
+                      onMouseEnter={() => setFocusIdx(0)}
+                      onClick={() => setStep('create')}
+                      className={[
+                        'flex items-center gap-3.5 px-3.5 py-3 rounded-2xl cursor-pointer',
+                        'border border-dashed transition-colors duration-150 motion-reduce:transition-none',
+                        focusIdx === 0 ? 'border-vault-accent' : 'border-vault-muted',
+                      ].join(' ')}
+                    >
+                      <span className="w-[22px] h-[22px] rounded-full flex-shrink-0 flex items-center justify-center border border-dashed border-vault-muted">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-vault-muted">
+                          <line x1="12" y1="5" x2="12" y2="19" />
+                          <line x1="5" y1="12" x2="19" y2="12" />
+                        </svg>
+                      </span>
+                      <span className="flex-1 text-[0.92rem] font-semibold text-vault-muted">New List</span>
+                    </div>
+
                     {lists.length === 0 && (
-                      <p className="text-vault-muted text-sm text-center py-4">No lists yet — create your first one below.</p>
+                      <p className="text-vault-muted text-sm text-center py-4">No lists yet — create your first one above.</p>
                     )}
                     {lists.map((list, i) => {
-                      const focused = focusIdx === i
+                      const focused = focusIdx === i + 1
                       return (
                         <div
                           key={list.id}
-                          ref={el => { rowRefs.current[i] = el }}
-                          onMouseEnter={() => setFocusIdx(i)}
+                          ref={el => { rowRefs.current[i + 1] = el }}
+                          onMouseEnter={() => setFocusIdx(i + 1)}
                           onClick={() => toggleList(list)}
                           className={[
                             'flex items-center gap-3.5 px-3.5 py-3 rounded-2xl bg-vault-surface cursor-pointer',
@@ -146,25 +165,6 @@ export function AddToListModal({ game, user, onClose, onListCreated }: Props) {
                         </div>
                       )
                     })}
-
-                    <div
-                      ref={el => { rowRefs.current[lists.length] = el }}
-                      onMouseEnter={() => setFocusIdx(lists.length)}
-                      onClick={() => setStep('create')}
-                      className={[
-                        'flex items-center gap-3.5 px-3.5 py-3 rounded-2xl cursor-pointer',
-                        'border border-dashed transition-colors duration-150 motion-reduce:transition-none',
-                        focusIdx === lists.length ? 'border-vault-accent' : 'border-vault-muted',
-                      ].join(' ')}
-                    >
-                      <span className="w-[22px] h-[22px] rounded-full flex-shrink-0 flex items-center justify-center border border-dashed border-vault-muted">
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-vault-muted">
-                          <line x1="12" y1="5" x2="12" y2="19" />
-                          <line x1="5" y1="12" x2="19" y2="12" />
-                        </svg>
-                      </span>
-                      <span className="flex-1 text-[0.92rem] font-semibold text-vault-muted">New List</span>
-                    </div>
                   </>
                 )}
               </div>

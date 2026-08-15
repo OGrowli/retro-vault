@@ -174,16 +174,20 @@ export function ListView({ sources, activeKey: initialKey, onBack, onGameSelect,
   const activeSource = sources.find(s => s.key === activeKey) ?? sources[0]
   const games = activeSource?.games ?? []
   const title = activeSource?.label ?? 'List'
+  const pendingCount = games.reduce((n, g) => n + (g.scraped_at ? 0 : 1), 0)
 
   // Scrape every game in the active collection, one at a time so we don't
-  // hammer ScreenScraper. Individual failures are counted, not fatal.
+  // hammer ScreenScraper. Already-scraped games are skipped; individual
+  // failures are counted, not fatal.
   const runScrape = async () => {
-    if (!games.length || scrape?.running) return
+    if (scrape?.running) return
+    const pending = games.filter(g => !g.scraped_at)
+    if (!pending.length) return
     cancelRef.current = false
-    setScrape({ total: games.length, done: 0, failed: 0, current: null, running: true })
+    setScrape({ total: pending.length, done: 0, failed: 0, current: null, running: true })
     let done = 0
     let failed = 0
-    for (const g of games) {
+    for (const g of pending) {
       if (cancelRef.current) break
       setScrape(s => (s ? { ...s, current: g.name } : s))
       try {
@@ -332,16 +336,19 @@ export function ListView({ sources, activeKey: initialKey, onBack, onGameSelect,
             <button
               onClick={() => void runScrape()}
               onMouseEnter={() => setFocusedIndex(SCRAPE_INDEX)}
+              disabled={pendingCount === 0}
               className={[
                 'px-4 py-2 rounded-xl text-sm font-bold uppercase tracking-wide inline-flex items-center gap-2',
                 'border transition-colors duration-150 motion-reduce:transition-none',
-                focusedIndex === SCRAPE_INDEX && !dropdownOpen
-                  ? 'ring-2 ring-white border-vault-accent bg-vault-surface text-white'
-                  : 'border-vault-muted text-vault-muted hover:text-white',
+                pendingCount === 0
+                  ? 'border-vault-muted/40 text-vault-muted/40 cursor-default'
+                  : focusedIndex === SCRAPE_INDEX && !dropdownOpen
+                    ? 'ring-2 ring-white border-vault-accent bg-vault-surface text-white'
+                    : 'border-vault-muted text-vault-muted hover:text-white',
               ].join(' ')}
-              title="Scrape metadata for every game in this list"
+              title="Scrape metadata for unscraped games in this list"
             >
-              <Glyph type="triangle" /> Scrape List
+              <Glyph type="triangle" /> {pendingCount === 0 ? 'All Scraped' : `Scrape List (${pendingCount})`}
             </button>
           )}
           <Clock />
