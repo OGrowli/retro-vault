@@ -144,6 +144,7 @@ MENU = [
         run(["systemctl", "start", "getty@tty1"]),
     )),
     ("Reboot", lambda: run(["systemctl", "reboot"])),
+    ("Shutdown", lambda: run(["systemctl", "poweroff"])),
     ("Cancel (relaunch frontend)", lambda: run(["systemctl", "start", "getty@tty1"])),
 ]
 
