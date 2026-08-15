@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import type { User, Game, GameFilter, HomePrefs, ListSource } from '@retro-vault/shared'
 import { api } from './api/client'
+import { Landing } from './screens/Landing'
+import { Doom } from './screens/Doom'
 import { ProfileSelect } from './screens/ProfileSelect'
 import { Home } from './screens/Home'
 import { GameDetail } from './screens/GameDetail'
@@ -16,11 +18,13 @@ import { RomAudit } from './screens/RomAudit'
 import { useIdleReload } from './hooks/useIdleReload'
 import { DEFAULT_HOME_PREFS, loadHomePrefs, saveHomePrefs } from './prefs'
 
-type Screen = 'profile-select' | 'home' | 'game-detail' | 'settings' | 'list-view' | 'home-settings' | 'wifi-settings' | 'scrape-settings' | 'controller-settings' | 'emulator-settings' | 'audio-settings' | 'rom-audit'
+type Screen = 'landing' | 'doom' | 'profile-select' | 'home' | 'game-detail' | 'settings' | 'list-view' | 'home-settings' | 'wifi-settings' | 'scrape-settings' | 'controller-settings' | 'emulator-settings' | 'audio-settings' | 'rom-audit'
 
 // Navigation hierarchy: back always goes to the screen's parent.
 const SCREEN_PARENT: Record<Screen, Screen | null> = {
-  'profile-select': null,
+  'landing': null,
+  'doom': 'landing',
+  'profile-select': 'landing',
   'home': 'profile-select',
   'game-detail': 'home',
   'settings': 'home',
@@ -57,7 +61,7 @@ function saveFilter(userId: number, filter: GameFilter) {
 const FROM_RANDOM_KEY = 'retrovault:from-random'
 
 export function App() {
-  const [screen, setScreen] = useState<Screen>('profile-select')
+  const [screen, setScreen] = useState<Screen>('landing')
   const [currentUser, setCurrentUser] = useState<User | null>(null)
   const [selectedGame, setSelectedGame] = useState<Game | null>(null)
   const [listView, setListView] = useState<{ sources: ListSource[]; activeKey: string } | null>(null)
@@ -129,6 +133,12 @@ export function App() {
     }).catch(() => {})
   }, [])
 
+  // Landing choice screen: Doom is its own simple flow; RetroVault drops into
+  // the existing profile-select → home path unchanged.
+  const handleLandingChoice = (choice: 'doom' | 'retrovault') => {
+    setScreen(choice === 'doom' ? 'doom' : 'profile-select')
+  }
+
   const handleProfileSelect = (user: User) => {
     setCurrentUser(user)
     setScreen('home')
@@ -186,6 +196,12 @@ export function App() {
 
   return (
     <>
+      {screen === 'landing' && (
+        <Landing onChoose={handleLandingChoice} />
+      )}
+      {screen === 'doom' && (
+        <Doom onBack={goBack} />
+      )}
       {screen === 'profile-select' && (
         <ProfileSelect onSelect={handleProfileSelect} />
       )}

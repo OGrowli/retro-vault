@@ -229,6 +229,12 @@ export const api = {
     }>('/system/health'),
   },
 
+  doom: {
+    wads: () => get<{ dir: string; wads: string[]; hasIwad: boolean }>('/doom/wads'),
+    launch: (opts: { online?: boolean; wad?: string } = {}) =>
+      post<{ launched: boolean; pid?: number }>('/doom/launch', opts),
+  },
+
   audit: {
     run: (systems?: string[]) => post<{ started: boolean; running?: boolean }>('/audit/run', systems ? { systems } : {}),
     status: () => get<AuditStatus>('/audit/status'),
