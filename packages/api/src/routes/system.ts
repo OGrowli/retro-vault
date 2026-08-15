@@ -1,10 +1,66 @@
 import { Hono } from 'hono'
-import { spawn } from 'node:child_process'
+import { spawn, execFile } from 'node:child_process'
+import { promisify } from 'node:util'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 
+const execFileAsync = promisify(execFile)
+
 export const systemRouter = new Hono()
+
+// CPU temperature from sysfs — millidegrees C, a sub-ms kernel read (no subprocess).
+const THERMAL_PATH = '/sys/class/thermal/thermal_zone0/temp'
+
+function readTempC(): number | null {
+  try {
+    const milli = parseInt(fs.readFileSync(THERMAL_PATH, 'utf8').trim(), 10)
+    return Number.isFinite(milli) ? milli / 1000 : null
+  } catch {
+    return null
+  }
+}
+
+// `vcgencmd get_throttled` → `throttled=0x<hex>` bitmask. Bits 0-3 are the
+// live state (under-voltage / arm-capped / throttled / soft-temp-limit now),
+// bits 16-19 the same conditions latched since boot. Absolute path in case the
+// systemd unit runs with a minimal PATH.
+async function readThrottle(): Promise<number | null> {
+  for (const bin of ['/usr/bin/vcgencmd', 'vcgencmd']) {
+    try {
+      const { stdout } = await execFileAsync(bin, ['get_throttled'], { timeout: 2000 })
+      const m = stdout.match(/0x([0-9a-fA-F]+)/)
+      if (m) return parseInt(m[1]!, 16)
+    } catch { /* try next / give up */ }
+  }
+  return null
+}
+
+// Cheap health snapshot for the Home indicator: CPU temp + power/throttle flags
+// so the user knows when to power down and let the Pi rest. Polled ~every 30s.
+systemRouter.get('/health', async (c) => {
+  if (process.platform !== 'linux') {
+    return c.json({
+      tempC: null,
+      throttleNow: false,
+      underVoltageNow: false,
+      throttleEver: false,
+      underVoltageEver: false,
+    })
+  }
+
+  const tempC = readTempC()
+  const bits = await readThrottle()
+  const b = bits ?? 0
+
+  return c.json({
+    tempC,
+    throttleNow: (b & 0b1111) !== 0,          // bits 0-3
+    underVoltageNow: (b & (1 << 0)) !== 0,    // bit 0
+    throttleEver: (b & (0b1111 << 16)) !== 0, // bits 16-19
+    underVoltageEver: (b & (1 << 16)) !== 0,  // bit 16
+  })
+})
 
 // Resolved from the service's WorkingDirectory (repo root), same as launch-game.sh.
 const DEPLOY_SCRIPT = path.resolve('scripts/deploy.sh')

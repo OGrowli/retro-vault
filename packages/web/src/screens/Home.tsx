@@ -12,6 +12,7 @@ import { RandomGameModal } from '../components/RandomGameModal'
 import { VirtualKeyboard } from '../components/VirtualKeyboard'
 import { Glyph } from '../components/Glyph'
 import { Clock } from '../components/Clock'
+import { HealthIndicator } from '../components/HealthIndicator'
 import { listOrderOf, gameSortOf } from '../prefs'
 import type { GamepadAction } from '../hooks/useGamepad'
 
@@ -338,6 +339,7 @@ export function Home({ user, systems, genres, filter, homePrefs, onFilterChange,
         <header className="px-[5%] pt-[3%] pb-2 flex items-center justify-between">
           <h1 className="text-white text-2xl font-bold tracking-tight">RetroVault</h1>
           <div className="flex items-center gap-3">
+            <HealthIndicator />
             <Clock />
             <button
               onClick={() => setFilterOpen(true)}

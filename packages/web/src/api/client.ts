@@ -220,6 +220,13 @@ export const api = {
     update: () => post<{ started: boolean; offset: number }>('/system/update'),
     updateLog: (offset: number) =>
       get<{ content: string; offset: number; size: number }>(`/system/update/log?offset=${offset}`),
+    health: () => get<{
+      tempC: number | null
+      throttleNow: boolean
+      underVoltageNow: boolean
+      throttleEver: boolean
+      underVoltageEver: boolean
+    }>('/system/health'),
   },
 
   audit: {
