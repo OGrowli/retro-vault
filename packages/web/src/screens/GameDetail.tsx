@@ -141,6 +141,8 @@ export function GameDetail({ game: initialGame, user, onBack, fromRandom = false
   const [addToListOpen, setAddToListOpen] = useState(false)
   // versionRefs[i] — keeps the gamepad-focused ROM row visible as focus moves.
   const versionRefs = useRef<(HTMLDivElement | null)[]>([])
+  // Guards the auto-scrape so it fires at most once per game id.
+  const autoScrapedRef = useRef<number | null>(null)
 
   useEffect(() => {
     api.games.get(game.id).then(d => {
@@ -218,6 +220,13 @@ export function GameDetail({ game: initialGame, user, onBack, fromRandom = false
       setScraping(false)
     }
   }, [game.id, scraping])
+
+  // Opening an unscraped game kicks off a scrape automatically (once per id).
+  useEffect(() => {
+    if (game.scraped_at || autoScrapedRef.current === game.id) return
+    autoScrapedRef.current = game.id
+    void scrape()
+  }, [game.id, game.scraped_at, scrape])
 
   useGamepad((action) => {
     if (continueRom) {
