@@ -265,7 +265,7 @@ hacksRouter.post('/:id/compile', async (c) => {
   const body = await c.req.json<{ baseRomId?: number }>().catch(() => ({} as { baseRomId?: number }))
 
   const hack = db.prepare('SELECT * FROM rom_hacks WHERE id = ?').get(id) as
-    | { id: number; title: string; system: string; patch_path: string | null; game_id: number | null } | undefined
+    | { id: number; title: string; system: string; patch_path: string | null; game_id: number | null; source_crc: string | null } | undefined
   if (!hack) return c.json({ error: 'hack not found' }, 404)
   if (!hack.game_id) return c.json({ error: 'hack is not matched to a game' }, 422)
   if (!hack.patch_path) return c.json({ error: 'no patch file for this hack (extract not complete?)' }, 422)
@@ -273,10 +273,21 @@ hacksRouter.post('/:id/compile', async (c) => {
   const patchAbs = path.join(ROMHACKS_DIR, hack.patch_path)
   if (!fs.existsSync(patchAbs)) return c.json({ error: `patch missing on device: ${patchAbs}` }, 422)
 
-  // Base ROM: explicit choice, else the game's primary (curated first).
+  // Base ROM: explicit choice; else the ROM whose CRC matches the patch's source
+  // CRC (BPS/UPS validate this — the primary/curated ROM is often a different
+  // region or itself a hack); else the game's primary (curated first).
+  // Prefer an official base over hack/enhanced variants (some games' curated
+  // primary is itself a romhack, e.g. an SA-1 patch), then curated, then id.
+  const pickPrimary = db.prepare(`
+    SELECT * FROM roms WHERE game_id = ?
+    ORDER BY (kind = 'official' OR kind IS NULL) DESC, curated DESC, id ASC LIMIT 1
+  `)
   const base = (body.baseRomId
     ? db.prepare('SELECT * FROM roms WHERE id = ? AND game_id = ?').get(body.baseRomId, hack.game_id)
-    : db.prepare('SELECT * FROM roms WHERE game_id = ? ORDER BY curated DESC, id ASC LIMIT 1').get(hack.game_id)
+    : hack.source_crc
+      ? (db.prepare('SELECT * FROM roms WHERE game_id = ? AND crc = ? LIMIT 1').get(hack.game_id, hack.source_crc.toUpperCase())
+         ?? pickPrimary.get(hack.game_id))
+      : pickPrimary.get(hack.game_id)
   ) as { id: number; system: string; rom_path: string } | undefined
   if (!base) return c.json({ error: 'no base ROM found for this game' }, 422)
   if (!fs.existsSync(base.rom_path)) return c.json({ error: `base ROM file missing: ${base.rom_path}` }, 422)
