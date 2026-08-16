@@ -124,7 +124,6 @@ const IDGAMES_MIRRORS = [
   'https://www.quaddicted.com/files/idgames/',
   'https://ftpmirror1.infania.net/pub/idgames/',
 ]
-const PLAYABLE_IN_ZIP = ['*.wad', '*.pk3', '*.pk7', '*.ipk3', '*.deh', '*.bex']
 
 interface IdgamesFile {
   id: number
@@ -223,23 +222,33 @@ doomRouter.post('/idgames/download', async (c) => {
   }
   if (!ok) return c.json({ error: `Could not download from any mirror (${lastErr})` }, 502)
 
+  const PLAYABLE_EXTS = new Set(['.wad', '.pk3', '.pk7', '.ipk3', '.deh', '.bex'])
+  const added: string[] = []
+  const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'idg-'))
   try {
     const isZip = path.extname(rec.filename).toLowerCase() === '.zip'
     if (isZip) {
-      // Flatten playable files straight into DOOM_DIR (case-insensitive match).
-      await execFileAsync('unzip', ['-o', '-j', '-C', tmp, ...PLAYABLE_IN_ZIP, '-d', DOOM_DIR])
-    } else {
+      // Extract everything flat to a temp dir, then copy out the playable files.
+      // unzip exits nonzero when an include pattern matches nothing, so we don't
+      // pass patterns / rely on its exit code — we inspect the results instead.
+      try { await execFileAsync('unzip', ['-o', '-j', '-C', tmp, '-d', workDir]) }
+      catch { /* partial/benign unzip warnings — validate by contents below */ }
+      for (const f of fs.readdirSync(workDir)) {
+        if (!PLAYABLE_EXTS.has(path.extname(f).toLowerCase())) continue
+        fs.copyFileSync(path.join(workDir, f), path.join(DOOM_DIR, f))
+        added.push(f)
+      }
+    } else if (PLAYABLE_EXTS.has(path.extname(rec.filename).toLowerCase())) {
       fs.copyFileSync(tmp, path.join(DOOM_DIR, path.basename(rec.filename)))
+      added.push(path.basename(rec.filename))
     }
   } catch (e) {
     return c.json({ error: `Extract failed: ${e instanceof Error ? e.message : String(e)}` }, 500)
   } finally {
     try { fs.unlinkSync(tmp) } catch { /* ignore */ }
+    try { fs.rmSync(workDir, { recursive: true, force: true }) } catch { /* ignore */ }
   }
 
-  // Report what's now playable from this download.
-  const exts = new Set(['.wad', '.pk3', '.pk7', '.ipk3', '.deh', '.bex'])
-  const added = fs.readdirSync(DOOM_DIR)
-    .filter(f => exts.has(path.extname(f).toLowerCase()))
+  if (!added.length) return c.json({ error: 'No playable WAD/PK3 found in the archive' }, 422)
   return c.json({ downloaded: rec.filename, title: rec.title, wads: added })
 })
