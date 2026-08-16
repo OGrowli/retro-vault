@@ -68,7 +68,10 @@ run_local() {
     echo "ERROR: no IWAD in $DOOM_DIR (drop doom2.wad / freedoom2.wad there)."
     exit 1
   fi
-  local args=(-iwad "$iwad" -fullscreen)
+  # +set use_joystick 1 forces the gamepad on regardless of the saved ini
+  # (LZDoom ships it off; the DualShock 4 otherwise only works via its touchpad
+  # mouse, so the D-pad/stick can't navigate menus or gameplay).
+  local args=(-iwad "$iwad" -fullscreen +set use_joystick 1)
   if [ -n "$pwad_name" ]; then args+=(-file "$DOOM_DIR/$pwad_name"); fi
   echo "=== running: $port ${args[*]}"
   sudo openvt -c 1 -s -w -f -- sudo -u pi -H "$port" "${args[@]}"
