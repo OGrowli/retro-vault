@@ -75,19 +75,93 @@ function fuzzyMatch(title: string, systems: string[], idx: Map<string, IdxGame[]
   return null
 }
 
-// Exact tier via a BPS/UPS source CRC. Scrape-independent: roms.crc (audit) then
-// DAT entries. (On-demand file hashing + SS jeu are future refinements.)
-const findRomByCrc = db.prepare('SELECT game_id FROM roms WHERE crc = ? LIMIT 1')
+// --- CRC32 (table-based, dependency-free) — for the exact BPS/UPS tier -------
+const CRC_TABLE = (() => {
+  const t = new Uint32Array(256)
+  for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1); t[n] = c >>> 0 }
+  return t
+})()
+function crc32(buf: Buffer, start = 0): string {
+  let crc = 0xFFFFFFFF
+  for (let i = start; i < buf.length; i++) crc = CRC_TABLE[(crc ^ buf[i]!) & 0xFF]! ^ (crc >>> 8)
+  return ((crc ^ 0xFFFFFFFF) >>> 0).toString(16).toUpperCase().padStart(8, '0')
+}
+const hex = (n: number) => (n >>> 0).toString(16).toUpperCase().padStart(8, '0')
+
+// CRC32 candidate(s) for a ROM. For .zip, read the inner file's CRC from the
+// central directory (No-Intro hashes uncompressed data, which the zip stores) —
+// reading only the tail so multi-MB ROMs aren't slurped whole. For raw ROMs,
+// hash the file plus common header-stripped variants (nes/snes) that a patch
+// author's source might use.
+function romCrcs(romPath: string, system: string): string[] {
+  try {
+    if (path.extname(romPath).toLowerCase() === '.zip') {
+      const size = fs.statSync(romPath).size
+      const tailLen = Math.min(size, 256 * 1024)
+      const fd = fs.openSync(romPath, 'r')
+      const tail = Buffer.alloc(tailLen)
+      fs.readSync(fd, tail, 0, tailLen, size - tailLen)
+      fs.closeSync(fd)
+      const base = size - tailLen
+      let eocd = -1
+      for (let i = tail.length - 22; i >= 0; i--) { if (tail.readUInt32LE(i) === 0x06054b50) { eocd = i; break } }
+      if (eocd < 0) return []
+      const count = tail.readUInt16LE(eocd + 10)
+      let p = tail.readUInt32LE(eocd + 16) - base
+      if (p < 0) return []
+      let best: { crc: string; size: number } | null = null
+      for (let n = 0; n < count && p + 46 <= tail.length; n++) {
+        if (tail.readUInt32LE(p) !== 0x02014b50) break
+        const crc = tail.readUInt32LE(p + 16), usize = tail.readUInt32LE(p + 24)
+        const fn = tail.readUInt16LE(p + 28), ex = tail.readUInt16LE(p + 30), cm = tail.readUInt16LE(p + 32)
+        if (!best || usize > best.size) best = { crc: hex(crc), size: usize >>> 0 }
+        p += 46 + fn + ex + cm
+      }
+      return best ? [best.crc] : []
+    }
+    const buf = fs.readFileSync(romPath)
+    const out = new Set<string>([crc32(buf)])
+    if (system === 'nes' && buf.length > 16 && buf[0] === 0x4E && buf[1] === 0x45 && buf[2] === 0x53 && buf[3] === 0x1A) out.add(crc32(buf, 16))
+    if (system === 'snes' && buf.length % 1024 === 512) out.add(crc32(buf, 512))
+    return [...out]
+  } catch { return [] }
+}
+
+// Build crc -> game_id over ROMs in the given systems (once per import). Also
+// caches each rom's primary CRC in roms.crc for reuse.
+const setRomCrc = db.prepare('UPDATE roms SET crc = ? WHERE id = ?')
+function buildCrcIndex(systems: string[]): Map<string, number> {
+  const idx = new Map<string, number>()
+  if (!systems.length) return idx
+  const placeholders = systems.map(() => '?').join(',')
+  const roms = db.prepare(`SELECT id, game_id, system, rom_path, crc FROM roms WHERE system IN (${placeholders})`)
+    .all(...systems) as Array<{ id: number; game_id: number; system: string; rom_path: string; crc: string | null }>
+  const save = db.transaction((rows: typeof roms) => {
+    for (const r of rows) {
+      let crcs = r.crc ? [r.crc] : []
+      if (!crcs.length && fs.existsSync(r.rom_path)) {
+        crcs = romCrcs(r.rom_path, r.system)
+        if (crcs[0]) setRomCrc.run(crcs[0], r.id)
+      }
+      for (const c of crcs) if (!idx.has(c)) idx.set(c, r.game_id)
+    }
+  })
+  save(roms)
+  return idx
+}
+
+// Exact tier via a BPS/UPS source CRC. Scrape-independent: the on-demand CRC
+// index (built from ROM files) → roms.crc → DAT entries.
 const findGameByDatCrc = db.prepare(`
   SELECT g.id AS game_id FROM dat_entries d
   JOIN games g ON g.system = d.system AND g.name_key = d.name_key
   WHERE d.crc = ? LIMIT 1
 `)
-function exactMatch(sourceCrc: string | null): number | null {
+function exactMatch(sourceCrc: string | null, crcIndex: Map<string, number>): number | null {
   if (!sourceCrc) return null
   const crc = sourceCrc.toUpperCase()
-  const r = findRomByCrc.get(crc) as { game_id: number } | undefined
-  if (r?.game_id) return r.game_id
+  const hit = crcIndex.get(crc)
+  if (hit) return hit
   const d = findGameByDatCrc.get(crc) as { game_id: number } | undefined
   return d?.game_id ?? null
 }
@@ -122,12 +196,20 @@ hacksRouter.post('/import', (c) => {
   const idx = JSON.parse(fs.readFileSync(indexFile, 'utf8')) as { items: IdxItem[] }
   const gameIndex = buildGameIndex()
 
+  // Build a CRC index only over the systems that actually have a source-CRC hack
+  // (BPS/UPS) — avoids hashing ROMs for systems that can't benefit. Done before
+  // the matching transaction (it reads files + writes roms.crc).
+  const crcSystems = [...new Set(
+    idx.items.filter(it => it.sourceCrc).flatMap(it => it.systems)
+  )]
+  const crcIndex = buildCrcIndex(crcSystems)
+
   let exact = 0, fuzzy = 0, unmatched = 0
   const run = db.transaction((items: IdxItem[]) => {
     for (const it of items) {
       const hack_key = it.rhdnId != null ? String(it.rhdnId) : it.bundle
       const system = it.systems[0] ?? 'unknown'
-      let gameId = exactMatch(it.sourceCrc)
+      let gameId = exactMatch(it.sourceCrc, crcIndex)
       let conf: string | null = gameId ? 'exact' : null
       if (!gameId) { gameId = fuzzyMatch(it.title, it.systems, gameIndex); conf = gameId ? 'fuzzy' : null }
       if (conf === 'exact') exact++; else if (conf === 'fuzzy') fuzzy++; else unmatched++
