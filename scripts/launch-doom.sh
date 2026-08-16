@@ -109,8 +109,21 @@ for _ in $(seq 1 20); do
 done
 sudo pkill -KILL -t tty1 2>/dev/null
 
+run_gencfg() {
+  # Start the port with the pad connected, wait for it to enumerate the
+  # joystick, then quit cleanly so LZDoom writes its per-controller config block
+  # to lzdoom.ini (no user menu interaction needed). We then hand-tune that block.
+  local port iwad
+  port="$(find_port)"; iwad="$(find_iwad)"
+  if [ -z "$port" ] || [ -z "$iwad" ]; then echo "gencfg: need port + IWAD"; exit 1; fi
+  echo "=== gencfg: $port (enumerate joystick, +quit)"
+  sudo openvt -c 1 -s -w -f -- sudo -u pi -H "$port" -iwad "$iwad" +set use_joystick 1 +wait 70 +quit
+  return $?
+}
+
 case "$MODE" in
   online) run_online;      RC=$? ;;
+  gencfg) run_gencfg;      RC=$? ;;      # generate LZDoom controller config, then quit
   wad)    run_local "" "$WAD"; RC=$? ;;   # $WAD is a custom PWAD
   *)      run_local "$WAD" ""; RC=$? ;;   # iwad mode: $WAD is an optional base IWAD
 esac
