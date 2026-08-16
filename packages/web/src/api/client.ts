@@ -247,7 +247,7 @@ export const api = {
   },
 
   doom: {
-    wads: () => get<{ dir: string; iwads: string[]; wads: string[] }>('/doom/wads'),
+    wads: () => get<{ dir: string; iwads: string[]; wads: string[]; onlineReady: boolean }>('/doom/wads'),
     launch: (opts: { online?: boolean; iwad?: string; wad?: string } = {}) =>
       post<{ launched: boolean; pid?: number }>('/doom/launch', opts),
     idgames: {

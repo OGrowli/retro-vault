@@ -51,7 +51,9 @@ function listWadDir(): { iwads: string[]; wads: string[] } {
 // scraping pipeline. Splits base games (IWADs) from custom PWADs.
 doomRouter.get('/wads', (c) => {
   const { iwads, wads } = listWadDir()
-  return c.json({ dir: DOOM_DIR, iwads, wads })
+  // Online multiplayer is only usable once a source-built port + browser is
+  // wired via DOOM_ONLINE_CMD (inherited by the launcher). Gate the UI on it.
+  return c.json({ dir: DOOM_DIR, iwads, wads, onlineReady: !!process.env['DOOM_ONLINE_CMD'] })
 })
 
 // Launch Doom. Body:
@@ -144,9 +146,11 @@ async function idgames(params: Record<string, string>): Promise<IdgamesFile[]> {
   const qs = new URLSearchParams({ ...params, out: 'json' }).toString()
   const res = await fetch(`${IDGAMES_API}?${qs}`, { signal: AbortSignal.timeout(12_000) })
   if (!res.ok) throw new Error(`idgames API ${res.status}`)
-  const json = await res.json() as { content?: { file?: IdgamesFile | IdgamesFile[] }; error?: { type: string; message: string } }
+  const json = await res.json() as { content?: (IdgamesFile & { file?: IdgamesFile | IdgamesFile[] }); error?: { type: string; message: string } }
   if (json.error) throw new Error(json.error.message || 'idgames API error')
-  const file = json.content?.file
+  // search/latestfiles nest records under content.file (array/object); the `get`
+  // action returns the single record directly under content.
+  const file = json.content?.file ?? (json.content?.id != null ? json.content : null)
   if (!file) return []
   return Array.isArray(file) ? file : [file]
 }

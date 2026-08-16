@@ -36,6 +36,7 @@ const iwadLabel = (f: string) => IWAD_LABELS[f.toLowerCase()] ?? f
 export function Doom({ onBack }: Props) {
   const [iwads, setIwads] = useState<string[]>([])
   const [wads, setWads] = useState<string[]>([])
+  const [onlineReady, setOnlineReady] = useState(false)
   const [dir, setDir] = useState('')
   const [loading, setLoading] = useState(true)
   const [focus, setFocus] = useState(0)
@@ -46,7 +47,7 @@ export function Doom({ onBack }: Props) {
 
   const loadWads = useCallback(() => {
     api.doom.wads()
-      .then(r => { setIwads(r.iwads); setWads(r.wads); setDir(r.dir); setLoading(false) })
+      .then(r => { setIwads(r.iwads); setWads(r.wads); setDir(r.dir); setOnlineReady(r.onlineReady); setLoading(false) })
       .catch(() => setLoading(false))
   }, [])
 
@@ -83,11 +84,11 @@ export function Doom({ onBack }: Props) {
   const activate = useCallback((idx: number) => {
     const item = items[idx]
     if (!item) return
-    if (item.kind === 'online') void launch({ online: true })
+    if (item.kind === 'online') { if (onlineReady) void launch({ online: true }) }
     else if (item.kind === 'browse') setBrowsing(true)
     else if (item.kind === 'iwad') void launch({ iwad: item.name })
     else void launch({ wad: item.name })
-  }, [items, launch])
+  }, [items, launch, onlineReady])
 
   useGamepad((action) => {
     if (launching) return
@@ -143,7 +144,10 @@ export function Doom({ onBack }: Props) {
             <p className="text-vault-muted text-sm text-center py-6">Loading…</p>
           ) : (
             <>
-              <Row idx={0} label="Online — Server Browser" sub="Browse & join live public games" />
+              <Row idx={0}
+                label={onlineReady ? 'Online — Server Browser' : 'Online — Coming Soon'}
+                sub={onlineReady ? 'Browse & join live public games' : 'Multiplayer port not installed yet'}
+                dim={!onlineReady} />
               <Row idx={1} label="Get More WADs" sub="Browse & download from /idgames" />
 
               {iwads.length > 0 && <Header text="Base Games" />}

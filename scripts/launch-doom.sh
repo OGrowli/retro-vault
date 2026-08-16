@@ -25,6 +25,14 @@ DOOM_DIR="${RETROVAULT_DOOM_DIR:-/home/pi/RetroPie/roms/doom}"
 
 echo "=== $(date -Is) doom launch mode=$MODE wad=$WAD"
 
+# Bail BEFORE any kiosk teardown if online was picked but no online port is set
+# up yet — otherwise selecting "Online" just tears down and relaunches the kiosk
+# (looks like a restart). Exits nonzero so the API surfaces an error.
+if [ "$MODE" = "online" ] && [ -z "$DOOM_ONLINE_CMD" ]; then
+  echo "online multiplayer not configured (DOOM_ONLINE_CMD unset) — leaving kiosk up."
+  exit 1
+fi
+
 restore_kiosk() {
   echo "=== $(date -Is) restoring kiosk"
   sudo systemctl start getty@tty1
