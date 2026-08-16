@@ -30,11 +30,12 @@ interface Props {
 type RowId = 'list' | 'system' | 'genre' | 'players' | 'options' | 'search' | 'apply' | 'addToList' | 'clear' | 'random' | 'import'
 const DROPDOWN_ROWS = new Set<RowId>(['list', 'system', 'genre', 'players', 'options'])
 
-type OptionKey = 'favoritesOnly' | 'neverPlayed' | 'noMetadata'
+type OptionKey = 'favoritesOnly' | 'neverPlayed' | 'noMetadata' | 'hasHacks'
 const OPTION_DEFS: { key: OptionKey; label: string }[] = [
   { key: 'favoritesOnly', label: 'Favorites Only' },
   { key: 'neverPlayed', label: 'Never Played' },
   { key: 'noMetadata', label: 'No Metadata' },
+  { key: 'hasHacks', label: 'Has Hacks' },
 ]
 
 const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v))
@@ -81,7 +82,7 @@ export function FilterDrawer({
     filter.yearRange !== undefined ||
     filter.listId !== undefined ||
     !!filter.favoritesOnly || !!filter.neverPlayed || !!filter.noMetadata ||
-    !!filter.query
+    !!filter.hasHacks || !!filter.query
 
   // Reset navigation each time the drawer opens.
   useEffect(() => {

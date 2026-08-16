@@ -6,6 +6,8 @@ export type GameFilter = {
   favoritesOnly?: boolean
   neverPlayed?: boolean
   noMetadata?: boolean
+  /** Only games that have at least one matched ROM hack. */
+  hasHacks?: boolean
   query?: string
   userId?: string
   /** Scope results to a premade list — search & random operate within it. */

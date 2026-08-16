@@ -33,6 +33,7 @@ function filterToParams(filter: GameFilter, userId?: number): string {
   if (filter.favoritesOnly) p.set('favoritesOnly', 'true')
   if (filter.neverPlayed) p.set('neverPlayed', 'true')
   if (filter.noMetadata) p.set('noMetadata', 'true')
+  if (filter.hasHacks) p.set('hasHacks', 'true')
   if (filter.query) p.set('query', filter.query)
   if (filter.listId !== undefined) p.set('listId', String(filter.listId))
   if (filter.includeAdult) p.set('includeAdult', 'true')

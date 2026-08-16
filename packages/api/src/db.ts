@@ -447,6 +447,10 @@ export function buildFilterClause(filter: GameFilter, userId?: number): FilterCl
     conditions.push(`g.scraped_at IS NULL`)
   }
 
+  if (filter.hasHacks) {
+    conditions.push(`EXISTS (SELECT 1 FROM rom_hacks rh WHERE rh.game_id = g.id)`)
+  }
+
   if (filter.listId !== undefined) {
     conditions.push(`EXISTS (SELECT 1 FROM list_games lg WHERE lg.game_id = g.id AND lg.list_id = ?)`)
     params.push(filter.listId)
@@ -479,6 +483,7 @@ export function parseFilter(query: Record<string, string | string[]>): GameFilte
   if (query['favoritesOnly'] === 'true') filter.favoritesOnly = true
   if (query['neverPlayed'] === 'true') filter.neverPlayed = true
   if (query['noMetadata'] === 'true') filter.noMetadata = true
+  if (query['hasHacks'] === 'true') filter.hasHacks = true
 
   const q = query['query']
   if (q) filter.query = q as string
