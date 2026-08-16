@@ -148,7 +148,7 @@ export function Doom({ onBack }: Props) {
                 label={onlineReady ? 'Online — Server Browser' : 'Online — Coming Soon'}
                 sub={onlineReady ? 'Browse & join live public games' : 'Multiplayer port not installed yet'}
                 dim={!onlineReady} />
-              <Row idx={1} label="Get More WADs" sub="Browse & download from /idgames" />
+              <Row idx={1} label="Id Games" sub="Browse & download Doom WADs" />
 
               {iwads.length > 0 && <Header text="Base Games" />}
               {iwads.map((f, i) => (
