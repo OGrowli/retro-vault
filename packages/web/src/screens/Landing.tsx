@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useGamepad } from '../hooks/useGamepad'
 import { Glyph } from '../components/Glyph'
 import { Clock } from '../components/Clock'
+import idGamesLogo from '../assets/idgames-logo.webp'
 
 type Choice = 'doom' | 'retrovault'
 
@@ -11,8 +12,8 @@ interface Props {
 
 // First screen on launch — pick Doom or the normal RetroVault flow. Deliberately
 // minimal and styled to match ProfileSelect so it reads as part of the app.
-const CARDS: { key: Choice; title: string; subtitle: string; accent: string }[] = [
-  { key: 'doom', title: 'DOOM', subtitle: 'Online servers · custom WADs', accent: '#b3202a' },
+const CARDS: { key: Choice; title: string; subtitle: string; accent: string; logo?: string }[] = [
+  { key: 'doom', title: 'Id Games', subtitle: 'Doom · custom WADs', accent: '#b3202a', logo: idGamesLogo },
   { key: 'retrovault', title: 'RetroVault', subtitle: 'Your game library', accent: '#0070D1' },
 ]
 
@@ -49,12 +50,16 @@ export function Landing({ onChoose }: Props) {
               ].join(' ')}
               style={{ background: `linear-gradient(160deg, ${card.accent}22, #14141c)` }}
             >
-              <span
-                className="text-4xl font-extrabold tracking-tight"
-                style={{ color: focused ? '#fff' : card.accent }}
-              >
-                {card.title}
-              </span>
+              {card.logo ? (
+                <img src={card.logo} alt={card.title} className="h-16 w-auto object-contain" />
+              ) : (
+                <span
+                  className="text-4xl font-extrabold tracking-tight"
+                  style={{ color: focused ? '#fff' : card.accent }}
+                >
+                  {card.title}
+                </span>
+              )}
               <span className={`text-xs uppercase tracking-widest ${focused ? 'text-white' : 'text-vault-muted'}`}>
                 {card.subtitle}
               </span>

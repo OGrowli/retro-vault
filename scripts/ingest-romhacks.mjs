@@ -101,15 +101,17 @@ function extractPatches() {
   if (!fs.existsSync(OUT_INDEX)) { console.error(`No index; run 'index' first.`); process.exit(1) }
   const idx = JSON.parse(fs.readFileSync(OUT_INDEX, 'utf8'))
 
-  // One-time: extract all bundles under CATEGORY/*/patches/ to WORK.
-  const catWork = path.join(WORK, CATEGORY)
-  if (!fs.existsSync(catWork)) {
-    console.log(`Extracting ${CATEGORY} bundles to ${WORK} (one-time, large) …`)
-    fs.mkdirSync(WORK, { recursive: true })
-    execFileSync('unzip', ['-q', '-o', OUTER, `${CATEGORY}/*/patches/*`, '-d', WORK], {
+  // Bulk-extract all bundles under CATEGORY/*/patches/ to WORK. Use -n (skip
+  // existing) and run every time so an interrupted extraction resumes instead
+  // of being skipped wholesale. Point WORK at WSL-native disk (not /mnt/c) for
+  // speed — see RHDN_WORK.
+  console.log(`Extracting ${CATEGORY} bundles to ${WORK} (resumable) …`)
+  fs.mkdirSync(WORK, { recursive: true })
+  try {
+    execFileSync('unzip', ['-q', '-n', OUTER, `${CATEGORY}/*/patches/*`, '-d', WORK], {
       maxBuffer: 64 * 1024 * 1024,
     })
-  }
+  } catch { /* unzip -n returns nonzero if nothing new to extract — fine */ }
 
   const tmp = path.join(WORK, '_patch_tmp')
   let done = 0, ok = 0, bps = 0, fail = 0
