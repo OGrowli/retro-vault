@@ -4,10 +4,28 @@ import { promisify } from 'node:util'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { getSetting, setSetting } from '../db.js'
 
 const execFileAsync = promisify(execFile)
 
 export const doomRouter = new Hono()
+
+// Which engine local Doom launches use: standalone 'lzdoom' (GZDoom features)
+// or 'retroarch' (lr-prboom libretro core — inherits RetroArch's controller
+// config). Persisted in the settings store; the launcher reads it via env.
+type DoomEngine = 'lzdoom' | 'retroarch'
+const getEngine = (): DoomEngine => (getSetting('doom_engine') === 'retroarch' ? 'retroarch' : 'lzdoom')
+
+doomRouter.get('/settings', (c) => c.json({ engine: getEngine(), onlineReady: !!process.env['DOOM_ONLINE_CMD'] }))
+
+doomRouter.post('/settings', async (c) => {
+  const body = await c.req.json<{ engine?: string }>().catch(() => ({} as { engine?: string }))
+  if (body.engine !== 'lzdoom' && body.engine !== 'retroarch') {
+    return c.json({ error: 'engine must be "lzdoom" or "retroarch"' }, 400)
+  }
+  setSetting('doom_engine', body.engine)
+  return c.json({ engine: body.engine })
+})
 
 // Where the user drops IWADs + custom PWADs. On the exFAT roms mount so it's
 // editable from Windows; not a registered system, so the importer ignores it.
@@ -53,7 +71,7 @@ doomRouter.get('/wads', (c) => {
   const { iwads, wads } = listWadDir()
   // Online multiplayer is only usable once a source-built port + browser is
   // wired via DOOM_ONLINE_CMD (inherited by the launcher). Gate the UI on it.
-  return c.json({ dir: DOOM_DIR, iwads, wads, onlineReady: !!process.env['DOOM_ONLINE_CMD'] })
+  return c.json({ dir: DOOM_DIR, iwads, wads, onlineReady: !!process.env['DOOM_ONLINE_CMD'], engine: getEngine() })
 })
 
 // Launch Doom. Body:
@@ -92,8 +110,11 @@ doomRouter.post('/launch', async (c) => {
     args = [LAUNCH_DOOM, 'iwad']
   }
 
+  // Pass the selected engine to the launcher (lzdoom vs retroarch/lr-prboom).
+  const env = { ...process.env, DOOM_ENGINE: getEngine() }
+
   return new Promise<Response>((resolve) => {
-    const child = spawn('bash', args, { detached: true, stdio: 'ignore' })
+    const child = spawn('bash', args, { detached: true, stdio: 'ignore', env })
     let settled = false
     const settle = (r: Response) => { if (!settled) { settled = true; resolve(r) } }
 

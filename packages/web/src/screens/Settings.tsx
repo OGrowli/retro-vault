@@ -116,7 +116,7 @@ interface Props {
   onOpenRomAudit: () => void
 }
 
-const FOCUS_ITEMS = ['adult', 'home', 'wifi', 'scraping', 'controllers', 'hotkeys', 'audio', 'rom-audit', 'update', 'back'] as const
+const FOCUS_ITEMS = ['adult', 'doom-engine', 'home', 'wifi', 'scraping', 'controllers', 'hotkeys', 'audio', 'rom-audit', 'update', 'back'] as const
 type FocusItem = (typeof FOCUS_ITEMS)[number]
 
 // Rebooting the device is disruptive — gate the update behind an explicit
@@ -183,7 +183,20 @@ export function Settings({ onBack, homePrefs, onHomePrefsChange, onOpenHome, onO
   const [updateMsg, setUpdateMsg] = useState<string | null>(null)
   // Set once the deploy is kicked off — drives the live-log progress modal.
   const [progressOffset, setProgressOffset] = useState<number | null>(null)
+  const [doomEngine, setDoomEngine] = useState<'lzdoom' | 'retroarch'>('lzdoom')
   const itemRefs = useRef<Partial<Record<FocusItem, HTMLElement | null>>>({})
+
+  useEffect(() => {
+    api.doom.getSettings().then(s => setDoomEngine(s.engine)).catch(() => {})
+  }, [])
+
+  const toggleDoomEngine = useCallback(() => {
+    setDoomEngine(prev => {
+      const next = prev === 'lzdoom' ? 'retroarch' : 'lzdoom'
+      api.doom.setEngine(next).catch(() => {})
+      return next
+    })
+  }, [])
 
   const focusIdx = FOCUS_ITEMS.indexOf(focused)
 
@@ -212,6 +225,7 @@ export function Settings({ onBack, homePrefs, onHomePrefsChange, onOpenHome, onO
 
   const activate = useCallback((item: FocusItem) => {
     if (item === 'adult') toggleAdult()
+    if (item === 'doom-engine') toggleDoomEngine()
     if (item === 'home') onOpenHome()
     if (item === 'wifi') onOpenWifi()
     if (item === 'scraping') onOpenScraping()
@@ -221,7 +235,7 @@ export function Settings({ onBack, homePrefs, onHomePrefsChange, onOpenHome, onO
     if (item === 'rom-audit') onOpenRomAudit()
     if (item === 'update') setUpdateOpen(true)
     if (item === 'back') onBack()
-  }, [toggleAdult, onOpenHome, onOpenWifi, onOpenScraping, onOpenControllers, onOpenHotkeys, onOpenAudio, onOpenRomAudit, onBack])
+  }, [toggleAdult, toggleDoomEngine, onOpenHome, onOpenWifi, onOpenScraping, onOpenControllers, onOpenHotkeys, onOpenAudio, onOpenRomAudit, onBack])
 
   useGamepad((action) => {
     if (action === 'back') { onBack(); return }
@@ -276,6 +290,27 @@ export function Settings({ onBack, homePrefs, onHomePrefsChange, onOpenHome, onO
               ].join(' ')}
             >
               <span className="w-5 h-5 rounded-full bg-white" />
+            </span>
+          </button>
+
+          <button
+            ref={setRef('doom-engine')}
+            onClick={toggleDoomEngine}
+            onMouseEnter={() => setFocused('doom-engine')}
+            className={[
+              'w-full py-4 rounded-xl text-left px-5 flex items-center gap-4',
+              'bg-vault-surface border border-vault-muted transition-colors duration-150 motion-reduce:transition-none',
+              isFocused('doom-engine') ? 'ring-2 ring-white border-vault-accent' : '',
+            ].join(' ')}
+          >
+            <div className="flex-1 min-w-0">
+              <span className="block text-white font-bold uppercase tracking-wide text-sm">Doom Engine</span>
+              <span className="block text-vault-muted text-[0.7rem] font-normal normal-case tracking-normal mt-0.5">
+                LZDoom (GZDoom features) or RetroArch/lr-prboom (uses RetroArch controller config)
+              </span>
+            </div>
+            <span className="flex-shrink-0 px-3 py-1.5 rounded-lg bg-vault-bg text-white text-xs font-bold uppercase tracking-wide">
+              {doomEngine === 'retroarch' ? 'RetroArch' : 'LZDoom'}
             </span>
           </button>
 

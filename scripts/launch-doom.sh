@@ -109,6 +109,26 @@ for _ in $(seq 1 20); do
 done
 sudo pkill -KILL -t tty1 2>/dev/null
 
+# RetroArch / lr-prboom route: inherits RetroArch's controller config. prboom
+# auto-locates the IWAD in the content's folder, so $DOOM_DIR (which holds the
+# IWADs) works for both a base IWAD and a PWAD. $1=iwad name (opt), $2=pwad (opt).
+run_retroarch() {
+  local iwad_name="$1" pwad_name="$2" core content ra
+  core="$(ls /opt/retropie/libretrocores/lr-prboom/*.so 2>/dev/null | head -1)"
+  if [ -z "$core" ]; then
+    echo "ERROR: lr-prboom core not installed. Install it via RetroPie-Setup, or switch the Doom engine to LZDoom."
+    exit 1
+  fi
+  if [ -n "$pwad_name" ]; then content="$DOOM_DIR/$pwad_name"
+  elif [ -n "$iwad_name" ] && [ -f "$DOOM_DIR/$iwad_name" ]; then content="$DOOM_DIR/$iwad_name"
+  else content="$(find_iwad)"; fi
+  if [ -z "$content" ]; then echo "ERROR: no IWAD/content in $DOOM_DIR"; exit 1; fi
+  ra="$(command -v retroarch || echo /opt/retropie/emulators/retroarch/bin/retroarch)"
+  echo "=== running (retroarch): $ra -L $core $content"
+  sudo openvt -c 1 -s -w -f -- sudo -u pi -H "$ra" -L "$core" "$content"
+  return $?
+}
+
 run_gencfg() {
   # Start the port with the pad connected, wait for it to enumerate the
   # joystick, then quit cleanly so LZDoom writes its per-controller config block
@@ -121,11 +141,15 @@ run_gencfg() {
   return $?
 }
 
+# Engine selector (set by the API from the doom_engine setting). LZDoom is the
+# default; 'retroarch' routes local play through lr-prboom.
+ENGINE="${DOOM_ENGINE:-lzdoom}"
+
 case "$MODE" in
   online) run_online;      RC=$? ;;
   gencfg) run_gencfg;      RC=$? ;;      # generate LZDoom controller config, then quit
-  wad)    run_local "" "$WAD"; RC=$? ;;   # $WAD is a custom PWAD
-  *)      run_local "$WAD" ""; RC=$? ;;   # iwad mode: $WAD is an optional base IWAD
+  wad)    if [ "$ENGINE" = "retroarch" ]; then run_retroarch "" "$WAD"; else run_local "" "$WAD"; fi; RC=$? ;;
+  *)      if [ "$ENGINE" = "retroarch" ]; then run_retroarch "$WAD" ""; else run_local "$WAD" ""; fi; RC=$? ;;
 esac
 
 echo "=== $(date -Is) doom exited (code $RC)"
