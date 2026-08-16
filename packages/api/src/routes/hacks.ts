@@ -265,7 +265,7 @@ hacksRouter.post('/:id/compile', async (c) => {
   const body = await c.req.json<{ baseRomId?: number }>().catch(() => ({} as { baseRomId?: number }))
 
   const hack = db.prepare('SELECT * FROM rom_hacks WHERE id = ?').get(id) as
-    | { id: number; title: string; system: string; patch_path: string | null; game_id: number | null; source_crc: string | null } | undefined
+    | { id: number; title: string; system: string; patch_path: string | null; game_id: number | null; source_crc: string | null; patch_format: string | null } | undefined
   if (!hack) return c.json({ error: 'hack not found' }, 404)
   if (!hack.game_id) return c.json({ error: 'hack is not matched to a game' }, 422)
   if (!hack.patch_path) return c.json({ error: 'no patch file for this hack (extract not complete?)' }, 422)
@@ -300,8 +300,9 @@ hacksRouter.post('/:id/compile', async (c) => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'hackbase-'))
     try { execFileSync('unzip', ['-o', '-j', base.rom_path, '-d', tmpDir], { stdio: 'ignore' }) }
     catch { /* fall through to the no-inner check */ }
+    // Exclude obvious text/metadata (NOT .md — that's the Megadrive ROM ext).
     const inner = fs.readdirSync(tmpDir)
-      .filter(f => !/\.(txt|nfo|dat|xml|md)$/i.test(f))
+      .filter(f => !/\.(txt|nfo|dat|xml|diz|html?)$/i.test(f))
       .map(f => ({ f, size: fs.statSync(path.join(tmpDir!, f)).size }))
       .sort((a, b) => b.size - a.size)
     if (!inner.length) {
@@ -319,12 +320,22 @@ hacksRouter.post('/:id/compile', async (c) => {
   const outPath = path.join(outDir, `${safe} [hack ${hack.id}]${outExt}`)
   fs.mkdirSync(outDir, { recursive: true })
 
+  const fmt = (hack.patch_format || path.extname(patchAbs).slice(1)).toLowerCase()
   try {
-    // flips handles IPS/BPS/UPS and autodetects; overwrite output.
-    execFileSync('flips', ['--apply', patchAbs, sourceRom, outPath], { stdio: 'pipe' })
+    if (fmt === 'xdelta') {
+      // xdelta3: -f force, -s source. No embedded source CRC to validate.
+      execFileSync('xdelta3', ['-d', '-f', '-s', sourceRom, patchAbs, outPath], { stdio: 'pipe' })
+    } else {
+      // flips handles IPS/BPS/UPS and autodetects; overwrite output.
+      execFileSync('flips', ['--apply', patchAbs, sourceRom, outPath], { stdio: 'pipe' })
+    }
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
-    return c.json({ error: `Patch failed (flips): ${msg.slice(0, 300)}` }, 500)
+    // BPS/UPS reject a wrong-version base ROM; make that legible.
+    const friendly = /checksum|crc|source/i.test(msg)
+      ? 'Patch rejected the base ROM — your library likely has a different region/revision than this hack needs.'
+      : `Patch failed: ${msg.slice(0, 200)}`
+    return c.json({ error: friendly }, 500)
   } finally {
     if (tmpDir) { try { fs.rmSync(tmpDir, { recursive: true, force: true }) } catch { /* ignore */ } }
   }

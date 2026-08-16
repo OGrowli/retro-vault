@@ -122,14 +122,14 @@ function extractPatches() {
     if (!fs.existsSync(bundleAbs)) { fail++; continue }
     try {
       fs.rmSync(tmp, { recursive: true, force: true }); fs.mkdirSync(tmp, { recursive: true })
-      // 7z handles zip/rar/7z uniformly; flatten patch files out of the bundle.
-      execFileSync('7z', ['e', '-y', `-o${tmp}`, bundleAbs, '*.ips', '*.bps', '*.ups', '-r'],
-        { stdio: 'ignore' })
-      const patches = fs.readdirSync(tmp).filter(f => /\.(ips|bps|ups)$/i.test(f))
+      // 7z handles zip/rar/7z uniformly; extract everything, then pick the patch
+      // by extension case-insensitively (catches uppercase .IPS + .xdelta).
+      execFileSync('7z', ['e', '-y', `-o${tmp}`, bundleAbs, '-r'], { stdio: 'ignore' })
+      const patches = fs.readdirSync(tmp).filter(f => /\.(ips|bps|ups|xdelta)$/i.test(f))
       if (!patches.length) { fail++; continue }
-      // Prefer bps/ups (carry a source CRC) over ips; then largest.
+      // Prefer bps/ups (carry a source CRC), then xdelta, then ips; then largest.
       patches.sort((a, b) => {
-        const rank = e => (/\.bps$/i.test(e) ? 0 : /\.ups$/i.test(e) ? 1 : 2)
+        const rank = e => (/\.bps$/i.test(e) ? 0 : /\.ups$/i.test(e) ? 1 : /\.xdelta$/i.test(e) ? 2 : 3)
         return rank(a) - rank(b) || fs.statSync(path.join(tmp, b)).size - fs.statSync(path.join(tmp, a)).size
       })
       const chosen = patches[0]
