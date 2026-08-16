@@ -236,6 +236,26 @@ db.exec(`
     PRIMARY KEY (game_id, kind)
   );
 
+  -- ROM hacks / translations catalogued from the ROMhacking.net dump. Derived
+  -- data, rebuilt by POST /hacks/import; game_id is the matched base game
+  -- (NULL = unmatched bucket). Kept separate from the games/roms pipeline.
+  CREATE TABLE IF NOT EXISTS rom_hacks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    hack_key TEXT NOT NULL UNIQUE,        -- rhdn id (as text) or bundle-path fallback
+    rhdn_id INTEGER,
+    kind TEXT NOT NULL DEFAULT 'hack',    -- hack | translation
+    system TEXT NOT NULL,                 -- primary mapped RetroVault system key
+    title TEXT NOT NULL,
+    author TEXT,
+    patch_format TEXT,                    -- ips | bps | ups
+    patch_path TEXT,                      -- relative path within the Pi romhacks tree
+    source_crc TEXT,                      -- BPS/UPS embedded source CRC (uppercase hex)
+    game_id INTEGER REFERENCES games(id) ON DELETE SET NULL,
+    match_confidence TEXT                 -- exact | fuzzy | manual | NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_rom_hacks_game ON rom_hacks(game_id);
+  CREATE INDEX IF NOT EXISTS idx_rom_hacks_system ON rom_hacks(system);
+
   CREATE INDEX IF NOT EXISTS idx_roms_game ON roms(game_id);
   CREATE INDEX IF NOT EXISTS idx_play_sessions_user ON play_sessions(user_id, started_at DESC);
   CREATE INDEX IF NOT EXISTS idx_play_sessions_rom ON play_sessions(rom_id);

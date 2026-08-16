@@ -22,6 +22,7 @@ import { systemRouter } from './routes/system.js'
 import { wifiRouter } from './routes/wifi.js'
 import { auditRouter } from './routes/audit.js'
 import { doomRouter } from './routes/doom.js'
+import { hacksRouter } from './routes/hacks.js'
 import { backfillRomKinds } from './importer.js'
 import { ensureBgVariant } from './scraper.js'
 
@@ -52,6 +53,7 @@ app.route('/system', systemRouter)
 app.route('/wifi', wifiRouter)
 app.route('/audit', auditRouter)
 app.route('/doom', doomRouter)
+app.route('/hacks', hacksRouter)
 
 const DATA_DIR = process.env['RETROVAULT_DATA_DIR'] ?? path.join(os.homedir(), '.retrovault')
 

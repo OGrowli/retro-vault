@@ -5,6 +5,7 @@ import { useGamepad } from '../hooks/useGamepad'
 import { Glyph } from '../components/Glyph'
 import { Clock } from '../components/Clock'
 import { AddToListModal } from '../components/AddToListModal'
+import { HacksPanel } from '../components/HacksPanel'
 
 interface Props {
   game: Game
@@ -17,7 +18,7 @@ interface Props {
   onListCreated?: (listId: number) => void
 }
 
-type ActionFocus = 'favorite' | 'add-to-list' | 'scrape' | 'random-again' | 'back'
+type ActionFocus = 'favorite' | 'add-to-list' | 'scrape' | 'hacks' | 'random-again' | 'back'
 
 const REGION_FLAGS: Record<string, string> = {
   USA: '🇺🇸',
@@ -123,8 +124,8 @@ function RomRow({
 export function GameDetail({ game: initialGame, user, onBack, fromRandom = false, onRandomAgain, onListCreated }: Props) {
   // "Random Again" only appears when we arrived here from a random pick.
   const ACTIONS: ActionFocus[] = fromRandom
-    ? ['favorite', 'add-to-list', 'scrape', 'random-again', 'back']
-    : ['favorite', 'add-to-list', 'scrape', 'back']
+    ? ['favorite', 'add-to-list', 'scrape', 'hacks', 'random-again', 'back']
+    : ['favorite', 'add-to-list', 'scrape', 'hacks', 'back']
   const [detail, setDetail] = useState<GameWithRoms | null>(null)
   const [game, setGame] = useState<Game>(initialGame)
   const [isFavorite, setIsFavorite] = useState(false)
@@ -139,6 +140,7 @@ export function GameDetail({ game: initialGame, user, onBack, fromRandom = false
   const [scraping, setScraping] = useState(false)
   const [scrapeError, setScrapeError] = useState<string | null>(null)
   const [addToListOpen, setAddToListOpen] = useState(false)
+  const [hacksOpen, setHacksOpen] = useState(false)
   // versionRefs[i] — keeps the gamepad-focused ROM row visible as focus moves.
   const versionRefs = useRef<(HTMLDivElement | null)[]>([])
   // Guards the auto-scrape so it fires at most once per game id.
@@ -268,11 +270,12 @@ export function GameDetail({ game: initialGame, user, onBack, fromRandom = false
         if (act === 'favorite') void toggleFavorite()
         if (act === 'add-to-list') setAddToListOpen(true)
         if (act === 'scrape') void scrape()
+        if (act === 'hacks') setHacksOpen(true)
         if (act === 'random-again') onRandomAgain?.()
         if (act === 'back') onBack()
       }
     }
-  }, !addToListOpen)
+  }, !addToListOpen && !hacksOpen)
 
   const lastPlayedDate = detail?.last_played
     ? new Date(detail.last_played).toLocaleDateString()
@@ -459,6 +462,7 @@ export function GameDetail({ game: initialGame, user, onBack, fromRandom = false
               ? (isFavorite ? 'Unfavorite' : 'Favorite')
               : act === 'add-to-list' ? 'Add to List'
               : act === 'scrape' ? (scraping ? 'Scraping…' : 'Scrape Metadata')
+              : act === 'hacks' ? 'Hacks'
               : act === 'random-again' ? '🎲 Random Again'
               : 'Back'
             return (
@@ -469,6 +473,7 @@ export function GameDetail({ game: initialGame, user, onBack, fromRandom = false
                   if (act === 'favorite') void toggleFavorite()
                   if (act === 'add-to-list') setAddToListOpen(true)
                   if (act === 'scrape') void scrape()
+                  if (act === 'hacks') setHacksOpen(true)
                   if (act === 'random-again') onRandomAgain?.()
                   if (act === 'back') onBack()
                 }}
@@ -493,6 +498,10 @@ export function GameDetail({ game: initialGame, user, onBack, fromRandom = false
 
       {addToListOpen && (
         <AddToListModal game={game} user={user} onClose={() => setAddToListOpen(false)} onListCreated={onListCreated} />
+      )}
+
+      {hacksOpen && (
+        <HacksPanel game={game} user={user} onClose={() => setHacksOpen(false)} />
       )}
 
       {continueRom && (

@@ -4,6 +4,7 @@ import type {
   ControllerConfig, HotkeyConfig, AudioConfig,
   WifiNetwork, WifiStatus,
   AuditStatus, AuditSystemSummary, AuditSystemReport,
+  RomHack,
 } from '@retro-vault/shared'
 
 // idgames Archive file record (subset we surface). Local to the client since
@@ -255,6 +256,16 @@ export const api = {
       get: (id: number) => get<{ file: IdgamesFile }>(`/doom/idgames/get?id=${id}`),
       download: (id: number) => post<{ downloaded: string; title?: string; wads: string[] }>('/doom/idgames/download', { id }),
     },
+  },
+
+  hacks: {
+    forGame: (gameId: number) => get<{ hacks: RomHack[] }>(`/hacks/for-game/${gameId}`),
+    import: () => post<{ total: number; exact: number; fuzzy: number; unmatched: number; matched: number }>('/hacks/import'),
+    unmatched: (system?: string, limit = 100, offset = 0) =>
+      get<{ total: number; items: RomHack[] }>(`/hacks/unmatched?limit=${limit}&offset=${offset}${system ? `&system=${system}` : ''}`),
+    assign: (id: number, gameId: number | null) => post<{ ok: boolean }>(`/hacks/${id}/assign`, { gameId }),
+    compile: (id: number, baseRomId?: number) => post<{ romId: number; outPath: string }>(`/hacks/${id}/compile`, baseRomId ? { baseRomId } : {}),
+    stats: () => get<{ systems: Array<{ system: string; total: number; matched: number }> }>('/hacks/stats'),
   },
 
   audit: {

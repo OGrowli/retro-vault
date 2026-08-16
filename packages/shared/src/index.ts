@@ -52,6 +52,23 @@ export interface Rom {
   last_played?: string | null
 }
 
+// A ROM hack / translation catalogued from the ROMhacking.net dump, matched to
+// a base game. Separate from the games/roms pipeline.
+export interface RomHack {
+  id: number
+  hack_key: string
+  rhdn_id: number | null
+  kind: 'hack' | 'translation'
+  system: string
+  title: string
+  author: string | null
+  patch_format: 'ips' | 'bps' | 'ups' | null
+  patch_path: string | null
+  source_crc: string | null
+  game_id: number | null
+  match_confidence: 'exact' | 'fuzzy' | 'manual' | null
+}
+
 export interface PlaySession {
   id: number
   user_id: number
