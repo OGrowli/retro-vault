@@ -1,6 +1,7 @@
 import { Hono } from 'hono'
 import { execFileSync } from 'node:child_process'
 import fs from 'node:fs'
+import os from 'node:os'
 import path from 'node:path'
 import { db, nameKey } from '../db.js'
 
@@ -198,9 +199,28 @@ hacksRouter.post('/:id/compile', async (c) => {
   if (!base) return c.json({ error: 'no base ROM found for this game' }, 422)
   if (!fs.existsSync(base.rom_path)) return c.json({ error: `base ROM file missing: ${base.rom_path}` }, 422)
 
-  // Output beside the base ROM in a _hacks/ subdir (importer scans top-level
-  // only, so it won't be re-imported — we register it explicitly).
-  const outExt = path.extname(base.rom_path) || '.rom'
+  // Patches target the raw ROM, not a .zip container. If the base is zipped,
+  // extract the inner ROM and patch that; output a raw ROM (RetroArch loads it).
+  let sourceRom = base.rom_path
+  let tmpDir: string | null = null
+  if (path.extname(base.rom_path).toLowerCase() === '.zip') {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'hackbase-'))
+    try { execFileSync('unzip', ['-o', '-j', base.rom_path, '-d', tmpDir], { stdio: 'ignore' }) }
+    catch { /* fall through to the no-inner check */ }
+    const inner = fs.readdirSync(tmpDir)
+      .filter(f => !/\.(txt|nfo|dat|xml|md)$/i.test(f))
+      .map(f => ({ f, size: fs.statSync(path.join(tmpDir!, f)).size }))
+      .sort((a, b) => b.size - a.size)
+    if (!inner.length) {
+      fs.rmSync(tmpDir, { recursive: true, force: true })
+      return c.json({ error: 'could not extract a ROM from the zipped base' }, 422)
+    }
+    sourceRom = path.join(tmpDir, inner[0]!.f)
+  }
+
+  // Output in a _hacks/ subdir beside the base ROM (importer scans top-level
+  // only, so it won't be re-imported — we register it explicitly). Raw ROM ext.
+  const outExt = path.extname(sourceRom) || '.rom'
   const safe = hack.title.replace(/[^\w.\- ]+/g, '_').slice(0, 80).trim()
   const outDir = path.join(path.dirname(base.rom_path), '_hacks')
   const outPath = path.join(outDir, `${safe} [hack ${hack.id}]${outExt}`)
@@ -208,10 +228,12 @@ hacksRouter.post('/:id/compile', async (c) => {
 
   try {
     // flips handles IPS/BPS/UPS and autodetects; overwrite output.
-    execFileSync('flips', ['--apply', patchAbs, base.rom_path, outPath], { stdio: 'pipe' })
+    execFileSync('flips', ['--apply', patchAbs, sourceRom, outPath], { stdio: 'pipe' })
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
     return c.json({ error: `Patch failed (flips): ${msg.slice(0, 300)}` }, 500)
+  } finally {
+    if (tmpDir) { try { fs.rmSync(tmpDir, { recursive: true, force: true }) } catch { /* ignore */ } }
   }
   if (!fs.existsSync(outPath)) return c.json({ error: 'flips produced no output' }, 500)
 
