@@ -6,6 +6,22 @@ import type {
   AuditStatus, AuditSystemSummary, AuditSystemReport,
 } from '@retro-vault/shared'
 
+// idgames Archive file record (subset we surface). Local to the client since
+// it's not part of the app's game/ROM domain model.
+export interface IdgamesFile {
+  id: number
+  title?: string
+  author?: string
+  description?: string
+  rating?: number
+  votes?: number
+  dir?: string
+  filename?: string
+  size?: number
+  date?: string
+  url?: string
+}
+
 function filterToParams(filter: GameFilter, userId?: number): string {
   const p = new URLSearchParams()
   if (userId !== undefined) p.set('userId', String(userId))
@@ -233,6 +249,12 @@ export const api = {
     wads: () => get<{ dir: string; iwads: string[]; wads: string[] }>('/doom/wads'),
     launch: (opts: { online?: boolean; iwad?: string; wad?: string } = {}) =>
       post<{ launched: boolean; pid?: number }>('/doom/launch', opts),
+    idgames: {
+      latest: (limit = 20) => get<{ files: IdgamesFile[] }>(`/doom/idgames/latest?limit=${limit}`),
+      search: (q: string) => get<{ files: IdgamesFile[] }>(`/doom/idgames/search?q=${encodeURIComponent(q)}`),
+      get: (id: number) => get<{ file: IdgamesFile }>(`/doom/idgames/get?id=${id}`),
+      download: (id: number) => post<{ downloaded: string; title?: string; wads: string[] }>('/doom/idgames/download', { id }),
+    },
   },
 
   audit: {

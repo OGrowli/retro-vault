@@ -3,6 +3,7 @@ import { api } from '../api/client'
 import { useGamepad } from '../hooks/useGamepad'
 import { Glyph } from '../components/Glyph'
 import { Clock } from '../components/Clock'
+import { DoomBrowse } from './DoomBrowse'
 
 interface Props {
   onBack: () => void
@@ -10,6 +11,7 @@ interface Props {
 
 type Item =
   | { kind: 'online' }
+  | { kind: 'browse' }
   | { kind: 'iwad'; name: string }
   | { kind: 'wad'; name: string }
 
@@ -39,16 +41,20 @@ export function Doom({ onBack }: Props) {
   const [focus, setFocus] = useState(0)
   const [launching, setLaunching] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [browsing, setBrowsing] = useState(false)
   const rowRefs = useRef<(HTMLDivElement | null)[]>([])
 
-  useEffect(() => {
+  const loadWads = useCallback(() => {
     api.doom.wads()
       .then(r => { setIwads(r.iwads); setWads(r.wads); setDir(r.dir); setLoading(false) })
       .catch(() => setLoading(false))
   }, [])
 
+  useEffect(() => { loadWads() }, [loadWads])
+
   const items: Item[] = [
     { kind: 'online' },
+    { kind: 'browse' },
     ...iwads.map(name => ({ kind: 'iwad', name } as const)),
     ...wads.map(name => ({ kind: 'wad', name } as const)),
   ]
@@ -78,6 +84,7 @@ export function Doom({ onBack }: Props) {
     const item = items[idx]
     if (!item) return
     if (item.kind === 'online') void launch({ online: true })
+    else if (item.kind === 'browse') setBrowsing(true)
     else if (item.kind === 'iwad') void launch({ iwad: item.name })
     else void launch({ wad: item.name })
   }, [items, launch])
@@ -88,7 +95,7 @@ export function Doom({ onBack }: Props) {
     if (action === 'up') setFocus(i => Math.max(0, i - 1))
     if (action === 'down') setFocus(i => Math.min(items.length - 1, i + 1))
     if (action === 'confirm') activate(focus)
-  }, true)
+  }, !browsing)
 
   const Row = ({ idx, label, sub, dim }: { idx: number; label: string; sub?: string; dim?: boolean }) => {
     const focused = focus === idx
@@ -116,6 +123,10 @@ export function Doom({ onBack }: Props) {
     <p className="text-vault-muted text-xs uppercase tracking-widest mt-4 mb-1 px-1">{text}</p>
   )
 
+  if (browsing) {
+    return <DoomBrowse onBack={(didDownload) => { setBrowsing(false); if (didDownload) loadWads() }} />
+  }
+
   return (
     <div className="fixed inset-0 bg-vault-bg flex flex-col">
       <div className="flex items-center justify-between px-[5%] pt-[3%]">
@@ -133,15 +144,16 @@ export function Doom({ onBack }: Props) {
           ) : (
             <>
               <Row idx={0} label="Online — Server Browser" sub="Browse & join live public games" />
+              <Row idx={1} label="Get More WADs" sub="Browse & download from /idgames" />
 
               {iwads.length > 0 && <Header text="Base Games" />}
               {iwads.map((f, i) => (
-                <Row key={f} idx={1 + i} label={iwadLabel(f)} sub={f} />
+                <Row key={f} idx={2 + i} label={iwadLabel(f)} sub={f} />
               ))}
 
               {wads.length > 0 && <Header text="Custom WADs" />}
               {wads.map((w, i) => (
-                <Row key={w} idx={1 + iwads.length + i} label={w} dim={!hasIwad} />
+                <Row key={w} idx={2 + iwads.length + i} label={w} dim={!hasIwad} />
               ))}
 
               {iwads.length === 0 && wads.length === 0 && (
