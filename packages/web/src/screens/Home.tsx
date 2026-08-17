@@ -37,6 +37,10 @@ const CONTINUE_THRESHOLD = 5 * 60
 
 // Grid page size: enough rows to cover several screens so scrolling rarely waits.
 const PAGE_SIZE = 120
+// How many pages of grid data to retain on each side of the visible window.
+// Bounds the in-memory game store (~ (2·KEEP_PAGES + spanned pages)·PAGE_SIZE)
+// so a huge library can't balloon the V8 heap on the 1GB Pi.
+const KEEP_PAGES = 3
 
 // Focusable columns in a rail: visible cards (capped) plus a Show More tile when there's overflow.
 const railColCount = (len: number) => Math.min(len, RAIL_CAP) + (len > RAIL_CAP ? 1 : 0)
@@ -47,7 +51,13 @@ export function Home({ user, systems, genres, filter, homePrefs, onFilterChange,
   // Paged "All Games" grid: total count + a sparse index→game store filled on
   // demand as the grid scrolls, instead of holding the whole library in memory.
   const [gamesTotal, setGamesTotal] = useState(0)
-  const [gamesStore, setGamesStore] = useState<Map<number, Game>>(new Map())
+  // Sparse index→game store for the paged "All Games" grid. Held in a ref and
+  // mutated in place (not cloned per page — cloning a growing Map on every one
+  // of ~160 page loads was O(n²) GC churn). A version counter triggers the
+  // re-render when its contents change; pages far from the viewport are evicted
+  // (see ensureRange) so memory stays bounded no matter how big the library is.
+  const gamesStoreRef = useRef<Map<number, Game>>(new Map())
+  const [storeVersion, setStoreVersion] = useState(0)
   const requestedPagesRef = useRef<Set<number>>(new Set())
   const filterRef = useRef(filter)
   filterRef.current = filter
@@ -93,22 +103,42 @@ export function Home({ user, systems, genres, filter, homePrefs, onFilterChange,
     } catch { /* lists are non-critical */ }
   }, [user.id, homePrefs])
 
-  // Load whatever grid pages back the [start, end) index window, once each.
-  // Reads the current filter from a ref so its identity stays stable.
+  // Load whatever grid pages back the [start, end) index window, once each, and
+  // evict pages more than KEEP_PAGES away from that window so the store never
+  // grows past a few hundred games — the grid re-requests an evicted page (via
+  // onNeedRange) if it's scrolled back into view. Reads the current filter from
+  // a ref so its identity stays stable.
   const ensureRange = useCallback((start: number, end: number) => {
     const first = Math.floor(start / PAGE_SIZE)
     const last = Math.floor(Math.max(start, end - 1) / PAGE_SIZE)
+
+    // Drop far-away pages to bound memory (V8 heap is capped on the Pi).
+    const keepLo = first - KEEP_PAGES
+    const keepHi = last + KEEP_PAGES
+    const store = gamesStoreRef.current
+    let changed = false
+    for (const pg of [...requestedPagesRef.current]) {
+      if (pg < keepLo || pg > keepHi) {
+        for (let i = 0; i < PAGE_SIZE; i++) store.delete(pg * PAGE_SIZE + i)
+        requestedPagesRef.current.delete(pg)
+        changed = true
+      }
+    }
+
+    const toFetch: number[] = []
     for (let pg = first; pg <= last; pg++) {
       if (requestedPagesRef.current.has(pg)) continue
       requestedPagesRef.current.add(pg)
+      toFetch.push(pg)
+    }
+    if (changed && toFetch.length === 0) setStoreVersion(v => v + 1)
+
+    for (const pg of toFetch) {
       api.games.page(filterRef.current, user.id, { limit: PAGE_SIZE, offset: pg * PAGE_SIZE })
         .then(({ total, items }) => {
           setGamesTotal(total)
-          setGamesStore(prev => {
-            const next = new Map(prev)
-            items.forEach((g, i) => next.set(pg * PAGE_SIZE + i, g))
-            return next
-          })
+          items.forEach((g, i) => gamesStoreRef.current.set(pg * PAGE_SIZE + i, g))
+          setStoreVersion(v => v + 1)
         })
         .catch(() => { requestedPagesRef.current.delete(pg) })
     }
@@ -117,10 +147,16 @@ export function Home({ user, systems, genres, filter, homePrefs, onFilterChange,
   // Discard the grid and reload from page 0 (filter changed or library changed).
   const resetGrid = useCallback(() => {
     requestedPagesRef.current = new Set()
-    setGamesStore(new Map())
+    gamesStoreRef.current = new Map()
+    setStoreVersion(v => v + 1)
     setGamesTotal(0)
     ensureRange(0, PAGE_SIZE)
   }, [ensureRange])
+
+  // Resolve a game by absolute grid index for VirtualGrid. Reads the mutable
+  // store from a ref; storeVersion is in the deps so its identity changes when
+  // pages load or are evicted, prompting the grid to re-render with fresh data.
+  const getGame = useCallback((i: number) => gamesStoreRef.current.get(i), [storeVersion])
 
   useEffect(() => {
     Promise.all([
@@ -264,7 +300,7 @@ export function Home({ user, systems, genres, filter, homePrefs, onFilterChange,
     onSettings,
     onConfirm: (region, row, col) => {
       if (region === 'all-games') {
-        const game = gamesStore.get(row * GRID_COLS + col)
+        const game = gamesStoreRef.current.get(row * GRID_COLS + col)
         if (game) onGameSelect(game)
         return
       }
@@ -281,7 +317,7 @@ export function Home({ user, systems, genres, filter, homePrefs, onFilterChange,
     onBack: onSwitchUser,
     onFavorite: (region, row, col) => {
       let game: Game | undefined
-      if (region === 'all-games') game = gamesStore.get(row * GRID_COLS + col)
+      if (region === 'all-games') game = gamesStoreRef.current.get(row * GRID_COLS + col)
       else game = collectionFor(region)?.games[col]
       if (!game) return
       const g = game
@@ -422,9 +458,9 @@ export function Home({ user, systems, genres, filter, homePrefs, onFilterChange,
 
         <VirtualGrid
           total={gamesTotal}
-          getGame={(i) => gamesStore.get(i)}
+          getGame={getGame}
           onNeedRange={ensureRange}
-          loading={loading && gamesStore.size === 0}
+          loading={loading && gamesStoreRef.current.size === 0}
           focusedRow={gridIdx.row}
           focusedCol={gridIdx.col}
           isActiveRegion={nav.region === 'all-games' && !filterOpen}
