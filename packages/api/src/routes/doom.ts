@@ -185,14 +185,26 @@ doomRouter.get('/idgames/latest', async (c) => {
   }
 })
 
-// GET /doom/idgames/search?q=&type=&sort=  — search the archive.
+// Which record field the query matches against, and how results are ordered.
+// These mirror the idgames API's `search` action; anything outside the allowed
+// sets falls back to a sensible default (the API itself is lenient, but we
+// validate so the UI can't send junk).
+const SEARCH_TYPES = new Set(['filename', 'title', 'author', 'email', 'description', 'credits', 'editors', 'textfile'])
+const SORT_KEYS = new Set(['date', 'filename', 'size', 'rating'])
+
+// GET /doom/idgames/search?q=&type=&sort=&dir=  — search the archive.
+//   type: title | author | filename | email | description | credits | editors | textfile
+//   sort: rating | date | size | filename      dir: desc | asc
 doomRouter.get('/idgames/search', async (c) => {
   const q = (c.req.query('q') ?? '').trim()
   if (q.length < 2) return c.json({ files: [] })
-  const type = c.req.query('type') ?? 'title'   // title | author | filename | textfile
-  const sort = c.req.query('sort') ?? 'rating'  // rating | date | filename
+  const typeReq = c.req.query('type') ?? ''
+  const sortReq = c.req.query('sort') ?? ''
+  const type = SEARCH_TYPES.has(typeReq) ? typeReq : 'title'
+  const sort = SORT_KEYS.has(sortReq) ? sortReq : 'rating'
+  const dir = c.req.query('dir') === 'asc' ? 'asc' : 'desc'
   try {
-    return c.json({ files: await idgames({ action: 'search', query: q, type, sort, dir: 'desc' }) })
+    return c.json({ files: await idgames({ action: 'search', query: q, type, sort, dir }) })
   } catch (e) {
     return c.json({ error: e instanceof Error ? e.message : 'idgames unavailable' }, 502)
   }

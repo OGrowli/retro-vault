@@ -23,6 +23,16 @@ export interface IdgamesFile {
   url?: string
 }
 
+// idgames `search` action knobs — which record field the query matches, how the
+// results are ordered, and the direction. Mirrors the API's accepted values.
+export type IdgamesSearchType = 'title' | 'author' | 'filename' | 'textfile' | 'description'
+export type IdgamesSortKey = 'rating' | 'date' | 'size' | 'filename'
+export interface IdgamesSearchOpts {
+  type?: IdgamesSearchType
+  sort?: IdgamesSortKey
+  dir?: 'asc' | 'desc'
+}
+
 function filterToParams(filter: GameFilter, userId?: number): string {
   const p = new URLSearchParams()
   if (userId !== undefined) p.set('userId', String(userId))
@@ -255,7 +265,13 @@ export const api = {
       post<{ launched: boolean; pid?: number }>('/doom/launch', opts),
     idgames: {
       latest: (limit = 20) => get<{ files: IdgamesFile[] }>(`/doom/idgames/latest?limit=${limit}`),
-      search: (q: string) => get<{ files: IdgamesFile[] }>(`/doom/idgames/search?q=${encodeURIComponent(q)}`),
+      search: (q: string, opts?: IdgamesSearchOpts) => {
+        const p = new URLSearchParams({ q })
+        if (opts?.type) p.set('type', opts.type)
+        if (opts?.sort) p.set('sort', opts.sort)
+        if (opts?.dir) p.set('dir', opts.dir)
+        return get<{ files: IdgamesFile[] }>(`/doom/idgames/search?${p.toString()}`)
+      },
       get: (id: number) => get<{ file: IdgamesFile }>(`/doom/idgames/get?id=${id}`),
       download: (id: number) => post<{ downloaded: string; title?: string; wads: string[] }>('/doom/idgames/download', { id }),
     },

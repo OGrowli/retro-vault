@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { api } from '../api/client'
-import type { IdgamesFile } from '../api/client'
+import type { IdgamesFile, IdgamesSearchType, IdgamesSortKey } from '../api/client'
 import { useGamepad } from '../hooks/useGamepad'
 import { Glyph } from '../components/Glyph'
 import { VirtualKeyboard } from '../components/VirtualKeyboard'
@@ -12,6 +12,25 @@ interface Props {
 
 const star = (r?: number) => (r == null ? '—' : `${'★'.repeat(Math.round(r))}${'☆'.repeat(5 - Math.round(r))}`)
 
+// idgames `search` knobs surfaced as cycle-able chips. Field = which record
+// field the query matches; Sort = ordering key; Order = direction. These only
+// affect search — the latest-uploads view ignores them (the API has no sort on
+// latestfiles), so cycling them just sets the pref for the next search.
+const FIELDS: { key: IdgamesSearchType; label: string }[] = [
+  { key: 'title', label: 'Title' },
+  { key: 'author', label: 'Author' },
+  { key: 'filename', label: 'Filename' },
+  { key: 'description', label: 'Description' },
+  { key: 'textfile', label: 'Text file' },
+]
+const SORTS: { key: IdgamesSortKey; label: string }[] = [
+  { key: 'rating', label: 'Rating' },
+  { key: 'date', label: 'Date' },
+  { key: 'size', label: 'Size' },
+  { key: 'filename', label: 'Name' },
+]
+const CTRL_COUNT = 4 // Search · Field · Sort · Order
+
 // Browse/download the Doomworld /idgames archive — "Id Games". Two-pane like a
 // RetroVault list view: results on the left, the focused entry's details on the
 // right, updating as you navigate. Downloads extract into the Doom WAD folder.
@@ -19,7 +38,12 @@ export function DoomBrowse({ onBack }: Props) {
   const [files, setFiles] = useState<IdgamesFile[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [focus, setFocus] = useState(0)              // 0 = Search row, 1.. = results
+  const [focus, setFocus] = useState(0)              // 0 = control row, 1.. = results
+  const [ctrl, setCtrl] = useState(0)                // which control chip (0..3) when focus === 0
+  const [field, setField] = useState<IdgamesSearchType>('title')
+  const [sort, setSort] = useState<IdgamesSortKey>('rating')
+  const [order, setOrder] = useState<'asc' | 'desc'>('desc')
+  const [lastQuery, setLastQuery] = useState('')     // active search query (empty = latest view)
   const [query, setQuery] = useState('')
   const [searching, setSearching] = useState(false)  // keyboard overlay open
   const [downloading, setDownloading] = useState(false)
@@ -37,13 +61,39 @@ export function DoomBrowse({ onBack }: Props) {
   }, [])
   useEffect(() => { loadLatest() }, [loadLatest])
 
-  const runSearch = useCallback((q: string) => {
-    setSearching(false); setFocus(1); setLoading(true); setError(null)
-    api.doom.idgames.search(q)
+  // `over` lets a control chip re-run the active query with a just-changed knob
+  // without waiting for the state update to land in this closure.
+  const runSearch = useCallback((q: string, over?: { field?: IdgamesSearchType; sort?: IdgamesSortKey; order?: 'asc' | 'desc' }) => {
+    setSearching(false); setLastQuery(q); setFocus(1); setLoading(true); setError(null)
+    api.doom.idgames.search(q, {
+      type: over?.field ?? field,
+      sort: over?.sort ?? sort,
+      dir: over?.order ?? order,
+    })
       .then(r => setFiles(r.files))
       .catch(e => setError(e instanceof Error ? e.message : 'Search failed'))
       .finally(() => setLoading(false))
-  }, [])
+  }, [field, sort, order])
+
+  // Cycle a control chip; if a search is active, re-run it with the new value.
+  const cycleField = useCallback(() => {
+    const next = FIELDS[(FIELDS.findIndex(x => x.key === field) + 1) % FIELDS.length].key
+    setField(next); if (lastQuery) runSearch(lastQuery, { field: next })
+  }, [field, lastQuery, runSearch])
+  const cycleSort = useCallback(() => {
+    const next = SORTS[(SORTS.findIndex(x => x.key === sort) + 1) % SORTS.length].key
+    setSort(next); if (lastQuery) runSearch(lastQuery, { sort: next })
+  }, [sort, lastQuery, runSearch])
+  const toggleOrder = useCallback(() => {
+    const next = order === 'desc' ? 'asc' : 'desc'
+    setOrder(next); if (lastQuery) runSearch(lastQuery, { order: next })
+  }, [order, lastQuery, runSearch])
+  const activateCtrl = useCallback((i: number) => {
+    if (i === 0) setSearching(true)
+    else if (i === 1) cycleField()
+    else if (i === 2) cycleSort()
+    else toggleOrder()
+  }, [cycleField, cycleSort, toggleOrder])
 
   const current = focus > 0 ? files[focus - 1] : undefined
 
@@ -76,8 +126,10 @@ export function DoomBrowse({ onBack }: Props) {
     if (action === 'back') { onBack(didDownload); return }
     if (action === 'up') setFocus(i => Math.max(0, i - 1))
     if (action === 'down') setFocus(i => Math.min(files.length, i + 1))
+    if (action === 'left' && focus === 0) setCtrl(i => Math.max(0, i - 1))
+    if (action === 'right' && focus === 0) setCtrl(i => Math.min(CTRL_COUNT - 1, i + 1))
     if (action === 'confirm') {
-      if (focus === 0) { setSearching(true); return }
+      if (focus === 0) { activateCtrl(ctrl); return }
       if (current && !done.has(current.id)) void download(current)
     }
   }, !searching)
@@ -122,15 +174,32 @@ export function DoomBrowse({ onBack }: Props) {
         <div className="w-[42%] flex flex-col gap-1.5 overflow-y-auto pr-1" style={{ scrollbarWidth: 'none' }}>
           <div
             ref={el => { rowRefs.current[0] = el }}
-            onMouseEnter={() => setFocus(0)}
-            onClick={() => setSearching(true)}
-            className={[
-              'flex items-center gap-3 px-4 py-3 rounded-xl cursor-pointer border border-dashed flex-shrink-0',
-              focus === 0 ? 'border-vault-accent bg-vault-surface' : 'border-vault-muted',
-            ].join(' ')}
+            className="flex items-center gap-1.5 flex-wrap flex-shrink-0"
           >
-            <span className="text-vault-muted">🔍</span>
-            <span className="text-[0.9rem] font-semibold text-white">Search…</span>
+            {(() => {
+              const chip = (i: number, dashed = false) => [
+                'flex items-center gap-1.5 px-3 py-2 rounded-lg text-[0.8rem] text-white cursor-pointer border flex-shrink-0',
+                dashed ? 'border-dashed' : '',
+                focus === 0 && ctrl === i ? 'border-vault-accent bg-vault-surface' : 'border-transparent bg-vault-card',
+              ].join(' ')
+              const lbl = (t: string) => <span className="text-vault-muted text-[0.58rem] uppercase tracking-wider">{t}</span>
+              return (
+                <>
+                  <div onMouseEnter={() => { setFocus(0); setCtrl(0) }} onClick={() => { setFocus(0); setCtrl(0); setSearching(true) }} className={chip(0, true)}>
+                    <span className="text-vault-muted">🔍</span><span className="font-semibold">Search…</span>
+                  </div>
+                  <div onMouseEnter={() => { setFocus(0); setCtrl(1) }} onClick={() => { setFocus(0); setCtrl(1); cycleField() }} className={chip(1)}>
+                    {lbl('Field')}<span className="font-semibold">{FIELDS.find(x => x.key === field)!.label}</span>
+                  </div>
+                  <div onMouseEnter={() => { setFocus(0); setCtrl(2) }} onClick={() => { setFocus(0); setCtrl(2); cycleSort() }} className={chip(2)}>
+                    {lbl('Sort')}<span className="font-semibold">{SORTS.find(x => x.key === sort)!.label}</span>
+                  </div>
+                  <div onMouseEnter={() => { setFocus(0); setCtrl(3) }} onClick={() => { setFocus(0); setCtrl(3); toggleOrder() }} className={chip(3)}>
+                    {lbl('Order')}<span className="font-semibold">{order === 'desc' ? '↓ Desc' : '↑ Asc'}</span>
+                  </div>
+                </>
+              )
+            })()}
           </div>
 
           {loading ? (
@@ -193,7 +262,7 @@ export function DoomBrowse({ onBack }: Props) {
 
       <footer className="flex-shrink-0 px-[4%] pb-5">
         <p className="text-vault-muted text-xs uppercase tracking-wide flex items-center gap-1.5 flex-wrap">
-          <Glyph type="cross" /> Download / Search  ·  <Glyph type="circle" /> Back  ·  ↑↓ Browse
+          <Glyph type="cross" /> Download / Search  ·  <Glyph type="circle" /> Back  ·  ↑↓ Browse  ·  ←→ Filter &amp; sort
         </p>
       </footer>
     </div>
