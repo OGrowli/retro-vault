@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { api } from '../api/client'
 import { useGamepad } from '../hooks/useGamepad'
-import { Glyph } from '../components/Glyph'
 import { Clock } from '../components/Clock'
+import { Breadcrumb, Title, SectionHeader, HintBar, Tag, rowClass, Caret } from '../components/ui'
 import { DoomBrowse } from './DoomBrowse'
 
 interface Props {
@@ -98,90 +98,89 @@ export function Doom({ onBack }: Props) {
     if (action === 'confirm') activate(focus)
   }, !browsing)
 
-  const Row = ({ idx, label, sub, dim }: { idx: number; label: string; sub?: string; dim?: boolean }) => {
+  const Row = ({ idx, label, sub, tag, dim }: { idx: number; label: string; sub?: string; tag?: string; dim?: boolean }) => {
     const focused = focus === idx
     return (
       <div
         ref={el => { rowRefs.current[idx] = el }}
         onMouseEnter={() => setFocus(idx)}
         onClick={() => activate(idx)}
-        className={[
-          'flex items-center gap-3.5 px-4 py-3.5 rounded-2xl cursor-pointer',
-          'border transition-[box-shadow,transform] duration-150 motion-reduce:transition-none',
-          focused ? 'bg-vault-surface ring-2 ring-vault-accent scale-[1.01] border-transparent' : 'bg-vault-card border-transparent',
-        ].join(' ')}
+        className={[rowClass(focused, 'idg'), dim && !focused ? 'opacity-60' : ''].join(' ')}
       >
-        <span className="flex-1 min-w-0">
-          <span className={`block text-[0.95rem] font-semibold ${dim ? 'text-vault-muted' : 'text-white'} truncate`}>{label}</span>
-          {sub && <span className="block text-xs text-vault-muted uppercase tracking-wide mt-0.5">{sub}</span>}
-        </span>
-        {focused && <span className="text-vault-accent text-xs font-bold uppercase tracking-wide flex-shrink-0">Play</span>}
+        <Caret selected={focused} mode="idg" />
+        <span className="truncate text-xl">{label}</span>
+        {tag && <Tag mode="idg" dark={focused}>{tag}</Tag>}
+        <span className="flex-1" />
+        {sub && (
+          <span className={`font-mono text-[0.85rem] tracking-[0.06em] ${focused ? 'text-idg-ink/70' : 'text-idg-muted'}`}>
+            {focused && !tag ? `${sub}  ·  a launch` : sub}
+          </span>
+        )}
       </div>
     )
   }
-
-  const Header = ({ text }: { text: string }) => (
-    <p className="text-vault-muted text-xs uppercase tracking-widest mt-4 mb-1 px-1">{text}</p>
-  )
 
   if (browsing) {
     return <DoomBrowse onBack={(didDownload) => { setBrowsing(false); if (didDownload) loadWads() }} />
   }
 
   return (
-    <div className="fixed inset-0 bg-vault-bg flex flex-col">
-      <div className="flex items-center justify-between px-[5%] pt-[3%]">
-        <div>
-          <h1 className="text-white text-3xl font-extrabold tracking-tight">DOOM</h1>
-          <p className="text-vault-muted text-xs uppercase tracking-widest mt-1">Pick a game</p>
-        </div>
+    <div className="fixed inset-0 bg-idg-bg text-idg-text flex flex-col px-[5%] py-[3%] font-sans">
+      <div className="flex items-center justify-between flex-shrink-0">
+        <Breadcrumb mode="idg">landing / idgames</Breadcrumb>
         <Clock />
       </div>
 
-      <div className="flex-1 overflow-hidden px-[5%] pt-6">
-        <div className="max-w-[560px] mx-auto flex flex-col gap-2 overflow-y-auto max-h-[62vh]" style={{ scrollbarWidth: 'none' }}>
+      <div className="flex items-baseline gap-4 mt-4 flex-shrink-0">
+        <Title mode="idg" className="text-6xl">idGames</Title>
+        <span className="font-mono text-[0.9rem] uppercase tracking-[0.1em] text-idg-muted">
+          {iwads.length} iwads · {wads.length} custom wads · lzdoom
+        </span>
+      </div>
+
+      <div className="flex-1 overflow-hidden pt-6 min-h-0">
+        <div className="flex flex-col overflow-y-auto h-full" style={{ scrollbarWidth: 'none' }}>
           {loading ? (
-            <p className="text-vault-muted text-sm text-center py-6">Loading…</p>
+            <p className="text-idg-muted text-sm py-6 font-mono">loading…</p>
           ) : (
             <>
-              <Row idx={0}
-                label={onlineReady ? 'Online — Server Browser' : 'Online — Coming Soon'}
-                sub={onlineReady ? 'Browse & join live public games' : 'Multiplayer port not installed yet'}
-                dim={!onlineReady} />
-              <Row idx={1} label="Id Games" sub="Browse & download Doom WADs" />
-
-              {iwads.length > 0 && <Header text="Base Games" />}
+              {iwads.length > 0 && <div className="mb-2"><SectionHeader mode="idg" label="base games" /></div>}
               {iwads.map((f, i) => (
-                <Row key={f} idx={2 + i} label={iwadLabel(f)} sub={f} />
+                <Row key={f} idx={2 + i} label={iwadLabel(f)} tag="iwad" sub={f} />
               ))}
 
-              {wads.length > 0 && <Header text="Custom WADs" />}
+              <div className="my-2"><SectionHeader mode="idg" label="library" /></div>
+              <Row idx={1} label="Get More — browse the archive" sub="search the doomworld archive" />
+              <Row idx={0}
+                label={onlineReady ? 'Online multiplayer' : 'Online multiplayer'}
+                sub={onlineReady ? 'browse & join live public games' : 'unavailable · no server configured'}
+                dim={!onlineReady} />
+
+              {wads.length > 0 && <div className="mt-3 mb-2"><SectionHeader mode="idg" label="downloaded wads" /></div>}
               {wads.map((w, i) => (
-                <Row key={w} idx={2 + iwads.length + i} label={w} dim={!hasIwad} />
+                <Row key={w} idx={2 + iwads.length + i} label={w} tag="wad" dim={!hasIwad} />
               ))}
 
               {iwads.length === 0 && wads.length === 0 && (
-                <p className="text-vault-muted text-sm text-center py-4">
-                  No WADs found. Drop IWADs / .wad / .pk3 files in{dir ? ` ${dir}` : ' the Doom folder'} to list them here.
+                <p className="text-idg-muted text-sm py-4 font-mono">
+                  no wads found. drop iwads / .wad / .pk3 files in{dir ? ` ${dir}` : ' the doom folder'} to list them here.
                 </p>
               )}
               {!hasIwad && wads.length > 0 && (
-                <p className="text-amber-400/80 text-xs text-center py-2">
-                  No IWAD (doom2.wad / freedoom2.wad) in the folder — custom WADs need one to launch.
+                <p className="text-idg-accent text-xs py-2 font-mono">
+                  no iwad (doom2.wad / freedoom2.wad) in the folder — custom wads need one to launch.
                 </p>
               )}
             </>
           )}
 
-          {error && <p className="text-red-400 text-sm text-center py-2">{error}</p>}
-          {launching && <p className="text-vault-accent-bright text-sm text-center py-2">Launching…</p>}
+          {error && <p className="text-red-400 text-sm py-2">{error}</p>}
+          {launching && <p className="text-idg-accent text-sm py-2 font-mono">launching…</p>}
         </div>
       </div>
 
-      <footer className="flex-shrink-0 px-[5%] pb-6 pt-3">
-        <p className="text-vault-muted text-xs uppercase tracking-wide flex items-center gap-1.5 flex-wrap">
-          <Glyph type="cross" /> Play  ·  <Glyph type="circle" /> Back  ·  ↑↓ Navigate
-        </p>
+      <footer className="flex-shrink-0 pt-4">
+        <HintBar mode="idg" hints={['d-pad move', 'a launch', 'b back to landing']} />
       </footer>
     </div>
   )

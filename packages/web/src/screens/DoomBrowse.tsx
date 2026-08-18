@@ -2,15 +2,14 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { api } from '../api/client'
 import type { IdgamesFile, IdgamesSearchType, IdgamesSortKey } from '../api/client'
 import { useGamepad } from '../hooks/useGamepad'
-import { Glyph } from '../components/Glyph'
 import { VirtualKeyboard } from '../components/VirtualKeyboard'
-import idGamesLogo from '../assets/idgames-logo.webp'
+import { Breadcrumb, Title, HintBar, Tag, rowClass, Caret } from '../components/ui'
 
 interface Props {
   onBack: (didDownload: boolean) => void
 }
 
-const star = (r?: number) => (r == null ? '—' : `${'★'.repeat(Math.round(r))}${'☆'.repeat(5 - Math.round(r))}`)
+const rateNum = (r?: number) => (r == null ? '—' : r.toFixed(2))
 
 // idgames `search` knobs surfaced as cycle-able chips. Field = which record
 // field the query matches; Sort = ordering key; Order = direction. These only
@@ -137,11 +136,11 @@ export function DoomBrowse({ onBack }: Props) {
   // ---- search keyboard overlay ----
   if (searching) {
     return (
-      <div className="fixed inset-0 bg-vault-bg flex flex-col items-center justify-center px-6">
+      <div className="fixed inset-0 bg-idg-bg text-idg-text flex flex-col items-center justify-center px-6">
         <div className="w-full max-w-[560px] space-y-4">
-          <h2 className="text-white text-xl font-bold">Search Id Games</h2>
-          <div className="bg-vault-surface border border-vault-accent rounded-xl px-4 py-3 text-white text-lg min-h-[52px] break-all">
-            {query || <span className="text-vault-muted">Title or keyword…</span>}
+          <Title mode="idg" className="text-4xl">Search the archive</Title>
+          <div className="bg-black/20 border border-idg-dim rounded-[2px] px-4 py-3 text-idg-text text-lg min-h-[52px] break-all font-mono">
+            {query || <span className="text-idg-muted">title or keyword…</span>}
           </div>
           <VirtualKeyboard
             value={query}
@@ -160,42 +159,35 @@ export function DoomBrowse({ onBack }: Props) {
   const got = current ? done.has(current.id) : false
 
   return (
-    <div className="fixed inset-0 bg-vault-bg flex flex-col">
-      <header className="flex items-center gap-3 px-[4%] pt-[2.5%] pb-3">
-        <img src={idGamesLogo} alt="Id Games" className="h-9 w-auto object-contain" />
-        <div>
-          <h1 className="text-white text-2xl font-extrabold tracking-tight leading-none">Id Games</h1>
-          <p className="text-vault-muted text-[0.65rem] uppercase tracking-widest mt-1">Doomworld archive · browse &amp; download</p>
-        </div>
-      </header>
+    <div className="fixed inset-0 bg-idg-bg text-idg-text flex flex-col px-[4%] pt-[2.5%] pb-5 font-sans">
+      <Breadcrumb mode="idg">idgames / browse</Breadcrumb>
 
-      <div className="flex-1 min-h-0 flex gap-5 px-[4%] pb-4">
-        {/* Left: results list */}
-        <div className="w-[42%] flex flex-col gap-1.5 overflow-y-auto pr-1" style={{ scrollbarWidth: 'none' }}>
+      <div className="flex-1 min-h-0 flex gap-8 pt-4">
+        {/* Left: control row + results list */}
+        <div className="w-[42%] flex flex-col gap-2 overflow-y-auto pr-1" style={{ scrollbarWidth: 'none' }}>
           <div
             ref={el => { rowRefs.current[0] = el }}
-            className="flex items-center gap-1.5 flex-wrap flex-shrink-0"
+            className="flex items-center gap-2 flex-wrap flex-shrink-0"
           >
             {(() => {
-              const chip = (i: number, dashed = false) => [
-                'flex items-center gap-1.5 px-3 py-2 rounded-lg text-[0.8rem] text-white cursor-pointer border flex-shrink-0',
-                dashed ? 'border-dashed' : '',
-                focus === 0 && ctrl === i ? 'border-vault-accent bg-vault-surface' : 'border-transparent bg-vault-card',
+              const chip = (i: number) => [
+                'flex items-center gap-2 px-3 py-2 rounded-[2px] font-mono text-[0.8rem] cursor-pointer border flex-shrink-0',
+                focus === 0 && ctrl === i ? 'border-idg-dim bg-idg-fill text-idg-ink' : 'border-idg-dim/50 text-idg-text',
               ].join(' ')
-              const lbl = (t: string) => <span className="text-vault-muted text-[0.58rem] uppercase tracking-wider">{t}</span>
+              const lbl = (t: string) => <span className="text-idg-muted text-[0.6rem] uppercase tracking-[0.12em]">{t}</span>
               return (
                 <>
-                  <div onMouseEnter={() => { setFocus(0); setCtrl(0) }} onClick={() => { setFocus(0); setCtrl(0); setSearching(true) }} className={chip(0, true)}>
-                    <span className="text-vault-muted">🔍</span><span className="font-semibold">Search…</span>
+                  <div onMouseEnter={() => { setFocus(0); setCtrl(0) }} onClick={() => { setFocus(0); setCtrl(0); setSearching(true) }} className={chip(0)}>
+                    <span>search the archive</span>
                   </div>
                   <div onMouseEnter={() => { setFocus(0); setCtrl(1) }} onClick={() => { setFocus(0); setCtrl(1); cycleField() }} className={chip(1)}>
-                    {lbl('Field')}<span className="font-semibold">{FIELDS.find(x => x.key === field)!.label}</span>
+                    {lbl('field')}<span>{FIELDS.find(x => x.key === field)!.label.toLowerCase()}</span>
                   </div>
                   <div onMouseEnter={() => { setFocus(0); setCtrl(2) }} onClick={() => { setFocus(0); setCtrl(2); cycleSort() }} className={chip(2)}>
-                    {lbl('Sort')}<span className="font-semibold">{SORTS.find(x => x.key === sort)!.label}</span>
+                    {lbl('sort')}<span>{SORTS.find(x => x.key === sort)!.label.toLowerCase()} {order === 'desc' ? '↓' : '↑'}</span>
                   </div>
                   <div onMouseEnter={() => { setFocus(0); setCtrl(3) }} onClick={() => { setFocus(0); setCtrl(3); toggleOrder() }} className={chip(3)}>
-                    {lbl('Order')}<span className="font-semibold">{order === 'desc' ? '↓ Desc' : '↑ Asc'}</span>
+                    {lbl('order')}<span>{order === 'desc' ? 'desc' : 'asc'}</span>
                   </div>
                 </>
               )
@@ -203,11 +195,11 @@ export function DoomBrowse({ onBack }: Props) {
           </div>
 
           {loading ? (
-            <p className="text-vault-muted text-sm text-center py-6">Loading…</p>
+            <p className="text-idg-muted text-sm py-6 font-mono">loading…</p>
           ) : error && files.length === 0 ? (
-            <p className="text-red-400 text-sm text-center py-6">{error}</p>
+            <p className="text-red-400 text-sm py-6">{error}</p>
           ) : files.length === 0 ? (
-            <p className="text-vault-muted text-sm text-center py-6">No results.</p>
+            <p className="text-idg-muted text-sm py-6 font-mono">no results.</p>
           ) : (
             files.map((f, i) => {
               const idx = i + 1
@@ -218,13 +210,11 @@ export function DoomBrowse({ onBack }: Props) {
                   ref={el => { rowRefs.current[idx] = el }}
                   onMouseEnter={() => setFocus(idx)}
                   onClick={() => setFocus(idx)}
-                  className={[
-                    'flex items-center gap-2 px-4 py-2.5 rounded-xl cursor-pointer border flex-shrink-0',
-                    focused ? 'bg-vault-surface ring-2 ring-vault-accent border-transparent' : 'bg-vault-card border-transparent',
-                  ].join(' ')}
+                  className={rowClass(focused, 'idg')}
                 >
-                  <span className="flex-1 min-w-0 text-[0.88rem] font-semibold text-white truncate">{f.title || f.filename}</span>
-                  {done.has(f.id) && <span className="text-emerald-400 text-[10px] font-bold uppercase flex-shrink-0">✓</span>}
+                  <Caret selected={focused} mode="idg" />
+                  <span className="flex-1 min-w-0 text-lg truncate">{f.title || f.filename}</span>
+                  {done.has(f.id) && <Tag mode="idg" dark={focused}>downloaded</Tag>}
                 </div>
               )
             })
@@ -232,26 +222,33 @@ export function DoomBrowse({ onBack }: Props) {
         </div>
 
         {/* Right: focused entry detail */}
-        <div className="flex-1 min-w-0 bg-vault-card rounded-2xl p-6 flex flex-col overflow-hidden">
+        <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
           {!d ? (
-            <div className="m-auto text-vault-muted text-sm">Select an entry, or press Search.</div>
+            <div className="m-auto text-idg-muted text-sm font-mono">select an entry, or press search.</div>
           ) : (
             <>
-              <h2 className="text-white text-2xl font-extrabold leading-tight">{d.title || d.filename}</h2>
-              <p className="text-vault-muted text-sm mt-1">
-                {d.author || 'Unknown'} · {star(d.rating)}{d.votes != null ? ` (${d.votes})` : ''}{d.date ? ` · ${d.date}` : ''}
-              </p>
-              <p className="text-vault-muted text-[15px] leading-relaxed mt-4 overflow-y-auto flex-1" style={{ scrollbarWidth: 'none' }}>
-                {d.description || 'No description.'}
-              </p>
-              {d.dir && <p className="text-vault-muted text-[0.65rem] mt-3 font-mono truncate">/idgames/{d.dir}{d.filename}</p>}
+              <Title mode="idg" className="text-5xl">{d.title || d.filename}</Title>
+              <div className="flex items-center gap-4 mt-3">
+                <span className="text-idg-text/70 text-lg">{d.author || 'author unknown'}</span>
+                {d.date && <><span className="text-idg-text/40">·</span><span className="text-idg-text/70 text-lg">{d.date}</span></>}
+                <span className="flex-1" />
+                <span className="font-display font-semibold text-4xl text-idg-accent">{rateNum(d.rating)}</span>
+                <span className="font-mono text-[0.85rem] tracking-[0.06em] text-idg-muted">of 5{d.votes != null ? ` · ${d.votes} votes` : ''}</span>
+              </div>
 
-              <div className="mt-4 flex items-center gap-3">
+              <div className="h-px bg-idg-text/15 my-5" />
+
+              <p className="font-read text-[1.15rem] leading-[1.5] text-idg-text/82 overflow-y-auto flex-1" style={{ scrollbarWidth: 'none', ['textWrap' as string]: 'pretty' }}>
+                {d.description || 'The archive carries no text file, so nothing here describes the file yet.'}
+              </p>
+              {d.dir && <p className="text-idg-muted text-[0.75rem] mt-3 font-mono truncate">/idgames/{d.dir}{d.filename}</p>}
+
+              <div className="mt-5 flex items-center gap-4">
                 <span className={[
-                  'px-5 py-2.5 rounded-xl font-bold text-sm uppercase tracking-wide inline-flex items-center gap-2',
-                  got ? 'bg-emerald-600/20 text-emerald-300' : 'bg-vault-accent text-white',
+                  'px-6 py-3 rounded-[2px] border-l-[6px] font-mono uppercase tracking-[0.08em] text-sm inline-flex items-center gap-3',
+                  got ? 'border-idg-dim bg-idg-bg text-idg-accent' : 'border-idg-gold bg-idg-fill text-idg-ink',
                 ].join(' ')}>
-                  {downloading ? 'Downloading…' : got ? '✓ In your WAD list' : <><Glyph type="cross" /> Download</>}
+                  {downloading ? 'downloading…' : got ? '✓ in your wad list' : '▸ download'}
                 </span>
                 {error && <span className="text-red-400 text-sm">{error}</span>}
               </div>
@@ -260,10 +257,8 @@ export function DoomBrowse({ onBack }: Props) {
         </div>
       </div>
 
-      <footer className="flex-shrink-0 px-[4%] pb-5">
-        <p className="text-vault-muted text-xs uppercase tracking-wide flex items-center gap-1.5 flex-wrap">
-          <Glyph type="cross" /> Download / Search  ·  <Glyph type="circle" /> Back  ·  ↑↓ Browse  ·  ←→ Filter &amp; sort
-        </p>
+      <footer className="flex-shrink-0 pt-4">
+        <HintBar mode="idg" hints={['d-pad move', 'a download', 'x field / sort', 'b back to idgames']} />
       </footer>
     </div>
   )
