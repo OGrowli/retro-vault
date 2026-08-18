@@ -2,8 +2,8 @@ import { useState, useCallback, useRef, useEffect } from 'react'
 import type { HomePrefs } from '@retro-vault/shared'
 import { api } from '../api/client'
 import { useGamepad } from '../hooks/useGamepad'
-import { Glyph } from '../components/Glyph'
 import { Clock } from '../components/Clock'
+import { Breadcrumb, Title, HintBar, rowClass, Caret } from '../components/ui'
 
 // Streams scripts/deploy.sh output into a scrolling feed by polling the tail
 // endpoint. The deploy ends in a reboot, so once polls start failing after
@@ -70,31 +70,31 @@ function UpdateProgressModal({ startOffset, onClose }: { startOffset: number; on
     <>
       <div className="fixed inset-0 bg-black/80 z-40" />
       <div className="fixed inset-0 z-50 flex items-center justify-center px-6">
-        <div className="bg-vault-card rounded-2xl p-6 w-full max-w-2xl space-y-4" style={{ boxShadow: '0 24px 64px rgba(0,0,0,0.6)' }}>
+        <div className="bg-vault-panel border border-vault-surface p-6 w-full max-w-2xl space-y-4" style={{ boxShadow: '0 24px 64px rgba(0,0,0,0.6)' }}>
           <div className="flex items-center gap-3">
             {phase === 'running' && !complete && (
               <span className="w-4 h-4 rounded-full border-2 border-vault-muted border-t-vault-accent animate-spin motion-reduce:animate-none" />
             )}
-            <h2 className="text-white text-xl font-bold">Updating RetroVault</h2>
+            <h2 className="font-display text-3xl">Updating RetroVault</h2>
           </div>
 
           <pre
             ref={feedRef}
             onScroll={onFeedScroll}
-            className="h-72 overflow-y-auto rounded-xl bg-black/60 border border-vault-surface p-4 text-[0.72rem] leading-relaxed text-[#c8f7d0] font-mono whitespace-pre-wrap break-words"
+            className="h-72 overflow-y-auto rounded-[2px] bg-black/60 border border-vault-surface p-4 text-[0.72rem] leading-relaxed text-[#c8f7d0] font-mono whitespace-pre-wrap break-words"
             style={{ scrollbarWidth: 'thin' }}
           >
             {log || 'Waiting for output…'}
           </pre>
 
-          <p className="text-vault-muted text-sm">{status}</p>
+          <p className="text-vault-muted text-sm font-mono tracking-[0.04em]">{status}</p>
 
           <div className="flex justify-end">
             <button
               onClick={onClose}
-              className="px-5 py-2.5 rounded-xl font-bold text-sm uppercase tracking-wide bg-vault-surface text-white border border-vault-muted inline-flex items-center gap-2"
+              className="px-5 py-2.5 rounded-[2px] font-mono uppercase tracking-[0.08em] text-sm bg-vault-surface text-[#eaf0f8] border border-vault-muted"
             >
-              <Glyph type="circle" /> Close
+              b close
             </button>
           </div>
         </div>
@@ -116,7 +116,7 @@ interface Props {
   onOpenRomAudit: () => void
 }
 
-const FOCUS_ITEMS = ['adult', 'doom-engine', 'home', 'wifi', 'scraping', 'controllers', 'hotkeys', 'audio', 'rom-audit', 'update', 'back'] as const
+const FOCUS_ITEMS = ['adult', 'doom-engine', 'home', 'wifi', 'scraping', 'controllers', 'hotkeys', 'audio', 'rom-audit', 'update'] as const
 type FocusItem = (typeof FOCUS_ITEMS)[number]
 
 // Rebooting the device is disruptive — gate the update behind an explicit
@@ -139,10 +139,10 @@ function UpdateConfirmModal({ updating, onConfirm, onCancel }: {
     <>
       <div className="fixed inset-0 bg-black/80 z-40" onClick={updating ? undefined : onCancel} />
       <div className="fixed inset-0 z-50 flex items-center justify-center px-6">
-        <div className="bg-vault-card rounded-2xl p-8 w-full max-w-sm space-y-5" style={{ boxShadow: '0 24px 64px rgba(0,0,0,0.6)' }}>
+        <div className="bg-vault-panel border border-vault-surface p-8 w-full max-w-sm space-y-5" style={{ boxShadow: '0 24px 64px rgba(0,0,0,0.6)' }}>
           <div>
-            <h2 className="text-white text-xl font-bold">Update RetroVault?</h2>
-            <p className="text-vault-muted text-sm mt-2">
+            <h2 className="font-display text-3xl">Update RetroVault?</h2>
+            <p className="text-vault-muted text-sm mt-2 font-read leading-relaxed">
               Pulls the latest code, rebuilds, and reboots the device. This can take a few minutes and
               will interrupt any running game.
             </p>
@@ -157,8 +157,8 @@ function UpdateConfirmModal({ updating, onConfirm, onCancel }: {
                 disabled={updating}
                 onClick={() => { if (key === 'confirm') onConfirm(); else onCancel() }}
                 className={[
-                  'flex-1 px-4 py-3 rounded-xl font-bold text-sm uppercase tracking-wide transition-colors duration-150',
-                  key === 'confirm' ? 'bg-vault-accent text-white' : 'bg-vault-surface text-white border border-vault-muted',
+                  'flex-1 px-4 py-3 rounded-[2px] font-mono uppercase tracking-[0.08em] text-sm',
+                  key === 'confirm' ? 'bg-vault-accent-bright text-vault-ink' : 'bg-vault-surface text-[#eaf0f8] border border-vault-muted',
                   focus === key ? 'ring-2 ring-white' : '',
                   updating ? 'opacity-60' : '',
                 ].join(' ')}
@@ -167,8 +167,8 @@ function UpdateConfirmModal({ updating, onConfirm, onCancel }: {
               </button>
             ))}
           </div>
-          <p className="text-vault-muted text-xs uppercase tracking-wide text-center">
-            ← → Select · <Glyph type="cross" /> Confirm · <Glyph type="circle" /> Cancel
+          <p className="text-vault-muted text-xs uppercase tracking-[0.08em] text-center font-mono">
+            ← → select · a confirm · b cancel
           </p>
         </div>
       </div>
@@ -234,8 +234,7 @@ export function Settings({ onBack, homePrefs, onHomePrefsChange, onOpenHome, onO
     if (item === 'audio') onOpenAudio()
     if (item === 'rom-audit') onOpenRomAudit()
     if (item === 'update') setUpdateOpen(true)
-    if (item === 'back') onBack()
-  }, [toggleAdult, toggleDoomEngine, onOpenHome, onOpenWifi, onOpenScraping, onOpenControllers, onOpenHotkeys, onOpenAudio, onOpenRomAudit, onBack])
+  }, [toggleAdult, toggleDoomEngine, onOpenHome, onOpenWifi, onOpenScraping, onOpenControllers, onOpenHotkeys, onOpenAudio, onOpenRomAudit])
 
   useGamepad((action) => {
     if (action === 'back') { onBack(); return }
@@ -258,101 +257,54 @@ export function Settings({ onBack, homePrefs, onHomePrefsChange, onOpenHome, onO
     { item: 'update', title: 'Update RetroVault', subtitle: 'Pull latest, rebuild, and reboot' },
   ]
 
+  // A flat settings row — title + optional inline status on the right.
+  const SettingRow = ({ item, title, subtitle, status }: { item: FocusItem; title: string; subtitle: string; status?: string }) => {
+    const focused = isFocused(item)
+    return (
+      <div
+        ref={setRef(item)}
+        onClick={() => activate(item)}
+        onMouseEnter={() => setFocused(item)}
+        className={rowClass(focused)}
+      >
+        <Caret selected={focused} />
+        <div className="min-w-0">
+          <div className="text-xl leading-tight">{title}</div>
+          <div className={`text-[0.85rem] mt-0.5 truncate ${focused ? 'text-vault-ink/70' : 'text-vault-muted'}`}>{subtitle}</div>
+        </div>
+        <span className="flex-1" />
+        {status && (
+          <span className={`font-mono text-[0.9rem] tracking-[0.06em] ${focused ? 'text-vault-ink/80' : 'text-vault-accent'}`}>{status}</span>
+        )}
+      </div>
+    )
+  }
+
   return (
-    <div className="fixed inset-0 bg-vault-bg flex flex-col">
-      <header className="px-[5%] pt-[3%] pb-4 border-b border-vault-surface flex items-center gap-4">
-        <h1 className="text-white text-2xl font-bold tracking-tight">Settings</h1>
-        <div className="ml-auto"><Clock /></div>
-      </header>
+    <div className="fixed inset-0 bg-vault-bg flex flex-col px-[5%] py-[3%] font-sans">
+      <div className="flex items-center justify-between flex-shrink-0">
+        <Breadcrumb>retrovault / settings</Breadcrumb>
+        <Clock />
+      </div>
 
-      <div className="flex-1 overflow-y-auto px-[5%] py-8" style={{ scrollbarWidth: 'none' }}>
-        <div className="space-y-3 max-w-lg">
-          <button
-            ref={setRef('adult')}
-            onClick={toggleAdult}
-            onMouseEnter={() => setFocused('adult')}
-            className={[
-              'w-full py-4 rounded-xl text-left px-5 flex items-center gap-4',
-              'bg-vault-surface border border-vault-muted transition-colors duration-150 motion-reduce:transition-none',
-              isFocused('adult') ? 'ring-2 ring-white border-vault-accent' : '',
-            ].join(' ')}
-          >
-            <div className="flex-1 min-w-0">
-              <span className="block text-white font-bold uppercase tracking-wide text-sm">Show Adult Titles</span>
-              <span className="block text-vault-muted text-[0.7rem] font-normal normal-case tracking-normal mt-0.5">
-                Reveal adult-flagged games in the grid, search &amp; random
-              </span>
-            </div>
-            <span
-              className={[
-                'flex-shrink-0 w-12 h-7 rounded-full flex items-center px-1 transition-colors duration-150',
-                homePrefs.showAdult ? 'bg-vault-accent justify-end' : 'bg-vault-bg justify-start',
-              ].join(' ')}
-            >
-              <span className="w-5 h-5 rounded-full bg-white" />
-            </span>
-          </button>
+      <div className="flex items-baseline gap-4 mt-4 flex-shrink-0">
+        <Title className="text-6xl">Settings</Title>
+        <span className="font-mono text-[0.9rem] uppercase tracking-[0.1em] text-vault-muted">retrovault · pi 3b+</span>
+      </div>
 
-          <button
-            ref={setRef('doom-engine')}
-            onClick={toggleDoomEngine}
-            onMouseEnter={() => setFocused('doom-engine')}
-            className={[
-              'w-full py-4 rounded-xl text-left px-5 flex items-center gap-4',
-              'bg-vault-surface border border-vault-muted transition-colors duration-150 motion-reduce:transition-none',
-              isFocused('doom-engine') ? 'ring-2 ring-white border-vault-accent' : '',
-            ].join(' ')}
-          >
-            <div className="flex-1 min-w-0">
-              <span className="block text-white font-bold uppercase tracking-wide text-sm">Doom Engine</span>
-              <span className="block text-vault-muted text-[0.7rem] font-normal normal-case tracking-normal mt-0.5">
-                LZDoom (GZDoom features) or RetroArch/lr-prboom (uses RetroArch controller config)
-              </span>
-            </div>
-            <span className="flex-shrink-0 px-3 py-1.5 rounded-lg bg-vault-bg text-white text-xs font-bold uppercase tracking-wide">
-              {doomEngine === 'retroarch' ? 'RetroArch' : 'LZDoom'}
-            </span>
-          </button>
-
+      <div className="flex-1 overflow-y-auto py-6 min-h-0" style={{ scrollbarWidth: 'none' }}>
+        <div className="flex flex-col max-w-2xl">
+          <SettingRow item="adult" title="Show Adult Titles" subtitle="Reveal adult-flagged games in grid, search & random" status={homePrefs.showAdult ? 'on' : 'off'} />
+          <SettingRow item="doom-engine" title="Doom Engine" subtitle="LZDoom (GZDoom features) or RetroArch/lr-prboom" status={doomEngine === 'retroarch' ? 'retroarch' : 'lzdoom'} />
           {menu.map(({ item, title, subtitle }) => (
-            <button
-              key={item}
-              ref={setRef(item)}
-              onClick={() => activate(item)}
-              onMouseEnter={() => setFocused(item)}
-              className={[
-                'w-full py-4 rounded-xl font-bold text-white uppercase tracking-wide text-sm text-left px-5',
-                'bg-vault-surface border border-vault-muted transition-colors duration-150 motion-reduce:transition-none',
-                isFocused(item) ? 'ring-2 ring-white border-vault-accent' : '',
-              ].join(' ')}
-            >
-              {title}
-              <span className="block text-vault-muted text-[0.7rem] font-normal normal-case tracking-normal mt-0.5">
-                {subtitle}
-              </span>
-            </button>
+            <SettingRow key={item} item={item} title={title} subtitle={subtitle} />
           ))}
-          {updateMsg && <p className="text-vault-accent text-sm">{updateMsg}</p>}
+          {updateMsg && <p className="text-vault-accent text-sm mt-3 font-mono">{updateMsg}</p>}
         </div>
       </div>
 
-      {/* Footer */}
-      <div className="px-[5%] py-4 border-t border-vault-surface flex items-center gap-4">
-        <button
-          ref={setRef('back')}
-          onClick={onBack}
-          className={[
-            'px-6 py-3 rounded-xl font-bold text-sm uppercase tracking-wide transition-colors duration-150',
-            'bg-vault-surface text-white border border-vault-muted inline-flex items-center gap-2',
-            'motion-reduce:transition-none',
-            isFocused('back') ? 'ring-2 ring-white' : '',
-          ].join(' ')}
-        >
-          <Glyph type="circle" /> Back
-        </button>
-        <p className="text-vault-muted text-xs uppercase tracking-wide flex items-center gap-1.5">
-          <Glyph type="circle" /> Back  ·  D-Pad Navigate  ·  <Glyph type="cross" /> Select
-        </p>
+      <div className="flex-shrink-0 pt-4">
+        <HintBar hints={['d-pad move', 'a select', 'b back']} />
       </div>
 
       {updateOpen && (

@@ -81,7 +81,7 @@ export function VirtualKeyboard({ value, onChange, onDone, onCancel, enabled, ma
 
   return (
     <div className="select-none">
-      <div className="mb-3 bg-vault-surface border border-vault-muted rounded-lg px-4 py-2.5 min-h-[42px] flex items-center gap-1.5">
+      <div className="mb-3 bg-vault-surface border border-vault-muted rounded-[2px] px-4 py-2.5 min-h-[42px] flex items-center gap-1.5">
         <span className="text-white text-sm font-mono flex-1 min-w-0 truncate">
           {display || <span className="text-vault-muted not-italic">—</span>}
         </span>
@@ -96,7 +96,7 @@ export function VirtualKeyboard({ value, onChange, onDone, onCancel, enabled, ma
           >
             {keys.map((key, ci) => {
               const isFocused = enabled && row === ri && col === ci
-              const base = 'flex items-center justify-center font-bold tracking-wide transition-colors duration-75 border rounded-lg'
+              const base = 'flex items-center justify-center font-bold tracking-wide transition-colors duration-75 border rounded-[2px]'
               const focusCls = isFocused ? 'ring-2 ring-vault-accent border-vault-accent text-white' : ''
 
               if (key === 'SPACE') {
@@ -113,7 +113,7 @@ export function VirtualKeyboard({ value, onChange, onDone, onCancel, enabled, ma
                 return (
                   <button key={key}
                     onPointerDown={e => { e.preventDefault(); pressKey(key) }}
-                    className={`${base} h-10 min-w-[90px] text-sm uppercase text-white bg-vault-accent ${isFocused ? 'ring-2 ring-white border-vault-accent' : 'border-vault-accent'}`}
+                    className={`${base} h-10 min-w-[90px] text-sm uppercase text-vault-ink bg-vault-accent-bright ${isFocused ? 'ring-2 ring-white border-vault-accent' : 'border-vault-accent'}`}
                   >
                     Done ✓
                   </button>
@@ -133,7 +133,7 @@ export function VirtualKeyboard({ value, onChange, onDone, onCancel, enabled, ma
                 return (
                   <button key={key}
                     onPointerDown={e => { e.preventDefault(); pressKey(key) }}
-                    className={`${base} w-9 h-9 text-sm ${shift ? 'bg-vault-accent text-white border-vault-accent' : 'bg-vault-surface text-vault-muted'} ${focusCls || (shift ? '' : 'border-vault-muted')}`}
+                    className={`${base} w-9 h-9 text-sm ${shift ? 'bg-vault-accent-bright text-vault-ink border-vault-accent' : 'bg-vault-surface text-vault-muted'} ${focusCls || (shift ? '' : 'border-vault-muted')}`}
                   >
                     ⇧
                   </button>

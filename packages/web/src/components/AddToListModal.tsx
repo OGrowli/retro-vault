@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import type { Game, GameList, User } from '@retro-vault/shared'
 import { api } from '../api/client'
 import { useGamepad } from '../hooks/useGamepad'
-import { Glyph } from './Glyph'
+import { Title, HintBar } from './ui'
 import { VirtualKeyboard } from './VirtualKeyboard'
 import { loadHomePrefs, listOrderOf } from '../prefs'
 
@@ -95,14 +95,14 @@ export function AddToListModal({ game, user, onClose, onListCreated }: Props) {
       <div className="fixed inset-0 bg-black/80 z-40" onClick={onClose} />
       <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
         <div
-          className="bg-vault-card rounded-2xl p-6 w-full max-w-[460px] max-h-[85vh] flex flex-col gap-4 animate-rise-in motion-reduce:animate-none"
+          className="bg-vault-panel border border-vault-surface p-6 w-full max-w-[460px] max-h-[85vh] flex flex-col gap-4 animate-rise-in motion-reduce:animate-none"
           style={{ boxShadow: '0 24px 64px rgba(0,0,0,0.6)' }}
         >
           {step === 'browse' ? (
             <>
               <div>
-                <h2 className="text-white text-xl font-extrabold">Add to List</h2>
-                <p className="text-vault-accent-bright text-xs font-semibold uppercase tracking-wide mt-0.5">{game.name}</p>
+                <Title className="text-4xl">Add to List</Title>
+                <p className="text-vault-accent text-xs font-mono uppercase tracking-[0.12em] mt-1">{game.name}</p>
               </div>
 
               <div className="flex flex-col gap-1.5 overflow-y-auto max-h-[260px] pr-0.5" style={{ scrollbarWidth: 'none' }}>
@@ -115,7 +115,7 @@ export function AddToListModal({ game, user, onClose, onListCreated }: Props) {
                       onMouseEnter={() => setFocusIdx(0)}
                       onClick={() => setStep('create')}
                       className={[
-                        'flex items-center gap-3.5 px-3.5 py-3 rounded-2xl cursor-pointer',
+                        'flex items-center gap-3.5 px-3.5 py-3 rounded-[2px] cursor-pointer',
                         'border border-dashed transition-colors duration-150 motion-reduce:transition-none',
                         focusIdx === 0 ? 'border-vault-accent' : 'border-vault-muted',
                       ].join(' ')}
@@ -141,25 +141,25 @@ export function AddToListModal({ game, user, onClose, onListCreated }: Props) {
                           onMouseEnter={() => setFocusIdx(i + 1)}
                           onClick={() => toggleList(list)}
                           className={[
-                            'flex items-center gap-3.5 px-3.5 py-3 rounded-2xl bg-vault-surface cursor-pointer',
-                            'border transition-[box-shadow,transform,border-color] duration-150 motion-reduce:transition-none',
-                            focused ? 'border-transparent ring-2 ring-vault-accent scale-[1.015]' : 'border-transparent',
+                            'flex items-center gap-3.5 px-3.5 py-3 rounded-[2px] bg-vault-surface cursor-pointer',
+                            'border transition-[box-shadow,border-color] duration-150 motion-reduce:transition-none',
+                            focused ? 'border-transparent ring-2 ring-vault-accent' : 'border-transparent',
                           ].join(' ')}
                         >
                           <span
                             className={[
-                              'w-[22px] h-[22px] rounded-full flex-shrink-0 flex items-center justify-center border',
-                              list.included ? 'bg-vault-accent border-vault-accent' : 'border-vault-muted',
+                              'w-[22px] h-[22px] rounded-[2px] flex-shrink-0 flex items-center justify-center border',
+                              list.included ? 'bg-vault-accent-bright border-vault-accent' : 'border-vault-muted',
                             ].join(' ')}
                           >
                             {list.included && (
-                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#0c0a16" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                                 <path d="M4 12l5 5L20 7" />
                               </svg>
                             )}
                           </span>
-                          <span className="flex-1 min-w-0 text-[0.92rem] font-semibold text-[#eaeaf2] truncate">{list.name}</span>
-                          <span className="flex-shrink-0 text-xs text-vault-muted uppercase tracking-wide">
+                          <span className="flex-1 min-w-0 text-base text-[#eaf0f8] truncate">{list.name}</span>
+                          <span className="flex-shrink-0 text-xs text-vault-muted font-mono uppercase tracking-[0.08em]">
                             {list.game_count} title{list.game_count === 1 ? '' : 's'}
                           </span>
                         </div>
@@ -169,21 +169,19 @@ export function AddToListModal({ game, user, onClose, onListCreated }: Props) {
                 )}
               </div>
 
-              <p className="text-vault-muted text-xs uppercase tracking-wide flex items-center justify-center gap-1.5 flex-wrap">
-                <Glyph type="cross" /> Toggle  ·  <Glyph type="circle" /> Close  ·  ↑↓ Navigate
-              </p>
+              <HintBar hints={['d-pad move', 'a toggle', 'b close']} />
             </>
           ) : (
             <>
               <div>
-                <h2 className="text-white text-xl font-extrabold">New List</h2>
-                <p className="text-vault-accent-bright text-xs font-semibold uppercase tracking-wide mt-0.5">
+                <Title className="text-4xl">New List</Title>
+                <p className="text-vault-accent text-xs font-mono uppercase tracking-[0.12em] mt-1">
                   {game.name} will be added automatically
                 </p>
               </div>
 
               <div>
-                <label className="text-vault-muted text-xs uppercase tracking-wide block mb-2">List Name</label>
+                <label className="text-vault-muted text-xs font-mono uppercase tracking-[0.1em] block mb-2">List Name</label>
                 <input
                   autoFocus
                   type="text"
@@ -195,7 +193,7 @@ export function AddToListModal({ game, user, onClose, onListCreated }: Props) {
                   }}
                   maxLength={40}
                   placeholder="e.g. Couch Co-op"
-                  className="w-full bg-vault-surface border border-vault-accent rounded-xl px-3.5 py-3 text-white text-[0.95rem] focus:outline-none"
+                  className="w-full bg-vault-surface border border-vault-accent-dim rounded-[2px] px-3.5 py-3 text-white text-[0.95rem] font-mono focus:outline-none"
                 />
               </div>
 
@@ -213,7 +211,7 @@ export function AddToListModal({ game, user, onClose, onListCreated }: Props) {
       </div>
 
       {toast && (
-        <div className="fixed left-1/2 -translate-x-1/2 bottom-10 z-[60] bg-vault-accent text-white text-sm font-bold px-4 py-2.5 rounded-full shadow-lg animate-fade-in">
+        <div className="fixed left-1/2 -translate-x-1/2 bottom-10 z-[60] bg-vault-accent-bright text-vault-ink text-sm font-mono tracking-[0.04em] px-4 py-2.5 rounded-[2px] shadow-lg animate-fade-in">
           {toast}
         </div>
       )}

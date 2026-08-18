@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import type { GameList, User } from '@retro-vault/shared'
 import { api } from '../api/client'
 import { useGamepad } from '../hooks/useGamepad'
-import { Glyph } from './Glyph'
+import { Title, HintBar } from './ui'
 import { VirtualKeyboard } from './VirtualKeyboard'
 import { loadHomePrefs, listOrderOf } from '../prefs'
 
@@ -108,14 +108,14 @@ export function AddResultsToListModal({ gameIds, user, onClose, onListCreated, o
       <div className="fixed inset-0 bg-black/80 z-40" onClick={onClose} />
       <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
         <div
-          className="bg-vault-card rounded-2xl p-6 w-full max-w-[460px] max-h-[85vh] flex flex-col gap-4 animate-rise-in motion-reduce:animate-none"
+          className="bg-vault-panel border border-vault-surface p-6 w-full max-w-[460px] max-h-[85vh] flex flex-col gap-4 animate-rise-in motion-reduce:animate-none"
           style={{ boxShadow: '0 24px 64px rgba(0,0,0,0.6)' }}
         >
           {step === 'browse' ? (
             <>
               <div>
-                <h2 className="text-white text-xl font-extrabold">Add Results to List</h2>
-                <p className="text-vault-accent-bright text-xs font-semibold uppercase tracking-wide mt-0.5">
+                <Title className="text-4xl">Add Results to List</Title>
+                <p className="text-vault-accent text-xs font-mono uppercase tracking-[0.12em] mt-1">
                   {titles(gameIds.length)} from your search
                 </p>
               </div>
@@ -137,19 +137,19 @@ export function AddResultsToListModal({ gameIds, user, onClose, onListCreated, o
                           onMouseEnter={() => setFocusIdx(i)}
                           onClick={() => void addToList(list)}
                           className={[
-                            'flex items-center gap-3.5 px-3.5 py-3 rounded-2xl bg-vault-surface cursor-pointer',
-                            'border transition-[box-shadow,transform,border-color] duration-150 motion-reduce:transition-none',
-                            focused ? 'border-transparent ring-2 ring-vault-accent scale-[1.015]' : 'border-transparent',
+                            'flex items-center gap-3.5 px-3.5 py-3 rounded-[2px] bg-vault-surface cursor-pointer',
+                            'border transition-[box-shadow,border-color] duration-150 motion-reduce:transition-none',
+                            focused ? 'border-transparent ring-2 ring-vault-accent' : 'border-transparent',
                           ].join(' ')}
                         >
-                          <span className="w-[22px] h-[22px] rounded-full flex-shrink-0 flex items-center justify-center border border-vault-muted">
+                          <span className="w-[22px] h-[22px] rounded-[2px] flex-shrink-0 flex items-center justify-center border border-vault-muted">
                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-vault-muted">
                               <line x1="12" y1="5" x2="12" y2="19" />
                               <line x1="5" y1="12" x2="19" y2="12" />
                             </svg>
                           </span>
-                          <span className="flex-1 min-w-0 text-[0.92rem] font-semibold text-[#eaeaf2] truncate">{list.name}</span>
-                          <span className="flex-shrink-0 text-xs text-vault-muted uppercase tracking-wide">
+                          <span className="flex-1 min-w-0 text-base text-[#eaf0f8] truncate">{list.name}</span>
+                          <span className="flex-shrink-0 text-xs text-vault-muted font-mono uppercase tracking-[0.08em]">
                             {titles(list.game_count)}
                           </span>
                         </div>
@@ -161,38 +161,36 @@ export function AddResultsToListModal({ gameIds, user, onClose, onListCreated, o
                       onMouseEnter={() => setFocusIdx(lists.length)}
                       onClick={() => setStep('create')}
                       className={[
-                        'flex items-center gap-3.5 px-3.5 py-3 rounded-2xl cursor-pointer',
+                        'flex items-center gap-3.5 px-3.5 py-3 rounded-[2px] cursor-pointer',
                         'border border-dashed transition-colors duration-150 motion-reduce:transition-none',
                         focusIdx === lists.length ? 'border-vault-accent' : 'border-vault-muted',
                       ].join(' ')}
                     >
-                      <span className="w-[22px] h-[22px] rounded-full flex-shrink-0 flex items-center justify-center border border-dashed border-vault-muted">
+                      <span className="w-[22px] h-[22px] rounded-[2px] flex-shrink-0 flex items-center justify-center border border-dashed border-vault-muted">
                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-vault-muted">
                           <line x1="12" y1="5" x2="12" y2="19" />
                           <line x1="5" y1="12" x2="19" y2="12" />
                         </svg>
                       </span>
-                      <span className="flex-1 text-[0.92rem] font-semibold text-vault-muted">New List from Results</span>
+                      <span className="flex-1 text-base text-vault-muted">New List from Results</span>
                     </div>
                   </>
                 )}
               </div>
 
-              <p className="text-vault-muted text-xs uppercase tracking-wide flex items-center justify-center gap-1.5 flex-wrap">
-                <Glyph type="cross" /> Add  ·  <Glyph type="circle" /> Close  ·  ↑↓ Navigate
-              </p>
+              <HintBar hints={['d-pad move', 'a add', 'b close']} />
             </>
           ) : (
             <>
               <div>
-                <h2 className="text-white text-xl font-extrabold">New List</h2>
-                <p className="text-vault-accent-bright text-xs font-semibold uppercase tracking-wide mt-0.5">
+                <Title className="text-4xl">New List</Title>
+                <p className="text-vault-accent text-xs font-mono uppercase tracking-[0.12em] mt-1">
                   {titles(gameIds.length)} will be added automatically
                 </p>
               </div>
 
               <div>
-                <label className="text-vault-muted text-xs uppercase tracking-wide block mb-2">List Name</label>
+                <label className="text-vault-muted text-xs font-mono uppercase tracking-[0.1em] block mb-2">List Name</label>
                 <input
                   autoFocus
                   type="text"
@@ -204,7 +202,7 @@ export function AddResultsToListModal({ gameIds, user, onClose, onListCreated, o
                   }}
                   maxLength={40}
                   placeholder="e.g. SNES RPGs"
-                  className="w-full bg-vault-surface border border-vault-accent rounded-xl px-3.5 py-3 text-white text-[0.95rem] focus:outline-none"
+                  className="w-full bg-vault-surface border border-vault-accent-dim rounded-[2px] px-3.5 py-3 text-white text-[0.95rem] font-mono focus:outline-none"
                 />
               </div>
 
@@ -222,7 +220,7 @@ export function AddResultsToListModal({ gameIds, user, onClose, onListCreated, o
       </div>
 
       {toast && (
-        <div className="fixed left-1/2 -translate-x-1/2 bottom-10 z-[60] bg-vault-accent text-white text-sm font-bold px-4 py-2.5 rounded-full shadow-lg animate-fade-in">
+        <div className="fixed left-1/2 -translate-x-1/2 bottom-10 z-[60] bg-vault-accent-bright text-vault-ink text-sm font-mono tracking-[0.04em] px-4 py-2.5 rounded-[2px] shadow-lg animate-fade-in">
           {toast}
         </div>
       )}
