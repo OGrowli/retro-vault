@@ -18,10 +18,10 @@ export function GameCard({ game, focused, label, size = 'sm', onClick }: Props) 
       data-focusable="true"
       onClick={() => onClick?.(game)}
       className={[
-        'relative flex-shrink-0 rounded-xl overflow-hidden cursor-pointer',
-        'bg-vault-card',
+        'relative flex-shrink-0 rounded-[2px] overflow-hidden cursor-pointer',
+        'bg-vault-card border-l-[6px]',
         isLg ? 'w-56 h-72' : 'w-44 h-60',
-        focused ? 'ring-4 ring-vault-accent-bright' : 'ring-0',
+        focused ? 'border-vault-pink ring-2 ring-vault-accent-bright' : 'border-transparent ring-0',
       ].join(' ')}
     >
       {game.box_art_path ? (
@@ -57,20 +57,16 @@ export function GameCard({ game, focused, label, size = 'sm', onClick }: Props) 
       )}
 
       <div className="p-2">
-        <p className="text-white text-sm font-semibold uppercase tracking-wide truncate leading-tight">
+        <p className="text-[#eaf0f8] text-sm font-semibold truncate leading-tight">
           {game.name}
         </p>
-        <p className="text-vault-muted text-xs mt-0.5 uppercase tracking-wider">{game.system}</p>
+        <p className="text-vault-muted text-xs mt-0.5 font-mono uppercase tracking-[0.1em]">{game.system}</p>
         {label && (
-          <span className="mt-1 inline-block bg-vault-accent text-white text-xs font-bold uppercase tracking-wide px-1.5 py-0.5 rounded">
+          <span className="mt-1 inline-block bg-vault-accent text-vault-ink text-xs font-mono uppercase tracking-[0.08em] px-1.5 py-0.5 rounded-[2px]">
             {label}
           </span>
         )}
       </div>
-
-      {focused && (
-        <div className="absolute inset-0 ring-2 ring-inset ring-vault-accent rounded-xl pointer-events-none" />
-      )}
     </div>
   )
 }

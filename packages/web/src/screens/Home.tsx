@@ -10,7 +10,7 @@ import { FilterDrawer } from '../components/FilterDrawer'
 import { AddResultsToListModal } from '../components/AddResultsToListModal'
 import { RandomGameModal } from '../components/RandomGameModal'
 import { VirtualKeyboard } from '../components/VirtualKeyboard'
-import { Glyph } from '../components/Glyph'
+import { HintBar } from '../components/ui'
 import { Clock } from '../components/Clock'
 import { HealthIndicator } from '../components/HealthIndicator'
 import { listOrderOf, gameSortOf } from '../prefs'
@@ -373,13 +373,13 @@ export function Home({ user, systems, genres, filter, homePrefs, onFilterChange,
 
       <div ref={scrollRef} className="relative h-full overflow-y-auto" style={{ scrollbarWidth: 'none' }}>
         <header className="px-[5%] pt-[3%] pb-2 flex items-center justify-between">
-          <h1 className="text-white text-2xl font-bold tracking-tight">RetroVault</h1>
+          <h1 className="font-display text-4xl tracking-[-0.02em] text-[#eaf0f8]">RetroVault</h1>
           <div className="flex items-center gap-3">
             <HealthIndicator />
             <Clock />
             <button
               onClick={() => setFilterOpen(true)}
-              className="px-3 py-1.5 rounded-lg text-vault-muted hover:text-white text-xs font-semibold uppercase tracking-wide border border-vault-muted hover:border-vault-accent transition-colors"
+              className="px-3 py-1.5 text-vault-muted hover:text-vault-accent font-mono text-[0.8rem] uppercase tracking-[0.12em] border border-vault-muted hover:border-vault-accent-dim transition-colors"
               title="Filters (Options / Tab)"
             >
               Filters
@@ -397,7 +397,7 @@ export function Home({ user, systems, genres, filter, homePrefs, onFilterChange,
             </button>
             <button
               onClick={onSwitchUser}
-              className="flex items-center gap-2.5 rounded-lg px-2 py-1 hover:bg-vault-surface transition-colors"
+              className="flex items-center gap-2.5 px-2 py-1 hover:bg-vault-surface transition-colors"
               title="Switch profile"
             >
               <div
@@ -406,7 +406,7 @@ export function Home({ user, systems, genres, filter, homePrefs, onFilterChange,
               >
                 {user.username.charAt(0).toUpperCase()}
               </div>
-              <span className="text-white text-sm font-medium">{user.username}</span>
+              <span className="font-mono text-[0.85rem] tracking-[0.06em] text-[#eaf0f8]">{user.username}</span>
             </button>
           </div>
         </header>
@@ -513,8 +513,8 @@ export function Home({ user, systems, genres, filter, homePrefs, onFilterChange,
 
       {searchVkOpen && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[60] px-4">
-          <div className="bg-vault-card rounded-2xl p-6 w-full max-w-[480px] space-y-4">
-            <h2 className="text-white text-lg font-bold">Search Games</h2>
+          <div className="bg-vault-panel border border-vault-surface p-6 w-full max-w-[480px] space-y-4">
+            <h2 className="font-display text-3xl">Search Games</h2>
             <VirtualKeyboard
               value={filter.query ?? ''}
               onChange={(v) => onFilterChange(f => ({ ...f, query: v || undefined }))}
@@ -526,10 +526,8 @@ export function Home({ user, systems, genres, filter, homePrefs, onFilterChange,
         </div>
       )}
 
-      <div className="absolute bottom-0 left-0 right-0 h-20 flex items-end pb-3 px-[5%] bg-gradient-to-t from-vault-bg via-vault-bg/80 to-transparent pointer-events-none">
-        <p className="text-vault-muted text-xs uppercase tracking-wide flex items-center gap-1.5 flex-wrap">
-          <Glyph type="cross" /> Select  ·  <Glyph type="square" /> Favorite  ·  <Glyph type="circle" /> Back  ·  Options Filter  ·  Share Settings
-        </p>
+      <div className="absolute bottom-0 left-0 right-0 h-20 flex items-end pb-4 px-[5%] bg-gradient-to-t from-vault-bg via-vault-bg/80 to-transparent pointer-events-none">
+        <HintBar hints={['d-pad move', 'a open', 'y favorite', 'x filter', 'start settings']} />
       </div>
     </div>
   )

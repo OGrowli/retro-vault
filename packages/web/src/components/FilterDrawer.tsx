@@ -49,7 +49,7 @@ interface CheckItem {
 
 function Chip({ children }: { children: ReactNode }) {
   return (
-    <span className="px-2.5 py-1 rounded-full text-[0.7rem] font-semibold uppercase tracking-wide bg-vault-accent text-white">
+    <span className="px-2.5 py-0.5 rounded-[2px] text-[0.7rem] font-mono uppercase tracking-[0.08em] border border-vault-accent-dim text-vault-accent">
       {children}
     </span>
   )
@@ -159,7 +159,7 @@ export function FilterDrawer({
         onClick={() => { setFocusedRow(i); activateRow(row) }}
         onMouseEnter={() => setFocusedRow(i)}
         className={[
-          'w-full text-left rounded-xl px-4 py-3 bg-vault-surface border transition-colors',
+          'w-full text-left rounded-[2px] px-4 py-3 bg-vault-surface border transition-colors',
           focusedRow === i && !dropdown ? 'border-vault-accent ring-2 ring-vault-accent' : 'border-vault-muted',
         ].join(' ')}
       >
@@ -194,7 +194,7 @@ export function FilterDrawer({
           onChange={e => onChange({ ...filter, query: e.target.value || undefined })}
           onKeyDown={e => { if (e.key === 'Enter') onApply() }}
           className={[
-            'w-full bg-vault-surface border rounded-xl px-3.5 py-3 text-white text-sm focus:outline-none',
+            'w-full bg-vault-surface border rounded-[2px] px-3.5 py-3 text-white text-sm focus:outline-none',
             focused ? 'border-vault-accent ring-2 ring-vault-accent' : 'border-vault-muted',
           ].join(' ')}
         />
@@ -215,8 +215,8 @@ export function FilterDrawer({
         onMouseEnter={() => setFocusedRow(i)}
         disabled={disabled}
         className={[
-          'w-full py-3 rounded-xl font-bold text-white uppercase tracking-wide text-sm',
-          primary ? 'bg-vault-accent' : 'bg-vault-surface border border-vault-muted',
+          'w-full py-3 rounded-[2px] font-mono uppercase tracking-[0.08em] text-sm',
+          primary ? 'bg-vault-accent-bright text-vault-ink' : 'bg-vault-surface border border-vault-muted text-[#eaf0f8]',
           focused ? 'ring-2 ring-white' : '',
           disabled ? 'opacity-50 cursor-not-allowed' : '',
         ].join(' ')}
@@ -240,7 +240,7 @@ export function FilterDrawer({
         style={{ boxShadow: '4px 0 24px rgba(0,0,0,0.6)' }}
       >
         <div className="p-6 border-b border-vault-surface flex items-center justify-between">
-          <h2 className="text-white text-xl font-bold">Filters</h2>
+          <h2 className="font-display text-3xl">Filters</h2>
           <button onClick={onClose} className="text-vault-muted text-sm uppercase tracking-wide flex items-center gap-1.5">
             <Glyph type="circle" /> Close
           </button>
@@ -254,7 +254,7 @@ export function FilterDrawer({
           {categoryRow('options')}
 
           {/* Year Range — mouse-only, not in the gamepad focus order. */}
-          <div className="rounded-xl px-4 py-3 bg-vault-surface border border-vault-muted">
+          <div className="rounded-[2px] px-4 py-3 bg-vault-surface border border-vault-muted">
             <p className="text-vault-muted text-xs uppercase tracking-widest mb-2">Year Range</p>
             <div className="flex items-center gap-3">
               <input
@@ -292,7 +292,7 @@ export function FilterDrawer({
         {dropdown && (
           <div className="absolute inset-0 z-10 bg-vault-card flex flex-col">
             <div className="p-6 border-b border-vault-surface flex items-center justify-between">
-              <h2 className="text-white text-xl font-bold">{CATEGORY_LABELS[dropdown]}</h2>
+              <h2 className="font-display text-3xl">{CATEGORY_LABELS[dropdown]}</h2>
               <button onClick={() => setDropdown(null)} className="text-vault-muted text-sm uppercase tracking-wide flex items-center gap-1.5">
                 <Glyph type="circle" /> Back
               </button>
@@ -306,7 +306,7 @@ export function FilterDrawer({
                   onClick={item.toggle}
                   onMouseEnter={() => setDropdownFocus(i)}
                   className={[
-                    'w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-left transition-colors',
+                    'w-full flex items-center gap-3 px-3.5 py-2.5 rounded-[2px] text-left transition-colors',
                     dropdownFocus === i ? 'bg-vault-surface ring-2 ring-vault-accent' : 'bg-transparent',
                   ].join(' ')}
                 >

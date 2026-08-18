@@ -2,9 +2,9 @@ import { useState, useEffect, useRef } from 'react'
 import type { User } from '@retro-vault/shared'
 import { api } from '../api/client'
 import { useGamepad } from '../hooks/useGamepad'
-import { Glyph } from '../components/Glyph'
 import { Clock } from '../components/Clock'
 import { VirtualKeyboard } from '../components/VirtualKeyboard'
+import { Breadcrumb, Title, Rule, HintBar, rowClass, Caret } from '../components/ui'
 
 const COLORS = [
   '#0070D1', '#e74c3c', '#2ecc71', '#f39c12',
@@ -42,10 +42,8 @@ export function ProfileSelect({ onSelect }: Props) {
   }, [focusedIndex, creating])
 
   useGamepad((action) => {
-    if (action === 'left') setFocusedIndex(i => Math.max(0, i - 1))
-    if (action === 'right') setFocusedIndex(i => Math.min(items.length - 1, i + 1))
-    if (action === 'up') setFocusedIndex(i => Math.max(0, i - 4))
-    if (action === 'down') setFocusedIndex(i => Math.min(items.length - 1, i + 4))
+    if (action === 'up') setFocusedIndex(i => Math.max(0, i - 1))
+    if (action === 'down') setFocusedIndex(i => Math.min(items.length - 1, i + 1))
 
     if (action === 'confirm') {
       const item = items[focusedIndex]
@@ -72,24 +70,23 @@ export function ProfileSelect({ onSelect }: Props) {
   }
 
   return (
-    <div className="fixed inset-0 bg-vault-bg flex flex-col items-center justify-center">
-      <div className="absolute top-[3%] right-[5%]"><Clock /></div>
-      <div className="mb-12">
-        <h1 className="text-white text-4xl font-bold tracking-tight text-center">RetroVault</h1>
-        <p className="text-vault-muted text-sm uppercase tracking-widest text-center mt-2">Choose your profile</p>
+    <div className="fixed inset-0 bg-vault-bg flex flex-col px-[5%] py-[3.5%] font-sans">
+      <div className="flex items-center justify-between">
+        <Breadcrumb>retrovault / profile</Breadcrumb>
+        <Clock />
       </div>
 
+      <Title className="text-7xl mt-6 mb-6">Who's playing?</Title>
+      <Rule />
+
       {loading ? (
-        <div className="grid grid-cols-4 gap-8">
+        <div className="flex-1 flex flex-col gap-1 mt-2">
           {Array.from({ length: 4 }, (_, i) => (
-            <div key={i} className="flex flex-col items-center gap-3">
-              <div className="w-24 h-24 rounded-full bg-vault-surface animate-pulse" />
-              <div className="h-3 w-16 bg-vault-surface animate-pulse rounded" />
-            </div>
+            <div key={i} className="h-16 bg-vault-panel animate-pulse" />
           ))}
         </div>
       ) : (
-        <div className="grid grid-cols-4 gap-8 px-[5%] max-h-[68vh] overflow-y-auto py-2" style={{ scrollbarWidth: 'none' }}>
+        <div className="flex-1 min-h-0 overflow-y-auto py-2 flex flex-col" style={{ scrollbarWidth: 'none' }}>
           {items.map((item, i) => {
             const focused = focusedIndex === i
             const isNew = item.id === -1
@@ -97,41 +94,39 @@ export function ProfileSelect({ onSelect }: Props) {
               <div
                 key={item.id}
                 ref={el => { itemRefs.current[i] = el }}
-                className="flex flex-col items-center gap-3 cursor-pointer"
+                className={rowClass(focused)}
                 onMouseEnter={() => setFocusedIndex(i)}
                 onClick={() => {
                   if (isNew) setCreating(true)
                   else onSelect(item as User)
                 }}
               >
-                <div
-                  className={[
-                    'w-24 h-24 rounded-full flex items-center justify-center',
-                    focused ? 'ring-4 ring-vault-accent-bright' : 'ring-0',
-                  ].join(' ')}
-                  style={{ background: isNew ? '#1e1e2a' : item.avatar_color }}
-                >
-                  {isNew ? (
-                    <span className="text-vault-muted text-3xl font-light">+</span>
-                  ) : (
-                    <span className="text-white text-3xl font-bold uppercase">
-                      {item.username.charAt(0)}
-                    </span>
-                  )}
-                </div>
-                <p className={`text-sm font-medium ${focused ? 'text-white' : 'text-vault-muted'} uppercase tracking-wide`}>
-                  {item.username}
-                </p>
+                <Caret selected={focused} />
+                {!isNew && (
+                  <span
+                    className="w-3.5 h-3.5 rounded-full flex-none"
+                    style={{ background: item.avatar_color }}
+                  />
+                )}
+                <span className={`text-4xl ${isNew && !focused ? 'text-vault-accent' : ''}`}>
+                  {isNew ? 'New Profile' : item.username}
+                </span>
+                <span className="flex-1" />
+                <span className={`font-mono text-[0.95rem] tracking-[0.06em] ${focused ? 'text-vault-ink/70' : 'text-vault-muted'}`}>
+                  {isNew ? 'a opens keyboard' : 'select profile'}
+                </span>
               </div>
             )
           })}
         </div>
       )}
 
+      <HintBar hints={['d-pad move', 'a select', 'b back to landing']} />
+
       {creating && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 px-4">
-          <div className="bg-vault-card rounded-2xl p-6 w-full max-w-[480px] max-h-[90vh] overflow-y-auto space-y-4" style={{ scrollbarWidth: 'none' }}>
-            <h2 className="text-white text-xl font-bold">New Profile</h2>
+          <div className="bg-vault-panel border border-vault-surface p-6 w-full max-w-[480px] max-h-[90vh] overflow-y-auto space-y-4" style={{ scrollbarWidth: 'none' }}>
+            <h2 className="font-display text-4xl">New Profile</h2>
 
             <div>
               <label className="text-vault-muted text-xs uppercase tracking-wide block mb-2">Username</label>
@@ -177,10 +172,6 @@ export function ProfileSelect({ onSelect }: Props) {
           </div>
         </div>
       )}
-
-      <p className="absolute bottom-8 text-vault-muted text-xs uppercase tracking-widest flex items-center gap-1.5">
-        <Glyph type="cross" /> Select  ·  D-Pad Navigate
-      </p>
     </div>
   )
 }

@@ -3,7 +3,7 @@ import type { Game, ListSource } from '@retro-vault/shared'
 import { api, bgVariant } from '../api/client'
 import { useGamepad } from '../hooks/useGamepad'
 import { Clock } from '../components/Clock'
-import { Glyph } from '../components/Glyph'
+import { Breadcrumb, Title, HintBar, rowClass, Caret } from '../components/ui'
 
 interface Props {
   sources: ListSource[]
@@ -59,30 +59,14 @@ function GameListRow({
       ref={rowRef}
       onMouseEnter={onFocus}
       onClick={onSelect}
-      className={[
-        'flex items-center gap-3.5 px-3.5 py-2.5 mb-1.5 rounded-xl cursor-pointer',
-        'transition-[background-color,transform,box-shadow] duration-150 motion-reduce:transition-none',
-        focused ? 'bg-vault-surface ring-2 ring-vault-accent scale-[1.02] translate-x-0.5' : 'bg-transparent',
-      ].join(' ')}
+      className={rowClass(focused)}
     >
+      <Caret selected={focused} />
+      <span className="flex-1 min-w-0 text-lg truncate">{game.name}</span>
       <span
         className={[
-          'w-1.5 h-1.5 rounded-full flex-shrink-0 transition-transform duration-150',
-          focused ? 'bg-vault-accent-bright scale-150' : 'bg-vault-muted',
-        ].join(' ')}
-      />
-      <span
-        className={[
-          'flex-1 min-w-0 text-[0.95rem] font-semibold tracking-wide truncate',
-          focused ? 'text-white' : 'text-[#d6d6e2]',
-        ].join(' ')}
-      >
-        {game.name}
-      </span>
-      <span
-        className={[
-          'flex-shrink-0 text-[0.65rem] font-bold uppercase tracking-wider',
-          focused ? 'text-vault-accent-bright' : 'text-vault-muted',
+          'flex-shrink-0 font-mono text-[0.8rem] uppercase tracking-[0.1em]',
+          focused ? 'text-vault-ink/70' : 'text-vault-muted',
         ].join(' ')}
       >
         {game.system}
@@ -104,54 +88,45 @@ function GamePreviewPanel({ game }: { game: Game | null }) {
   return (
     <div className="flex-1 min-w-0 flex gap-10 items-start">
       <div className="flex-shrink-0 w-64">
-        <div className="w-64 h-80 rounded-2xl overflow-hidden bg-vault-card shadow-2xl flex items-center justify-center">
+        <div className="w-64 h-80 overflow-hidden bg-vault-card border-[6px] border-vault-surface flex items-center justify-center">
           {game.box_art_path ? (
             <img src={game.box_art_path} alt={game.name} className="w-full h-full object-cover" />
           ) : (
             <div className="w-full h-full flex flex-col items-center justify-center gap-2 bg-vault-surface">
               <CartridgeIcon />
-              <span className="text-vault-muted text-[0.65rem] uppercase tracking-widest">{game.system}</span>
+              <span className="text-vault-muted text-[0.65rem] font-mono uppercase tracking-[0.14em]">{game.system}</span>
             </div>
           )}
         </div>
         {game.scraped_at && (
-          <div className="mt-3 flex items-center justify-center gap-1.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-vault-accent-bright inline-block" />
-            <span className="text-vault-accent-bright text-xs uppercase tracking-wide font-semibold">Scraped</span>
+          <div className="mt-3 flex items-center gap-2 font-mono text-xs uppercase tracking-[0.1em] text-vault-muted">
+            <span className="w-1.5 h-1.5 rounded-full bg-vault-accent inline-block" />
+            scraped
           </div>
         )}
       </div>
 
       {/* key on game.id restarts the rise-in animation on every focus change */}
-      <div key={game.id} className="flex-1 min-w-0 flex flex-col gap-4 animate-rise-in motion-reduce:animate-none">
+      <div key={game.id} className="flex-1 min-w-0 flex flex-col gap-5 animate-rise-in motion-reduce:animate-none">
         <div>
-          <p className="text-vault-accent-bright text-sm font-bold uppercase tracking-widest">{game.system}</p>
-          <h2 className="text-white text-4xl font-extrabold leading-tight mt-0.5">{game.name}</h2>
+          <p className="text-vault-accent font-mono text-[0.9rem] uppercase tracking-[0.14em]">{game.system}</p>
+          <Title className="text-6xl mt-1">{game.name}</Title>
         </div>
 
-        <div className="flex gap-7 py-3.5 border-y border-vault-surface">
+        <div className="flex gap-8 py-4 border-y border-[#eaf0f8]/15 font-mono text-[0.9rem] tracking-[0.04em]">
           {game.genre && (
-            <div>
-              <p className="text-vault-muted text-xs uppercase tracking-wide">Genre</p>
-              <p className="text-white text-sm font-semibold mt-0.5">{game.genre}</p>
-            </div>
+            <span><span className="text-vault-muted">genre </span>{game.genre}</span>
           )}
           {game.year && (
-            <div>
-              <p className="text-vault-muted text-xs uppercase tracking-wide">Year</p>
-              <p className="text-white text-sm font-semibold mt-0.5">{game.year}</p>
-            </div>
+            <span><span className="text-vault-muted">year </span>{game.year}</span>
           )}
           {game.players && (
-            <div>
-              <p className="text-vault-muted text-xs uppercase tracking-wide">Players</p>
-              <p className="text-white text-sm font-semibold mt-0.5">{game.players}</p>
-            </div>
+            <span><span className="text-vault-muted">players </span>{game.players}</span>
           )}
         </div>
 
         {game.description && (
-          <p className="text-vault-muted text-[17px] leading-relaxed max-w-[60ch] line-clamp-[8]">
+          <p className="font-read text-[1.15rem] leading-[1.5] text-[#eaf0f8]/74 max-w-[60ch] line-clamp-[8]" style={{ ['textWrap' as string]: 'pretty' }}>
             {game.description}
           </p>
         )}
@@ -282,20 +257,22 @@ export function ListView({ sources, activeKey: initialKey, onBack, onGameSelect,
         }}
       />
 
-      <header className="relative px-[5%] pt-[3%] pb-5 flex items-baseline justify-between flex-shrink-0">
+      <div className="relative px-[5%] pt-[3%]"><Breadcrumb>home / lists</Breadcrumb></div>
+
+      <header className="relative px-[5%] pt-3 pb-5 flex items-baseline justify-between flex-shrink-0">
         <div className="flex items-center gap-4">
           <div className="relative">
             <button
               onClick={() => (dropdownOpen ? setDropdownOpen(false) : openDropdown())}
               onMouseEnter={() => setFocusedIndex(SELECTOR_INDEX)}
               className={[
-                'flex items-center gap-3 rounded-xl px-4 py-2 -ml-4 transition-colors duration-150',
+                'flex items-center gap-3 rounded-[2px] px-4 py-2 -ml-4 transition-colors duration-150',
                 'motion-reduce:transition-none',
                 selectorFocused || dropdownOpen ? 'bg-vault-surface ring-2 ring-vault-accent' : 'hover:bg-vault-surface',
               ].join(' ')}
               title="Switch list"
             >
-              <h1 className="text-white text-2xl font-bold tracking-tight">{title}</h1>
+              <Title className="text-5xl">{title}</Title>
               <svg
                 width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                 strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
@@ -306,7 +283,7 @@ export function ListView({ sources, activeKey: initialKey, onBack, onGameSelect,
             </button>
 
             {dropdownOpen && (
-              <div className="absolute left-0 top-full mt-1 z-30 min-w-[280px] max-h-[60vh] overflow-y-auto rounded-xl bg-vault-card border border-vault-surface py-2 shadow-2xl" style={{ scrollbarWidth: 'none' }}>
+              <div className="absolute left-0 top-full mt-1 z-30 min-w-[280px] max-h-[60vh] overflow-y-auto rounded-[2px] bg-vault-panel border border-vault-surface py-2 shadow-2xl" style={{ scrollbarWidth: 'none' }}>
                 {sources.map((src, i) => (
                   <button
                     key={src.key}
@@ -318,10 +295,10 @@ export function ListView({ sources, activeKey: initialKey, onBack, onGameSelect,
                       dropdownFocus === i ? 'bg-vault-surface' : '',
                     ].join(' ')}
                   >
-                    <span className={['text-sm font-semibold truncate', src.key === activeKey ? 'text-vault-accent-bright' : 'text-white'].join(' ')}>
+                    <span className={['text-base truncate', src.key === activeKey ? 'text-vault-accent' : 'text-[#eaf0f8]'].join(' ')}>
                       {src.label}
                     </span>
-                    <span className="text-vault-muted text-[0.65rem] font-bold uppercase tracking-wider flex-shrink-0">
+                    <span className="text-vault-muted text-[0.7rem] font-mono uppercase tracking-[0.1em] flex-shrink-0">
                       {src.games.length}
                     </span>
                   </button>
@@ -329,7 +306,7 @@ export function ListView({ sources, activeKey: initialKey, onBack, onGameSelect,
               </div>
             )}
           </div>
-          <span className="text-vault-muted text-xs uppercase tracking-widest">{games.length} titles</span>
+          <span className="text-vault-muted font-mono text-[0.85rem] uppercase tracking-[0.1em]">{games.length} titles</span>
         </div>
         <div className="flex items-center gap-4">
           {games.length > 0 && (
@@ -338,17 +315,17 @@ export function ListView({ sources, activeKey: initialKey, onBack, onGameSelect,
               onMouseEnter={() => setFocusedIndex(SCRAPE_INDEX)}
               disabled={pendingCount === 0}
               className={[
-                'px-4 py-2 rounded-xl text-sm font-bold uppercase tracking-wide inline-flex items-center gap-2',
+                'px-4 py-2 rounded-[2px] font-mono text-[0.8rem] uppercase tracking-[0.1em] inline-flex items-center gap-2',
                 'border transition-colors duration-150 motion-reduce:transition-none',
                 pendingCount === 0
                   ? 'border-vault-muted/40 text-vault-muted/40 cursor-default'
                   : focusedIndex === SCRAPE_INDEX && !dropdownOpen
-                    ? 'ring-2 ring-white border-vault-accent bg-vault-surface text-white'
-                    : 'border-vault-muted text-vault-muted hover:text-white',
+                    ? 'ring-2 ring-white border-vault-accent-dim bg-vault-surface text-[#eaf0f8]'
+                    : 'border-vault-muted text-vault-muted hover:text-vault-accent',
               ].join(' ')}
               title="Scrape metadata for unscraped games in this list"
             >
-              <Glyph type="triangle" /> {pendingCount === 0 ? 'All Scraped' : `Scrape List (${pendingCount})`}
+              {pendingCount === 0 ? 'all scraped' : `scrape list · ${pendingCount}`}
             </button>
           )}
           <Clock />
@@ -377,49 +354,33 @@ export function ListView({ sources, activeKey: initialKey, onBack, onGameSelect,
       </main>
 
       <footer className="relative flex-shrink-0 px-[5%] pb-4 pt-3 bg-gradient-to-t from-vault-bg to-transparent">
-        <p className="text-vault-muted text-xs uppercase tracking-wide flex items-center gap-1.5 flex-wrap">
-          <Glyph type="cross" /> {dropdownOpen ? 'Choose list' : 'Select'}  ·  <Glyph type="circle" /> Back  ·  ↑↓ Move focus  ·  ↑ then ← → for Scrape List
-        </p>
+        <HintBar hints={['d-pad move', dropdownOpen ? 'a choose list' : 'a open', 'b back to home', 'y unfavorite']} />
       </footer>
 
       {scrape && (
         <div className="fixed inset-0 z-50 flex items-center justify-center px-6">
           <div className="absolute inset-0 bg-black/75" />
-          <div className="relative bg-vault-card rounded-2xl p-8 w-full max-w-md space-y-5" style={{ boxShadow: '0 24px 64px rgba(0,0,0,0.6)' }}>
-            <div className="flex items-center gap-3">
-              {scrape.running && (
-                <span className="w-4 h-4 rounded-full border-2 border-vault-muted border-t-vault-accent animate-spin motion-reduce:animate-none" />
-              )}
-              <h2 className="text-white text-xl font-bold">
-                {scrape.running ? `Scraping ${title}` : 'Scrape complete'}
-              </h2>
-            </div>
+          <div className="relative bg-vault-panel border border-vault-surface p-8 w-full max-w-md space-y-5" style={{ boxShadow: '0 24px 64px rgba(0,0,0,0.6)' }}>
+            <h2 className="font-display text-3xl">
+              {scrape.running ? `Scraping ${title}` : 'Scrape complete'}
+            </h2>
 
-            <div>
-              <div className="h-2 rounded-full bg-vault-surface overflow-hidden">
-                <div
-                  className="h-full bg-vault-accent transition-[width] duration-200 motion-reduce:transition-none"
-                  style={{ width: `${scrape.total ? (scrape.done / scrape.total) * 100 : 0}%` }}
-                />
-              </div>
-              <p className="text-vault-muted text-sm mt-2">
-                {scrape.done} / {scrape.total} scraped{scrape.failed > 0 ? ` · ${scrape.failed} failed` : ''}
-              </p>
+            {/* Plain-text status, streamed — no animated progress bar (spec). */}
+            <div className="font-mono text-sm tracking-[0.04em] text-vault-muted space-y-1">
+              <p className="text-vault-accent">{scrape.done} / {scrape.total} scraped{scrape.failed > 0 ? ` · ${scrape.failed} failed` : ''}</p>
               {scrape.running && scrape.current && (
-                <p className="text-vault-muted text-xs mt-1 truncate">Current: {scrape.current}</p>
+                <p className="truncate">current · {scrape.current}</p>
               )}
             </div>
 
             {scrape.running ? (
-              <p className="text-vault-muted text-xs uppercase tracking-wide text-center">
-                <Glyph type="circle" /> Back to stop
-              </p>
+              <p className="font-mono text-xs uppercase tracking-[0.1em] text-vault-muted">b back to stop</p>
             ) : (
               <button
                 onClick={() => setScrape(null)}
-                className="w-full py-3 rounded-xl font-bold text-sm uppercase tracking-wide bg-vault-accent text-white inline-flex items-center justify-center gap-2"
+                className="w-full py-3 rounded-[2px] font-mono uppercase tracking-[0.08em] text-sm bg-vault-accent-bright text-vault-ink"
               >
-                <Glyph type="cross" /> Done
+                a done
               </button>
             )}
           </div>

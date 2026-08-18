@@ -56,10 +56,10 @@ export function Rail({
 
   return (
     <section className="px-[5%] py-3">
-      <h2 className="text-white text-lg font-semibold mb-3 tracking-wide">
-        {title}
+      <h2 className="mb-3 flex items-baseline gap-3">
+        <span className="font-display text-3xl tracking-[-0.015em] text-[#eaf0f8]">{title}</span>
         {!loading && (
-          <span className="text-vault-muted text-sm font-normal"> · {games.length} titles</span>
+          <span className="text-vault-muted font-mono text-[0.85rem] uppercase tracking-[0.1em]">{games.length} titles</span>
         )}
       </h2>
       <div
@@ -93,17 +93,17 @@ export function Rail({
             <button
               onClick={onShowMore}
               className={[
-                'flex-shrink-0 rounded-xl flex flex-col items-center justify-center gap-2',
-                'bg-vault-card text-vault-muted hover:text-white transition-colors cursor-pointer',
+                'flex-shrink-0 rounded-[2px] flex flex-col items-center justify-center gap-2 border-l-[6px]',
+                'bg-vault-card text-vault-muted hover:text-vault-accent transition-colors cursor-pointer',
                 size === 'lg' ? 'w-56 h-72' : 'w-44 h-60',
-                isActiveRegion && focusedIndex === visible.length ? 'ring-4 ring-vault-accent-bright' : 'ring-0',
+                isActiveRegion && focusedIndex === visible.length ? 'border-vault-pink ring-2 ring-vault-accent-bright' : 'border-transparent ring-0',
               ].join(' ')}
             >
               <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M9 18l6-6-6-6" />
               </svg>
-              <span className="text-sm font-semibold uppercase tracking-wide">Show More</span>
-              <span className="text-xs text-vault-muted">{games.length} titles</span>
+              <span className="font-mono text-[0.8rem] uppercase tracking-[0.1em]">Show More</span>
+              <span className="text-xs text-vault-muted font-mono">{games.length} titles</span>
             </button>
           </div>
         )}

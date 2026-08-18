@@ -89,10 +89,10 @@ export function VirtualGrid({ total, getGame, onNeedRange, loading, focusedRow, 
   return (
     <section className="px-[5%] py-3">
       {title && (
-        <h2 className="text-white text-lg font-semibold mb-3 tracking-wide">
-          {title}
+        <h2 className="mb-3 flex items-baseline gap-3">
+          <span className="font-display text-3xl tracking-[-0.015em] text-[#eaf0f8]">{title}</span>
           {!loading && (
-            <span className="text-vault-muted text-sm font-normal"> · {total} titles</span>
+            <span className="text-vault-muted font-mono text-[0.85rem] uppercase tracking-[0.1em]">{total} titles</span>
           )}
         </h2>
       )}
