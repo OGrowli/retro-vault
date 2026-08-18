@@ -2,8 +2,6 @@ import { useState } from 'react'
 import { useGamepad } from '../hooks/useGamepad'
 import { Clock } from '../components/Clock'
 import { Breadcrumb, HintBar } from '../components/ui'
-import retrovaultHero from '../assets/retrovault-hero.png'
-import idgamesHero from '../assets/idgames-hero.png'
 
 type Choice = 'doom' | 'retrovault'
 
@@ -11,12 +9,16 @@ interface Props {
   onChoose: (choice: Choice) => void
 }
 
-// First screen on launch — pick RetroVault or the idGames/Doom mode. The one
-// screen where a bit of art earns its keep (seen once per session). Each block
-// is a full-bleed hero; the focused one gets the magenta selection bar.
-const CARDS: { key: Choice; title: string; subtitle: string; art: string }[] = [
-  { key: 'retrovault', title: 'RetroVault', subtitle: 'your game library', art: retrovaultHero },
-  { key: 'doom', title: 'idGames', subtitle: 'doom · custom wads', art: idgamesHero },
+// First screen on launch — pick RetroVault or the idGames/Doom mode. The spec
+// makes this the one screen where typographic personality earns its keep (seen
+// once per session), so each mode is a large type block in its own palette; the
+// focused one lights up with the magenta selection bar.
+const CARDS: {
+  key: Choice; title: string; subtitle: string
+  bg: string; accent: string; wash: string
+}[] = [
+  { key: 'retrovault', title: 'RetroVault', subtitle: 'your game library', bg: '#12101c', accent: '#6fd3ff', wash: 'rgba(53,198,255,0.10)' },
+  { key: 'doom', title: 'idGames', subtitle: 'doom · custom wads', bg: '#16100f', accent: '#ff8a3d', wash: 'rgba(255,107,26,0.10)' },
 ]
 
 export function Landing({ onChoose }: Props) {
@@ -47,26 +49,29 @@ export function Landing({ onChoose }: Props) {
               onMouseEnter={() => setFocus(i)}
               onClick={() => onChoose(card.key)}
               className={[
-                'flex-1 min-w-0 relative overflow-hidden cursor-pointer flex flex-col justify-end',
-                'border-l-[6px]',
-                focused ? 'border-vault-pink' : 'border-transparent',
+                'flex-1 min-w-0 relative overflow-hidden cursor-pointer flex flex-col justify-end p-12',
+                'border-l-[6px] transition-opacity duration-150 motion-reduce:transition-none',
+                focused ? 'border-vault-pink' : 'border-transparent opacity-60',
               ].join(' ')}
-              style={{ outline: focused ? '' : '1px solid rgba(234,240,248,0.14)' }}
+              style={{
+                background: focused ? `${card.wash}, ${card.bg}` : card.bg,
+                backgroundBlendMode: 'normal',
+                outline: focused ? `2px solid ${card.accent}` : '1px solid rgba(234,240,248,0.14)',
+                outlineOffset: '-2px',
+              }}
             >
-              <img
-                src={card.art}
-                alt={card.title}
-                className={[
-                  'absolute inset-0 w-full h-full object-cover',
-                  focused ? '' : 'opacity-55 grayscale-[0.3]',
-                ].join(' ')}
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
-              <div className="relative p-10">
-                <div className="font-display text-6xl tracking-[-0.02em] text-white">{card.title}</div>
-                <div className="font-mono text-[0.95rem] uppercase tracking-[0.14em] text-white/70 mt-2">
-                  {card.subtitle}
+              {/* oversized watermark initial for a little personality */}
+              <div
+                className="absolute -top-10 -right-6 font-display leading-none pointer-events-none select-none"
+                style={{ fontSize: '22rem', color: card.accent, opacity: focused ? 0.12 : 0.05 }}
+              >
+                {card.title.charAt(0)}
+              </div>
+              <div className="relative">
+                <div className="font-mono text-[0.95rem] uppercase tracking-[0.16em] mb-3" style={{ color: card.accent }}>
+                  {focused ? '▸ ' : ''}{card.subtitle}
                 </div>
+                <div className="font-display text-8xl tracking-[-0.02em] text-white leading-none">{card.title}</div>
               </div>
             </div>
           )

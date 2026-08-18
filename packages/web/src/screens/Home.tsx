@@ -7,7 +7,6 @@ import { GameList as GameListView } from '../components/GameList'
 import { FilterChips, buildChips } from '../components/FilterChips'
 import type { ActionChipId, ChipId } from '../components/FilterChips'
 import { AddResultsToListModal } from '../components/AddResultsToListModal'
-import { RandomGameModal } from '../components/RandomGameModal'
 import { VirtualKeyboard } from '../components/VirtualKeyboard'
 import { Clock } from '../components/Clock'
 import { HealthIndicator } from '../components/HealthIndicator'
@@ -51,7 +50,6 @@ export function Home({ user, systems, genres, filter, homePrefs, onFilterChange,
   const [lists, setLists] = useState<GameList[]>([])
   const [listGames, setListGames] = useState<Record<number, Game[]>>({})
   const [loading, setLoading] = useState(true)
-  const [randomGame, setRandomGame] = useState<Game | null>(null)
   const [randomLoading, setRandomLoading] = useState(false)
   const [importLoading, setImportLoading] = useState(false)
   const [importMessage, setImportMessage] = useState<string | null>(null)
@@ -155,15 +153,18 @@ export function Home({ user, systems, genres, filter, homePrefs, onFilterChange,
     prevActiveRef.current = inputActive
   }, [inputActive, user.id, loadLists])
 
-  const handleRandom = useCallback(async () => {
+  // Random goes straight to the game page (respecting active filters) — no
+  // intermediate popup. onRandomView opens Detail with "Random Again" available.
+  const goRandom = useCallback(async () => {
+    if (randomLoading) return
     setRandomLoading(true)
     try {
       const game = await api.games.random(filter, user.id)
-      setRandomGame(game)
+      ;(onRandomView ?? onGameSelect)(game)
     } catch {} finally {
       setRandomLoading(false)
     }
-  }, [filter, user.id])
+  }, [randomLoading, filter, user.id, onRandomView, onGameSelect])
 
   const handleImport = useCallback(async () => {
     setImportLoading(true)
@@ -211,7 +212,7 @@ export function Home({ user, systems, genres, filter, homePrefs, onFilterChange,
     allGamesCount: gamesTotal,
     disabled: !inputActive,
     onConfirm: (region, index) => {
-      if (region === 'top') { if (index === 0) setSearchVkOpen(true); else void handleRandom(); return }
+      if (region === 'top') { if (index === 0) setSearchVkOpen(true); else void goRandom(); return }
       if (region === 'chips') {
         const chip = chips[index]
         if (!chip) return
@@ -252,7 +253,7 @@ export function Home({ user, systems, genres, filter, homePrefs, onFilterChange,
 
   // Home nav is suspended while a chip dropdown, the search keyboard, or a modal
   // owns input — those render their own gamepad handlers.
-  useGamepad(handleAction, inputActive && !openChip && !searchVkOpen && !randomGame && !randomLoading && !addToListOpen)
+  useGamepad(handleAction, inputActive && !openChip && !searchVkOpen && !randomLoading && !addToListOpen)
 
   const gameCount = gamesTotal
   const searchFocused = nav.region === 'top' && nav.indexOf('top') === 0
@@ -288,7 +289,7 @@ export function Home({ user, systems, genres, filter, homePrefs, onFilterChange,
           <span className="text-lg truncate">{filter.query || `${gameCount.toLocaleString()} games`}</span>
         </button>
         <button
-          onClick={() => void handleRandom()}
+          onClick={() => void goRandom()}
           className={[
             'px-5 py-3 border-l-[6px] font-mono uppercase tracking-[0.1em] text-sm',
             randomFocused ? 'bg-vault-accent-bright text-vault-ink border-vault-pink' : 'bg-vault-panel border-transparent text-[#eaf0f8]',
@@ -363,14 +364,6 @@ export function Home({ user, systems, genres, filter, homePrefs, onFilterChange,
       <div className="flex-shrink-0 pt-3">
         <HintBar hints={['d-pad move', 'a open', 'y favorite', 'x filter', 'start settings']} />
       </div>
-
-      <RandomGameModal
-        game={randomGame}
-        loading={randomLoading}
-        onClose={() => setRandomGame(null)}
-        onView={(game) => { setRandomGame(null); (onRandomView ?? onGameSelect)(game) }}
-        onAnother={() => void handleRandom()}
-      />
 
       {addToListOpen && (
         <AddResultsToListModal
