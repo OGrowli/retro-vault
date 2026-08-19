@@ -5,8 +5,10 @@
 @layer base {
   :root {
     color-scheme: dark;
-    /* 10-foot UI: 18px base scales every rem-derived size up ~12.5% */
-    font-size: 112.5%;
+    /* 10-foot UI on a 1920 TV: the design is drawn against ~22px labels / 30px
+       rows, so scale the rem base up to match at couch distance. One global knob
+       — nudge this % to make the whole UI uniformly bigger/smaller. */
+    font-size: 140%;
   }
 
   * {
