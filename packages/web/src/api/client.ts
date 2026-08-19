@@ -23,6 +23,30 @@ export interface IdgamesFile {
   url?: string
 }
 
+// Stored archive record for a downloaded WAD (written at download time) plus the
+// on-disk stats the meta endpoint always returns. `meta` is null for side-loaded
+// WADs the archive never touched.
+export interface WadMeta {
+  title?: string
+  author?: string
+  description?: string
+  rating?: number
+  votes?: number
+  date?: string
+  size?: number
+  dir?: string
+  sourceId?: number
+  sourceFilename?: string
+  downloadedAt?: string
+}
+export interface WadInfo {
+  name: string
+  meta: WadMeta | null
+  size?: number
+  mtime?: string
+}
+export interface IdgamesReview { vote: number; text?: string; username: string | null }
+
 // idgames `search` action knobs — which record field the query matches, how the
 // results are ordered, and the direction. Mirrors the API's accepted values.
 export type IdgamesSearchType = 'title' | 'author' | 'filename' | 'textfile' | 'description'
@@ -259,6 +283,8 @@ export const api = {
 
   doom: {
     wads: () => get<{ dir: string; iwads: string[]; wads: string[]; onlineReady: boolean; engine: 'lzdoom' | 'retroarch' }>('/doom/wads'),
+    wadMeta: (name: string) => get<WadInfo>(`/doom/wads/meta?name=${encodeURIComponent(name)}`),
+    deleteWad: (name: string) => del<{ deleted: boolean; freed: number }>(`/doom/wads/${encodeURIComponent(name)}`),
     getSettings: () => get<{ engine: 'lzdoom' | 'retroarch'; onlineReady: boolean }>('/doom/settings'),
     setEngine: (engine: 'lzdoom' | 'retroarch') => post<{ engine: string }>('/doom/settings', { engine }),
     launch: (opts: { online?: boolean; iwad?: string; wad?: string } = {}) =>
@@ -273,6 +299,7 @@ export const api = {
         return get<{ files: IdgamesFile[] }>(`/doom/idgames/search?${p.toString()}`)
       },
       get: (id: number) => get<{ file: IdgamesFile }>(`/doom/idgames/get?id=${id}`),
+      reviews: (id: number) => get<{ total: number; reviews: IdgamesReview[] }>(`/doom/idgames/reviews?id=${id}`),
       download: (id: number) => post<{ downloaded: string; title?: string; wads: string[] }>('/doom/idgames/download', { id }),
     },
   },

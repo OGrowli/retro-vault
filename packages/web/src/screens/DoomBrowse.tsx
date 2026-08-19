@@ -46,7 +46,10 @@ export function DoomBrowse({ onBack }: Props) {
   const [query, setQuery] = useState('')
   const [searching, setSearching] = useState(false)  // keyboard overlay open
   const [downloading, setDownloading] = useState(false)
-  const [done, setDone] = useState<Set<number>>(new Set())
+  const [launching, setLaunching] = useState(false)
+  // id -> extracted playable filenames, for entries downloaded this session.
+  // Presence means "in your wad list"; the first file is what "play" launches.
+  const [downloaded, setDownloaded] = useState<Record<number, string[]>>({})
   const [didDownload, setDidDownload] = useState(false)
   const [detail, setDetail] = useState<Record<number, IdgamesFile>>({}) // id -> full record
   const rowRefs = useRef<(HTMLDivElement | null)[]>([])
@@ -115,8 +118,8 @@ export function DoomBrowse({ onBack }: Props) {
     if (downloading) return
     setDownloading(true); setError(null)
     try {
-      await api.doom.idgames.download(f.id)
-      setDone(prev => new Set(prev).add(f.id))
+      const r = await api.doom.idgames.download(f.id)
+      setDownloaded(prev => ({ ...prev, [f.id]: r.wads }))
       setDidDownload(true)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Download failed')
@@ -124,6 +127,20 @@ export function DoomBrowse({ onBack }: Props) {
       setDownloading(false)
     }
   }, [downloading])
+
+  // Play a just-downloaded entry on the default IWAD (device only).
+  const play = useCallback(async (f: IdgamesFile) => {
+    const wad = downloaded[f.id]?.[0]
+    if (!wad || launching) return
+    setLaunching(true); setError(null)
+    try {
+      await api.doom.launch({ wad })
+      setTimeout(() => setLaunching(false), 4000)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Launch failed')
+      setLaunching(false)
+    }
+  }, [downloaded, launching])
 
   useGamepad((action) => {
     if (searching) return
@@ -134,7 +151,10 @@ export function DoomBrowse({ onBack }: Props) {
     if (action === 'right' && focus === 0) setCtrl(i => Math.min(CTRL_COUNT - 1, i + 1))
     if (action === 'confirm') {
       if (focus === 0) { activateCtrl(ctrl); return }
-      if (current && !done.has(current.id)) void download(current)
+      if (!current) return
+      // First press downloads; once it's in the wad list, press again to play.
+      if (downloaded[current.id]) void play(current)
+      else void download(current)
     }
   }, !searching)
 
@@ -161,7 +181,7 @@ export function DoomBrowse({ onBack }: Props) {
   }
 
   const d = current ? (detail[current.id] ?? current) : undefined
-  const got = current ? done.has(current.id) : false
+  const got = current ? !!downloaded[current.id] : false
 
   return (
     <div className="fixed inset-0 bg-idg-bg text-idg-text flex flex-col px-[4%] pt-[2.5%] pb-5 font-sans">
@@ -219,7 +239,7 @@ export function DoomBrowse({ onBack }: Props) {
                 >
                   <Caret selected={focused} mode="idg" />
                   <span className="flex-1 min-w-0 text-lg truncate">{f.title || f.filename}</span>
-                  {done.has(f.id) && <Tag mode="idg" dark={focused}>downloaded</Tag>}
+                  {downloaded[f.id] && <Tag mode="idg" dark={focused}>downloaded</Tag>}
                 </div>
               )
             })
@@ -249,12 +269,15 @@ export function DoomBrowse({ onBack }: Props) {
               {d.dir && <p className="text-idg-muted text-[0.75rem] mt-3 font-mono truncate">/idgames/{d.dir}{d.filename}</p>}
 
               <div className="mt-5 flex items-center gap-4">
+                {/* When downloaded, the primary action flips to play; a subtle
+                    "in your wad list" note keeps the downloaded state visible. */}
                 <span className={[
                   'px-6 py-3 rounded-[2px] border-l-[6px] font-mono uppercase tracking-[0.08em] text-sm inline-flex items-center gap-3',
-                  got ? 'border-idg-dim bg-idg-bg text-idg-accent' : 'border-idg-gold bg-idg-fill text-idg-ink',
+                  'border-idg-gold bg-idg-fill text-idg-ink',
                 ].join(' ')}>
-                  {downloading ? 'downloading…' : got ? '✓ in your wad list' : '▸ download'}
+                  {downloading ? 'downloading…' : launching ? 'launching…' : got ? '▸ play' : '▸ download'}
                 </span>
+                {got && !launching && <span className="font-mono text-[0.75rem] uppercase tracking-[0.08em] text-idg-muted">✓ in your wad list</span>}
                 {error && <span className="text-red-400 text-sm">{error}</span>}
               </div>
             </>
@@ -263,7 +286,7 @@ export function DoomBrowse({ onBack }: Props) {
       </div>
 
       <footer className="flex-shrink-0 pt-4">
-        <HintBar mode="idg" hints={['d-pad move', 'a download', 'x field / sort', 'b back to idgames']} />
+        <HintBar mode="idg" hints={['d-pad move', 'a download / play', 'x field / sort', 'b back to idgames']} />
       </footer>
     </div>
   )

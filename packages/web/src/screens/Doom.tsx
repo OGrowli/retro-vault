@@ -4,6 +4,7 @@ import { useGamepad } from '../hooks/useGamepad'
 import { Clock } from '../components/Clock'
 import { Breadcrumb, Title, SectionHeader, HintBar, Tag, rowClass, Caret } from '../components/ui'
 import { DoomBrowse } from './DoomBrowse'
+import { WadDetail } from './WadDetail'
 
 interface Props {
   onBack: () => void
@@ -43,6 +44,7 @@ export function Doom({ onBack }: Props) {
   const [launching, setLaunching] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [browsing, setBrowsing] = useState(false)
+  const [detailWad, setDetailWad] = useState<string | null>(null)
   const rowRefs = useRef<(HTMLDivElement | null)[]>([])
 
   const loadWads = useCallback(() => {
@@ -87,7 +89,7 @@ export function Doom({ onBack }: Props) {
     if (item.kind === 'online') { if (onlineReady) void launch({ online: true }) }
     else if (item.kind === 'browse') setBrowsing(true)
     else if (item.kind === 'iwad') void launch({ iwad: item.name })
-    else void launch({ wad: item.name })
+    else setDetailWad(item.name) // custom WAD → open its detail page
   }, [items, launch, onlineReady])
 
   useGamepad((action) => {
@@ -96,7 +98,7 @@ export function Doom({ onBack }: Props) {
     if (action === 'up') setFocus(i => Math.max(0, i - 1))
     if (action === 'down') setFocus(i => Math.min(items.length - 1, i + 1))
     if (action === 'confirm') activate(focus)
-  }, !browsing)
+  }, !browsing && !detailWad)
 
   const Row = ({ idx, label, sub, tag, dim }: { idx: number; label: string; sub?: string; tag?: string; dim?: boolean }) => {
     const focused = focus === idx
@@ -122,6 +124,18 @@ export function Doom({ onBack }: Props) {
 
   if (browsing) {
     return <DoomBrowse onBack={(didDownload) => { setBrowsing(false); if (didDownload) loadWads() }} />
+  }
+
+  if (detailWad) {
+    return (
+      <WadDetail
+        name={detailWad}
+        defaultIwad={iwads[0]}
+        hasIwad={hasIwad}
+        onBack={() => setDetailWad(null)}
+        onDeleted={() => { setDetailWad(null); setFocus(0); loadWads() }}
+      />
+    )
   }
 
   return (

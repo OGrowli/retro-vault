@@ -65,6 +65,34 @@ function listWadDir(): { iwads: string[]; wads: string[] } {
   return { iwads, wads }
 }
 
+// ---- downloaded-WAD metadata sidecar ------------------------------------
+// idgames downloads are just files once extracted, so the rich archive record
+// (title/author/rating/description) is otherwise lost. We stash it in a small
+// JSON index next to the WADs, keyed by lowercased extracted filename, so the
+// WAD detail page can show it later. `.wadmeta.json` is a dotfile with a .json
+// ext, so listWadDir() never lists it as a playable WAD.
+interface WadMeta {
+  title?: string
+  author?: string
+  description?: string
+  rating?: number
+  votes?: number
+  date?: string
+  size?: number
+  dir?: string
+  sourceId?: number
+  sourceFilename?: string
+  downloadedAt?: string
+}
+const WAD_META_FILE = () => path.join(DOOM_DIR, '.wadmeta.json')
+function readWadMeta(): Record<string, WadMeta> {
+  try { return JSON.parse(fs.readFileSync(WAD_META_FILE(), 'utf8')) as Record<string, WadMeta> }
+  catch { return {} }
+}
+function writeWadMeta(map: Record<string, WadMeta>): void {
+  fs.writeFileSync(WAD_META_FILE(), JSON.stringify(map, null, 2))
+}
+
 // Lightweight folder listing — intentionally NOT part of the game metadata /
 // scraping pipeline. Splits base games (IWADs) from custom PWADs.
 doomRouter.get('/wads', (c) => {
@@ -72,6 +100,35 @@ doomRouter.get('/wads', (c) => {
   // Online multiplayer is only usable once a source-built port + browser is
   // wired via DOOM_ONLINE_CMD (inherited by the launcher). Gate the UI on it.
   return c.json({ dir: DOOM_DIR, iwads, wads, onlineReady: !!process.env['DOOM_ONLINE_CMD'], engine: getEngine() })
+})
+
+// GET /doom/wads/meta?name=  — stored archive record for one downloaded WAD,
+// plus on-disk size/mtime so side-loaded WADs (no record) still render.
+doomRouter.get('/wads/meta', (c) => {
+  const name = path.basename(c.req.query('name') ?? '')
+  if (!name) return c.json({ error: 'bad name' }, 400)
+  const meta = readWadMeta()[name.toLowerCase()] ?? null
+  let size: number | undefined
+  let mtime: string | undefined
+  try {
+    const st = fs.statSync(path.join(DOOM_DIR, name))
+    size = st.size; mtime = st.mtime.toISOString()
+  } catch { /* not on disk (dev) — meta-only render */ }
+  return c.json({ name, meta, size, mtime })
+})
+
+// DELETE /doom/wads/:name  — remove a downloaded WAD (and its sidecar record).
+// Guarded to a bare filename inside DOOM_DIR; base-game IWADs are protected.
+doomRouter.delete('/wads/:name', (c) => {
+  const name = path.basename(c.req.param('name'))
+  if (IWAD_NAMES.has(name.toLowerCase())) return c.json({ error: 'refusing to delete a base-game IWAD' }, 400)
+  const full = path.join(DOOM_DIR, name)
+  let freed = 0
+  try { freed = fs.statSync(full).size } catch { return c.json({ error: 'WAD not found' }, 404) }
+  try { fs.unlinkSync(full) } catch (e) { return c.json({ error: e instanceof Error ? e.message : 'delete failed' }, 500) }
+  const map = readWadMeta()
+  if (map[name.toLowerCase()]) { delete map[name.toLowerCase()]; try { writeWadMeta(map) } catch { /* ignore */ } }
+  return c.json({ deleted: true, freed })
 })
 
 // Launch Doom. Body:
@@ -232,6 +289,39 @@ doomRouter.get('/idgames/search', async (c) => {
   }
 })
 
+// A single archive review, trimmed to what the detail page renders. The API
+// nests them under content.reviews.review; username is an object (empty when
+// the reviewer was anonymous), so we coerce it to a name or null.
+interface IdgamesReview { vote: number; text?: string; username: string | null }
+
+// GET /doom/idgames/reviews?id=&limit=  — lazy reviews for the detail page.
+// Kept off the list/get paths (those are trimmed for payload size) — the detail
+// page fetches this on its own after painting.
+doomRouter.get('/idgames/reviews', async (c) => {
+  const id = parseInt(c.req.query('id') ?? '', 10)
+  if (!Number.isFinite(id)) return c.json({ error: 'bad id' }, 400)
+  const limit = Math.min(40, Math.max(1, parseInt(c.req.query('limit') ?? '25', 10) || 25))
+  try {
+    const qs = new URLSearchParams({ action: 'get', id: String(id), out: 'json' }).toString()
+    const res = await fetch(`${IDGAMES_API}?${qs}`, { signal: AbortSignal.timeout(12_000) })
+    if (!res.ok) throw new Error(`idgames API ${res.status}`)
+    const json = await res.json() as { content?: { reviews?: { review?: unknown } } }
+    const raw = json.content?.reviews?.review
+    const arr = Array.isArray(raw) ? raw : raw ? [raw] : []
+    const reviews: IdgamesReview[] = arr.map((r) => {
+      const o = r as { vote?: unknown; text?: unknown; username?: unknown }
+      return {
+        vote: Number(o.vote) || 0,
+        text: typeof o.text === 'string' && o.text.trim() ? o.text.trim() : undefined,
+        username: typeof o.username === 'string' && o.username.trim() ? o.username.trim() : null,
+      }
+    })
+    return c.json({ total: reviews.length, reviews: reviews.slice(0, limit) })
+  } catch (e) {
+    return c.json({ error: e instanceof Error ? e.message : 'idgames unavailable' }, 502)
+  }
+})
+
 // GET /doom/idgames/get?id=  — full record for a detail view.
 doomRouter.get('/idgames/get', async (c) => {
   const id = parseInt(c.req.query('id') ?? '', 10)
@@ -305,5 +395,22 @@ doomRouter.post('/idgames/download', async (c) => {
   }
 
   if (!added.length) return c.json({ error: 'No playable WAD/PK3 found in the archive' }, 422)
+
+  // Stash the archive record against each extracted file so the WAD detail page
+  // can show title/author/rating/description later. Best-effort — never fail the
+  // download over a metadata write.
+  try {
+    const map = readWadMeta()
+    const now = new Date().toISOString()
+    for (const f of added) {
+      map[f.toLowerCase()] = {
+        title: rec.title, author: rec.author, description: rec.description,
+        rating: rec.rating, votes: rec.votes, date: rec.date, size: rec.size,
+        dir: rec.dir, sourceId: rec.id, sourceFilename: rec.filename, downloadedAt: now,
+      }
+    }
+    writeWadMeta(map)
+  } catch { /* ignore — download still succeeded */ }
+
   return c.json({ downloaded: rec.filename, title: rec.title, wads: added })
 })
