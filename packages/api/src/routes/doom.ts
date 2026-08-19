@@ -160,6 +160,27 @@ interface IdgamesFile {
   url?: string
 }
 
+// Trim a raw idgames record to the fields the UI actually surfaces. The API
+// also returns `textfile` (the whole WAD .txt — tens of KB) plus credits /
+// reviews / editors we never render; dropping them shrinks the payload the Pi
+// has to transfer, parse and re-serialize by an order of magnitude, which is
+// what makes the latest-uploads list feel slow.
+function pick(r: IdgamesFile): IdgamesFile {
+  return {
+    id: r.id,
+    title: r.title,
+    author: r.author,
+    description: r.description,
+    rating: r.rating,
+    votes: r.votes,
+    dir: r.dir,
+    filename: r.filename,
+    size: r.size,
+    date: r.date,
+    url: r.url,
+  }
+}
+
 // The API returns content.file as an object for a single hit, an array for
 // many, and content: {} / an { error } / { warning } wrapper otherwise.
 async function idgames(params: Record<string, string>): Promise<IdgamesFile[]> {
@@ -172,7 +193,8 @@ async function idgames(params: Record<string, string>): Promise<IdgamesFile[]> {
   // action returns the single record directly under content.
   const file = json.content?.file ?? (json.content?.id != null ? json.content : null)
   if (!file) return []
-  return Array.isArray(file) ? file : [file]
+  const records = Array.isArray(file) ? file : [file]
+  return records.map(pick)
 }
 
 // GET /doom/idgames/latest?limit=  — newest uploads.

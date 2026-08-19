@@ -97,11 +97,16 @@ export function DoomBrowse({ onBack }: Props) {
   const current = focus > 0 ? files[focus - 1] : undefined
 
   // Lazy-fetch the full record (dir/date/size/credits) for the focused entry.
+  // Debounced: d-pad scrolling flies through rows, and each fetch is a slow
+  // round-trip to Doomworld — only fetch the entry focus actually settles on.
   useEffect(() => {
     if (!current || detail[current.id]) return
     let alive = true
-    api.doom.idgames.get(current.id).then(r => { if (alive) setDetail(d => ({ ...d, [current.id]: r.file })) }).catch(() => {})
-    return () => { alive = false }
+    const id = current.id
+    const t = setTimeout(() => {
+      api.doom.idgames.get(id).then(r => { if (alive) setDetail(d => ({ ...d, [id]: r.file })) }).catch(() => {})
+    }, 180)
+    return () => { alive = false; clearTimeout(t) }
   }, [current, detail])
 
   useEffect(() => { rowRefs.current[focus]?.scrollIntoView({ block: 'nearest' }) }, [focus])
