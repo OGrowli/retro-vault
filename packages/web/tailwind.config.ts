@@ -48,11 +48,19 @@ export default {
         'fade-in': { '0%': { opacity: '0' }, '100%': { opacity: '1' } },
         'slide-in': { '0%': { transform: 'translateX(-100%)' }, '100%': { transform: 'translateX(0)' } },
         'rise-in': { '0%': { opacity: '0', transform: 'translateY(8px)' }, '100%': { opacity: '1', transform: 'translateY(0)' } },
+        // Marquee for text too long to fit its row. The shift distance is set
+        // per-element via --mq-shift (measured in JS); holds at each end so the
+        // start and end of the title are both readable.
+        marquee: {
+          '0%, 12%': { transform: 'translateX(0)' },
+          '88%, 100%': { transform: 'translateX(var(--mq-shift, 0px))' },
+        },
       },
       animation: {
         'fade-in': 'fade-in 200ms ease-out',
         'slide-in': 'slide-in 250ms cubic-bezier(0.25, 0.46, 0.45, 0.94)',
         'rise-in': 'rise-in 220ms cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+        marquee: 'marquee 5s ease-in-out infinite alternate',
       },
     },
   },
