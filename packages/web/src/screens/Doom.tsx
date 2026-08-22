@@ -4,7 +4,9 @@ import { useGamepad } from '../hooks/useGamepad'
 import { StatusBar } from '../components/StatusBar'
 import { Breadcrumb, Title, SectionHeader, HintBar, Tag, rowClass, Caret } from '../components/ui'
 import { DoomBrowse } from './DoomBrowse'
+import { DoomSaved } from './DoomSaved'
 import { WadDetail } from './WadDetail'
+import type { DoomFavorite, DoomPlay } from '../api/client'
 
 interface Props {
   onBack: () => void
@@ -13,8 +15,24 @@ interface Props {
 type Item =
   | { kind: 'online' }
   | { kind: 'browse' }
+  | { kind: 'saved' }
+  | { kind: 'recent'; play: DoomPlay }
   | { kind: 'iwad'; name: string }
   | { kind: 'wad'; name: string }
+
+// Coarse "when" for the recently-played rows — a TV list wants "2h ago", not a
+// timestamp. SQLite hands back naive UTC ('YYYY-MM-DD HH:MM:SS'), so pin the
+// zone before parsing or every entry reads hours off.
+function ago(iso: string): string {
+  const t = Date.parse(iso.includes('T') ? iso : `${iso.replace(' ', 'T')}Z`)
+  if (!Number.isFinite(t)) return ''
+  const mins = Math.max(0, Math.round((Date.now() - t) / 60_000))
+  if (mins < 1) return 'just now'
+  if (mins < 60) return `${mins}m ago`
+  const hours = Math.round(mins / 60)
+  if (hours < 24) return `${hours}h ago`
+  return `${Math.round(hours / 24)}d ago`
+}
 
 // Friendly names for the recognised base games; falls back to the filename.
 const IWAD_LABELS: Record<string, string> = {
@@ -44,6 +62,9 @@ export function Doom({ onBack }: Props) {
   const [launching, setLaunching] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [browsing, setBrowsing] = useState(false)
+  const [showSaved, setShowSaved] = useState(false)
+  const [recent, setRecent] = useState<DoomPlay[]>([])
+  const [favorites, setFavorites] = useState<DoomFavorite[]>([])
   const [detailWad, setDetailWad] = useState<string | null>(null)
   const rowRefs = useRef<(HTMLDivElement | null)[]>([])
 
@@ -51,6 +72,10 @@ export function Doom({ onBack }: Props) {
     api.doom.wads()
       .then(r => { setIwads(r.iwads); setWads(r.wads); setDir(r.dir); setOnlineReady(r.onlineReady); setLoading(false) })
       .catch(() => setLoading(false))
+    // Saved + recently played sit above the folder listing; both are cheap local
+    // reads, so they refresh whenever the folder does.
+    api.doom.recent(5).then(r => setRecent(r.recent)).catch(() => {})
+    api.doom.favorites().then(r => setFavorites(r.favorites)).catch(() => {})
   }, [])
 
   useEffect(() => { loadWads() }, [loadWads])
@@ -58,9 +83,16 @@ export function Doom({ onBack }: Props) {
   const items: Item[] = [
     { kind: 'online' },
     { kind: 'browse' },
+    { kind: 'saved' },
+    ...recent.map(play => ({ kind: 'recent', play } as const)),
     ...iwads.map(name => ({ kind: 'iwad', name } as const)),
     ...wads.map(name => ({ kind: 'wad', name } as const)),
   ]
+  // Where each rendered section starts in `items` — the rows are laid out in a
+  // different order than the index list, so these keep the two in step.
+  const RECENT_BASE = 3
+  const IWAD_BASE = RECENT_BASE + recent.length
+  const WAD_BASE = IWAD_BASE + iwads.length
   const hasIwad = iwads.length > 0
 
   useEffect(() => {
@@ -88,6 +120,14 @@ export function Doom({ onBack }: Props) {
     if (!item) return
     if (item.kind === 'online') { if (onlineReady) void launch({ online: true }) }
     else if (item.kind === 'browse') setBrowsing(true)
+    else if (item.kind === 'saved') setShowSaved(true)
+    else if (item.kind === 'recent') {
+      // Recently-played rows relaunch straight away rather than opening detail.
+      const { target, kind } = item.play
+      if (kind === 'online') { if (onlineReady) void launch({ online: true }) }
+      else if (kind === 'iwad') void launch({ iwad: target })
+      else void launch({ wad: target })
+    }
     else if (item.kind === 'iwad') void launch({ iwad: item.name })
     else setDetailWad(item.name) // custom WAD → open its detail page
   }, [items, launch, onlineReady])
@@ -98,7 +138,7 @@ export function Doom({ onBack }: Props) {
     if (action === 'up') setFocus(i => Math.max(0, i - 1))
     if (action === 'down') setFocus(i => Math.min(items.length - 1, i + 1))
     if (action === 'confirm') activate(focus)
-  }, !browsing && !detailWad)
+  }, !browsing && !detailWad && !showSaved)
 
   const Row = ({ idx, label, sub, tag, dim }: { idx: number; label: string; sub?: string; tag?: string; dim?: boolean }) => {
     const focused = focus === idx
@@ -124,6 +164,10 @@ export function Doom({ onBack }: Props) {
 
   if (browsing) {
     return <DoomBrowse onBack={(didDownload) => { setBrowsing(false); if (didDownload) loadWads() }} />
+  }
+
+  if (showSaved) {
+    return <DoomSaved onBack={(changed) => { setShowSaved(false); if (changed) loadWads(); else api.doom.favorites().then(r => setFavorites(r.favorites)).catch(() => {}) }} />
   }
 
   if (detailWad) {
@@ -158,13 +202,31 @@ export function Doom({ onBack }: Props) {
             <p className="text-idg-muted text-sm py-6 font-mono">loading…</p>
           ) : (
             <>
-              {iwads.length > 0 && <div className="mb-2"><SectionHeader mode="idg" label="base games" /></div>}
+              {recent.length > 0 && <div className="mb-2"><SectionHeader mode="idg" label="recently played" /></div>}
+              {recent.map((r, i) => (
+                <Row
+                  key={`${r.kind}:${r.target}`}
+                  idx={RECENT_BASE + i}
+                  label={r.kind === 'online' ? 'Online multiplayer' : r.kind === 'iwad' ? iwadLabel(r.target) : r.target}
+                  tag={r.kind === 'online' ? 'online' : r.kind}
+                  sub={ago(r.playedAt)}
+                />
+              ))}
+
+              {iwads.length > 0 && <div className="mt-3 mb-2"><SectionHeader mode="idg" label="base games" /></div>}
               {iwads.map((f, i) => (
-                <Row key={f} idx={2 + i} label={iwadLabel(f)} tag="iwad" sub={f} />
+                <Row key={f} idx={IWAD_BASE + i} label={iwadLabel(f)} tag="iwad" sub={f} />
               ))}
 
               <div className="my-2"><SectionHeader mode="idg" label="library" /></div>
               <Row idx={1} label="Get More — browse the archive" sub="search the doomworld archive" />
+              <Row
+                idx={2}
+                label="Saved wads"
+                sub={favorites.length
+                  ? `${favorites.length} saved · ${favorites.filter(f => !f.downloaded).length} still to download`
+                  : 'nothing saved yet'}
+              />
               <Row idx={0}
                 label={onlineReady ? 'Online multiplayer' : 'Online multiplayer'}
                 sub={onlineReady ? 'browse & join live public games' : 'unavailable · no server configured'}
@@ -172,7 +234,7 @@ export function Doom({ onBack }: Props) {
 
               {wads.length > 0 && <div className="mt-3 mb-2"><SectionHeader mode="idg" label="downloaded wads" /></div>}
               {wads.map((w, i) => (
-                <Row key={w} idx={2 + iwads.length + i} label={w} tag="wad" dim={!hasIwad} />
+                <Row key={w} idx={WAD_BASE + i} label={w} tag="wad" dim={!hasIwad} />
               ))}
 
               {iwads.length === 0 && wads.length === 0 && (

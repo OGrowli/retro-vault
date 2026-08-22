@@ -33,7 +33,8 @@ export function WadDetail({ name, defaultIwad, hasIwad, onBack, onDeleted }: Pro
   const [reviews, setReviews] = useState<IdgamesReview[] | null>(null)
   const [reviewTotal, setReviewTotal] = useState(0)
   const [reviewsLoading, setReviewsLoading] = useState(false)
-  const [action, setAction] = useState(0)          // 0 = launch, 1 = delete
+  const [action, setAction] = useState(0)          // 0 = launch, 1 = save, 2 = delete
+  const [saved, setSaved] = useState(false)
   const [launching, setLaunching] = useState(false)
   const [armDelete, setArmDelete] = useState(false) // delete needs a second confirm
   const [error, setError] = useState<string | null>(null)
@@ -50,6 +51,25 @@ export function WadDetail({ name, defaultIwad, hasIwad, onBack, onDeleted }: Pro
 
   const meta = info?.meta ?? null
   const sourceId = meta?.sourceId
+
+  // Is this WAD in the saved list? Matched on filename, since a side-loaded WAD
+  // has no archive id to match on.
+  useEffect(() => {
+    let alive = true
+    api.doom.favorites()
+      .then(r => { if (alive) setSaved(r.favorites.some(f => f.name?.toLowerCase() === name.toLowerCase())) })
+      .catch(() => {})
+    return () => { alive = false }
+  }, [name])
+
+  const toggleSave = useCallback(async () => {
+    try {
+      const { favorited } = await api.doom.toggleFavorite({ name })
+      setSaved(favorited)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not save')
+    }
+  }, [name])
   const size = meta?.size ?? info?.size
 
   // Reviews fetch lazily once we know the archive id — deliberately off the
@@ -88,10 +108,12 @@ export function WadDetail({ name, defaultIwad, hasIwad, onBack, onDeleted }: Pro
   useGamepad((a) => {
     if (launching) return
     if (a === 'back') { onBack(); return }
-    if (a === 'up') { setAction(0); setArmDelete(false) }
-    if (a === 'down') { setAction(1) }
+    if (a === 'favorite') { void toggleSave(); return }
+    if (a === 'up') { setAction(i => Math.max(0, i - 1)); setArmDelete(false) }
+    if (a === 'down') { setAction(i => Math.min(2, i + 1)) }
     if (a === 'confirm') {
       if (action === 0) void launch()
+      else if (action === 1) void toggleSave()
       else if (armDelete) void remove()
       else setArmDelete(true)
     }
@@ -102,7 +124,8 @@ export function WadDetail({ name, defaultIwad, hasIwad, onBack, onDeleted }: Pro
   const downloaded = meta?.downloadedAt ? meta.downloadedAt.slice(0, 10) : null
 
   const launchFocused = action === 0
-  const deleteFocused = action === 1
+  const saveFocused = action === 1
+  const deleteFocused = action === 2
 
   return (
     <div className="fixed inset-0 bg-idg-bg text-idg-text flex flex-col px-[5%] pt-[3.2%] pb-[2.5%] font-sans gap-6 overflow-hidden">
@@ -183,9 +206,25 @@ export function WadDetail({ name, defaultIwad, hasIwad, onBack, onDeleted }: Pro
             {downloaded ? `downloaded ${downloaded} · lzdoom` : 'custom wad · lzdoom'}
           </div>
 
+          {/* Save — the idgames-side favorite, shown in the saved list */}
+          <div
+            onClick={() => { setAction(1); void toggleSave() }}
+            className={[
+              'flex items-center gap-6 px-6 py-3 rounded-[2px] border-l-[6px] cursor-pointer',
+              saveFocused ? 'border-idg-gold bg-idg-fill text-idg-ink' : 'border-transparent text-idg-text/85',
+            ].join(' ')}
+          >
+            <span className={`w-7 text-3xl leading-none ${saveFocused ? '' : 'text-transparent'}`}>▸</span>
+            <span className="text-2xl">{saved ? 'Saved' : 'Save'}</span>
+            <span className="flex-1" />
+            <span className={`font-mono text-[0.9rem] ${saveFocused ? 'text-idg-ink/70' : saved ? 'text-idg-accent' : 'text-idg-muted'}`}>
+              {saved ? 'on' : 'off'}
+            </span>
+          </div>
+
           {/* Delete */}
           <div
-            onClick={() => { setAction(1); armDelete ? void remove() : setArmDelete(true) }}
+            onClick={() => { setAction(2); armDelete ? void remove() : setArmDelete(true) }}
             className={[
               'flex items-center gap-6 px-6 py-3 rounded-[2px] border-l-[6px] cursor-pointer',
               deleteFocused ? 'border-idg-gold bg-idg-fill text-idg-ink' : 'border-transparent text-idg-text/85',
@@ -231,7 +270,7 @@ export function WadDetail({ name, defaultIwad, hasIwad, onBack, onDeleted }: Pro
       {loading && !info && <p className="text-idg-muted text-sm font-mono flex-shrink-0">loading…</p>}
 
       <footer className="flex-shrink-0">
-        <HintBar mode="idg" hints={['d-pad move', 'a launch', 'a·a delete', 'b back']} />
+        <HintBar mode="idg" hints={['d-pad move', 'a launch', 'y save', 'a·a delete', 'b back']} />
       </footer>
     </div>
   )

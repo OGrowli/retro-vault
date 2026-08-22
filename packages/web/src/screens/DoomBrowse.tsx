@@ -72,6 +72,8 @@ export function DoomBrowse({ onBack }: Props) {
   const [downloaded, setDownloaded] = useState<Record<number, string[]>>({})
   const [didDownload, setDidDownload] = useState(false)
   const [detail, setDetail] = useState<Record<number, IdgamesFile>>({}) // id -> full record
+  // Archive ids already in the saved list, so rows can show it and Y can toggle.
+  const [saved, setSaved] = useState<Set<number>>(new Set())
   const rowRefs = useRef<(HTMLDivElement | null)[]>([])
 
   const loadLatest = useCallback(() => {
@@ -82,6 +84,32 @@ export function DoomBrowse({ onBack }: Props) {
       .finally(() => setLoading(false))
   }, [])
   useEffect(() => { loadLatest() }, [loadLatest])
+
+  useEffect(() => {
+    let alive = true
+    api.doom.favorites()
+      .then(r => {
+        if (!alive) return
+        setSaved(new Set(r.favorites.map(f => f.sourceId).filter((id): id is number => id != null)))
+      })
+      .catch(() => {})
+    return () => { alive = false }
+  }, [])
+
+  // Y saves the focused entry for later; the cached record means the saved view
+  // can render it without asking Doomworld again.
+  const toggleSave = useCallback(async (f: IdgamesFile) => {
+    try {
+      const { favorited } = await api.doom.toggleFavorite({ sourceId: f.id, record: f })
+      setSaved(prev => {
+        const next = new Set(prev)
+        if (favorited) next.add(f.id); else next.delete(f.id)
+        return next
+      })
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not save')
+    }
+  }, [])
 
   // `over` lets a control chip re-run the active query with a just-changed knob
   // without waiting for the state update to land in this closure.
@@ -177,6 +205,7 @@ export function DoomBrowse({ onBack }: Props) {
     if (action === 'down') setFocus(i => Math.min(view.length, i + 1))
     if (action === 'left' && focus === 0) setCtrl(i => Math.max(0, i - 1))
     if (action === 'right' && focus === 0) setCtrl(i => Math.min(CTRL_COUNT - 1, i + 1))
+    if (action === 'favorite') { if (current) void toggleSave(current); return }
     if (action === 'confirm') {
       if (focus === 0) { activateCtrl(ctrl); return }
       if (!current) return
@@ -270,6 +299,7 @@ export function DoomBrowse({ onBack }: Props) {
                 >
                   <Caret selected={focused} mode="idg" />
                   <span className="flex-1 min-w-0 text-lg truncate">{f.title || f.filename}</span>
+                  {saved.has(f.id) && <Tag mode="idg" dark={focused}>saved</Tag>}
                   {downloaded[f.id] && <Tag mode="idg" dark={focused}>downloaded</Tag>}
                 </div>
               )
@@ -317,7 +347,7 @@ export function DoomBrowse({ onBack }: Props) {
       </div>
 
       <footer className="flex-shrink-0 pt-4">
-        <HintBar mode="idg" hints={['d-pad move', 'a download / play', 'x field / sort', 'b back to idgames']} />
+        <HintBar mode="idg" hints={['d-pad move', 'a download / play', 'y save', 'x field / sort', 'b back to idgames']} />
       </footer>
     </div>
   )

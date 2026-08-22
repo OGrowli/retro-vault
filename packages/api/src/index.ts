@@ -99,6 +99,9 @@ app.get('/*', (c) => {
   return c.text('Web build not found. Run: npm run build -w packages/web', 503)
 })
 
-serve({ fetch: app.fetch, port: 3000 }, (info) => {
+// 3000 on the device; PORT lets a second instance run alongside it locally.
+const PORT = parseInt(process.env['PORT'] ?? '', 10) || 3000
+
+serve({ fetch: app.fetch, port: PORT }, (info) => {
   console.log(`RetroVault API running on http://localhost:${info.port}`)
 })

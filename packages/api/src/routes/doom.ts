@@ -4,7 +4,7 @@ import { promisify } from 'node:util'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { getSetting, setSetting } from '../db.js'
+import { db, getSetting, setSetting } from '../db.js'
 
 const execFileAsync = promisify(execFile)
 
@@ -136,8 +136,139 @@ doomRouter.delete('/wads/:name', (c) => {
   try { fs.unlinkSync(full) } catch (e) { return c.json({ error: e instanceof Error ? e.message : 'delete failed' }, 500) }
   const map = readWadMeta()
   if (map[name.toLowerCase()]) { delete map[name.toLowerCase()]; try { writeWadMeta(map) } catch { /* ignore */ } }
+  // A saved entry survives the file: one that came from the archive reverts to a
+  // wishlist entry, a side-loaded one has nothing left to point at.
+  try {
+    db.prepare('DELETE FROM doom_favorites WHERE wad_name = ? AND source_id IS NULL').run(name)
+    db.prepare('UPDATE doom_favorites SET wad_name = NULL WHERE wad_name = ?').run(name)
+  } catch { /* ignore */ }
   return c.json({ deleted: true, freed })
 })
+
+// ---------------------------------------------------------------------------
+// Saved WADs + recently played. Device-wide, not per-user: the Doom flow starts
+// from the landing screen and never asks for a profile, unlike the RetroVault
+// side where favourites hang off users.id.
+// ---------------------------------------------------------------------------
+
+interface DoomFavoriteRow {
+  id: number
+  source_id: number | null
+  wad_name: string | null
+  title: string | null
+  author: string | null
+  rating: number | null
+  votes: number | null
+  dir: string | null
+  filename: string | null
+  size: number | null
+  date: string | null
+  created_at: string
+}
+
+// A saved entry is "downloaded" when its file is actually in DOOM_DIR. Entries
+// saved from the archive get their filename filled in later (on download), so
+// re-check the folder on read rather than trusting the stored name.
+function decorate(row: DoomFavoriteRow) {
+  const onDisk = row.wad_name ? fs.existsSync(path.join(DOOM_DIR, row.wad_name)) : false
+  return {
+    sourceId: row.source_id,
+    name: row.wad_name,
+    title: row.title,
+    author: row.author,
+    rating: row.rating,
+    votes: row.votes,
+    dir: row.dir,
+    filename: row.filename,
+    size: row.size,
+    date: row.date,
+    savedAt: row.created_at,
+    downloaded: onDisk,
+  }
+}
+
+const selectFavorites = () =>
+  db.prepare('SELECT * FROM doom_favorites ORDER BY created_at DESC, id DESC').all() as DoomFavoriteRow[]
+
+// GET /doom/favorites — the saved list, newest first.
+doomRouter.get('/favorites', (c) => c.json({ favorites: selectFavorites().map(decorate) }))
+
+// POST /doom/favorites/toggle  { sourceId?, name?, record? }
+// Save or unsave one WAD. Identified by archive id when it has one, otherwise by
+// filename — a side-loaded WAD the archive has never heard of is still savable.
+// `record` carries the archive fields to cache; on a downloaded WAD the sidecar
+// fills them in instead.
+doomRouter.post('/favorites/toggle', async (c) => {
+  type ToggleBody = { sourceId?: number; name?: string; record?: IdgamesFile }
+  const body = await c.req.json<ToggleBody>().catch(() => ({} as ToggleBody))
+  const sourceId = Number.isFinite(body.sourceId) ? Number(body.sourceId) : null
+  const name = body.name ? path.basename(body.name) : null
+  if (sourceId == null && !name) return c.json({ error: 'need sourceId or name' }, 400)
+
+  const existing = (sourceId != null
+    ? db.prepare('SELECT * FROM doom_favorites WHERE source_id = ?').get(sourceId)
+    : db.prepare('SELECT * FROM doom_favorites WHERE wad_name = ?').get(name)) as DoomFavoriteRow | undefined
+
+  if (existing) {
+    db.prepare('DELETE FROM doom_favorites WHERE id = ?').run(existing.id)
+    return c.json({ favorited: false })
+  }
+
+  // Prefer the record the caller passed (browsing the archive), fall back to the
+  // sidecar written at download/backfill time (saving from the WAD list).
+  const stored = name ? readWadMeta()[name.toLowerCase()] : undefined
+  const meta = stored && !stored.ignored ? stored : undefined
+  const rec = body.record
+  db.prepare(`
+    INSERT INTO doom_favorites (source_id, wad_name, title, author, rating, votes, dir, filename, size, date)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    sourceId ?? meta?.sourceId ?? null,
+    name,
+    rec?.title ?? meta?.title ?? null,
+    rec?.author ?? meta?.author ?? null,
+    rec?.rating ?? meta?.rating ?? null,
+    rec?.votes ?? meta?.votes ?? null,
+    rec?.dir ?? meta?.dir ?? null,
+    rec?.filename ?? meta?.sourceFilename ?? null,
+    rec?.size ?? meta?.size ?? null,
+    rec?.date ?? meta?.date ?? null,
+  )
+  return c.json({ favorited: true })
+})
+
+// A downloaded WAD and the archive entry it came from are the same saved thing.
+// After a download, point the entry at the file so the saved view can launch it.
+function linkDownload(sourceId: number, wadName: string): void {
+  try {
+    db.prepare('UPDATE doom_favorites SET wad_name = ? WHERE source_id = ? AND wad_name IS NULL')
+      .run(wadName, sourceId)
+  } catch { /* a save under that filename already exists — nothing to link */ }
+}
+
+// GET /doom/recent?limit=  — newest launch per target, files that are still on
+// disk only (a deleted WAD shouldn't linger as a dead row).
+doomRouter.get('/recent', (c) => {
+  const limit = Math.min(20, Math.max(1, parseInt(c.req.query('limit') ?? '6', 10) || 6))
+  const rows = db.prepare(`
+    SELECT target, kind, MAX(played_at) AS played_at
+    FROM doom_plays
+    GROUP BY target, kind
+    ORDER BY played_at DESC
+    LIMIT ?
+  `).all(limit * 2) as Array<{ target: string; kind: string; played_at: string }>
+
+  const recent = rows
+    .filter(r => r.kind === 'online' || fs.existsSync(path.join(DOOM_DIR, r.target)))
+    .slice(0, limit)
+    .map(r => ({ target: r.target, kind: r.kind as 'online' | 'iwad' | 'wad', playedAt: r.played_at }))
+  return c.json({ recent })
+})
+
+function recordPlay(target: string, kind: 'online' | 'iwad' | 'wad'): void {
+  try { db.prepare('INSERT INTO doom_plays (target, kind) VALUES (?, ?)').run(target, kind) }
+  catch { /* history is a nicety — never fail a launch over it */ }
+}
 
 // Launch Doom. Body:
 //   { online: true }        → jump to the server browser
@@ -161,16 +292,22 @@ doomRouter.post('/launch', async (c) => {
   const inDir = (name: string) => fs.existsSync(path.join(DOOM_DIR, path.basename(name)))
 
   let args: string[]
+  // What "recently played" should remember, recorded once the launch actually
+  // takes — a launcher that exits nonzero (missing port binary) isn't a play.
+  let played: { target: string; kind: 'online' | 'iwad' | 'wad' } | null = null
   if (body.online) {
     args = [LAUNCH_DOOM, 'online']
+    played = { target: 'online', kind: 'online' }
   } else if (body.wad) {
     const wad = path.basename(body.wad)
     if (!inDir(wad)) return c.json({ error: `WAD not found: ${wad}` }, 422)
     args = [LAUNCH_DOOM, 'wad', wad]
+    played = { target: wad, kind: 'wad' }
   } else if (body.iwad) {
     const iwad = path.basename(body.iwad)
     if (!inDir(iwad)) return c.json({ error: `IWAD not found: ${iwad}` }, 422)
     args = [LAUNCH_DOOM, 'iwad', iwad]
+    played = { target: iwad, kind: 'iwad' }
   } else {
     args = [LAUNCH_DOOM, 'iwad']
   }
@@ -181,7 +318,12 @@ doomRouter.post('/launch', async (c) => {
   return new Promise<Response>((resolve) => {
     const child = spawn('bash', args, { detached: true, stdio: 'ignore', env })
     let settled = false
-    const settle = (r: Response) => { if (!settled) { settled = true; resolve(r) } }
+    const settle = (r: Response, launched = false) => {
+      if (settled) return
+      settled = true
+      if (launched && played) recordPlay(played.target, played.kind)
+      resolve(r)
+    }
 
     child.on('error', (err) => settle(c.json({ error: `Doom launch failed: ${err.message}` }, 500)))
     // A fast nonzero exit means the launch itself failed (missing port binary /
@@ -191,9 +333,9 @@ doomRouter.post('/launch', async (c) => {
         settle(c.json({ error: `Doom launcher exited with code ${code} — check ~/.retrovault/doom.log on the Pi` }, 500))
         return
       }
-      settle(c.json({ launched: true }))
+      settle(c.json({ launched: true }), true)
     })
-    setTimeout(() => { child.unref(); settle(c.json({ launched: true, pid: child.pid })) }, 3000)
+    setTimeout(() => { child.unref(); settle(c.json({ launched: true, pid: child.pid }), true) }, 3000)
   })
 })
 
@@ -419,6 +561,10 @@ doomRouter.post('/idgames/download', async (c) => {
     }
     writeWadMeta(map)
   } catch { /* ignore — download still succeeded */ }
+
+  // If this archive entry was saved before it was downloaded, point the saved
+  // row at the playable file so the saved view offers "play" instead of "get".
+  if (added[0]) linkDownload(rec.id, added[0])
 
   return c.json({ downloaded: rec.filename, title: rec.title, wads: added })
 })

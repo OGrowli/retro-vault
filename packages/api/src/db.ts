@@ -256,6 +256,38 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_rom_hacks_game ON rom_hacks(game_id);
   CREATE INDEX IF NOT EXISTS idx_rom_hacks_system ON rom_hacks(system);
 
+  -- Doom lives outside the game/ROM pipeline (folder-listed WADs, no scraping),
+  -- and its flow never asks who's playing — so these are device-wide, not
+  -- per-user like the favorites table. A saved entry is either an archive record
+  -- you haven't downloaded yet (wad_name NULL), a downloaded WAD with a resolved
+  -- record, or a side-loaded file with no record at all (source_id NULL). The
+  -- archive fields are cached so the saved view renders without a round-trip to
+  -- Doomworld.
+  CREATE TABLE IF NOT EXISTS doom_favorites (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    source_id INTEGER UNIQUE,
+    wad_name TEXT UNIQUE,
+    title TEXT,
+    author TEXT,
+    rating REAL,
+    votes INTEGER,
+    dir TEXT,
+    filename TEXT,
+    size INTEGER,
+    date TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  -- One row per launch. Doom exits back to the landing screen rather than
+  -- reporting a duration, so unlike play_sessions this only records that it
+  -- happened; "recently played" is the newest row per target.
+  CREATE TABLE IF NOT EXISTS doom_plays (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    target TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    played_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
   CREATE INDEX IF NOT EXISTS idx_roms_game ON roms(game_id);
   CREATE INDEX IF NOT EXISTS idx_play_sessions_user ON play_sessions(user_id, started_at DESC);
   CREATE INDEX IF NOT EXISTS idx_play_sessions_rom ON play_sessions(rom_id);
@@ -268,6 +300,7 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_events_category ON events(category);
   CREATE INDEX IF NOT EXISTS idx_dat_entries_crc ON dat_entries(system, crc);
   CREATE INDEX IF NOT EXISTS idx_dat_entries_name ON dat_entries(system, name_key);
+  CREATE INDEX IF NOT EXISTS idx_doom_plays_time ON doom_plays(played_at DESC);
 `)
 
 // Idempotent column add for DBs created before lists.last_viewed_at existed.

@@ -47,6 +47,31 @@ export interface WadInfo {
 }
 export interface IdgamesReview { vote: number; text?: string; username: string | null }
 
+// A saved WAD. `sourceId` is null for a side-loaded file the archive doesn't
+// know, `name` is null for something saved from the archive but not downloaded
+// yet, and `downloaded` says whether the file is on disk right now.
+export interface DoomFavorite {
+  sourceId: number | null
+  name: string | null
+  title: string | null
+  author: string | null
+  rating: number | null
+  votes: number | null
+  dir: string | null
+  filename: string | null
+  size: number | null
+  date: string | null
+  savedAt: string
+  downloaded: boolean
+}
+
+// One entry in the Doom hub's recently-played strip.
+export interface DoomPlay {
+  target: string
+  kind: 'online' | 'iwad' | 'wad'
+  playedAt: string
+}
+
 // idgames `search` action knobs — which record field the query matches, how the
 // results are ordered, and the direction. Mirrors the API's accepted values.
 export type IdgamesSearchType = 'title' | 'author' | 'filename' | 'textfile' | 'description'
@@ -289,6 +314,12 @@ export const api = {
     setEngine: (engine: 'lzdoom' | 'retroarch') => post<{ engine: string }>('/doom/settings', { engine }),
     launch: (opts: { online?: boolean; iwad?: string; wad?: string } = {}) =>
       post<{ launched: boolean; pid?: number }>('/doom/launch', opts),
+    favorites: () => get<{ favorites: DoomFavorite[] }>('/doom/favorites'),
+    // Save/unsave by archive id when there is one, else by filename. `record`
+    // caches the archive fields so the saved view doesn't have to re-fetch them.
+    toggleFavorite: (body: { sourceId?: number; name?: string; record?: IdgamesFile }) =>
+      post<{ favorited: boolean }>('/doom/favorites/toggle', body),
+    recent: (limit = 6) => get<{ recent: DoomPlay[] }>(`/doom/recent?limit=${limit}`),
     idgames: {
       latest: (limit = 20) => get<{ files: IdgamesFile[] }>(`/doom/idgames/latest?limit=${limit}`),
       search: (q: string, opts?: IdgamesSearchOpts) => {
