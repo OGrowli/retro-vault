@@ -11,7 +11,8 @@
     "seed": "tsx packages/api/src/seed.ts",
     "dev": "bash scripts/dev.sh",
     "dev:win": "powershell -ExecutionPolicy Bypass -File scripts/dev.ps1",
-    "deploy": "bash scripts/deploy.sh"
+    "deploy": "bash scripts/deploy.sh",
+    "doom:backfill": "node scripts/backfill-wadmeta.mjs"
   },
   "devDependencies": {
     "tsx": "^4.15.0"

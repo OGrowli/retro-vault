@@ -83,6 +83,11 @@ interface WadMeta {
   sourceId?: number
   sourceFilename?: string
   downloadedAt?: string
+  /** How scripts/backfill-wadmeta.mjs arrived at this record (absent = written at download time). */
+  matchedBy?: 'filename' | 'title' | 'fuzzy' | 'manual'
+  matchScore?: number
+  /** Tombstone from `--clear`: this WAD has no archive record — don't re-match it. */
+  ignored?: boolean
 }
 const WAD_META_FILE = () => path.join(DOOM_DIR, '.wadmeta.json')
 function readWadMeta(): Record<string, WadMeta> {
@@ -107,7 +112,10 @@ doomRouter.get('/wads', (c) => {
 doomRouter.get('/wads/meta', (c) => {
   const name = path.basename(c.req.query('name') ?? '')
   if (!name) return c.json({ error: 'bad name' }, 400)
-  const meta = readWadMeta()[name.toLowerCase()] ?? null
+  // A tombstoned entry means "known to have no archive record" — render it the
+  // same as a WAD we've never looked up.
+  const stored = readWadMeta()[name.toLowerCase()]
+  const meta = stored && !stored.ignored ? stored : null
   let size: number | undefined
   let mtime: string | undefined
   try {
