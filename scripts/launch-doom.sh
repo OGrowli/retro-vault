@@ -75,6 +75,41 @@ audio_env() {
   fi
 }
 
+# --- LZDoom joystick config ---------------------------------------------------
+# LZDoom's SDL backend only reads the saved [Joy:JS:n] axis block when the
+# joystick options menu enumerates devices — a plain launch never loads it, and
+# the destructor then writes the in-memory defaults back over it, so a
+# hand-tuned block silently disappears the first time you play without visiting
+# that menu. (Defaults are wrong for a DualShock 4 anyway: L2 is mapped to look,
+# and the right stick's Y axis to fly-up.)
+#
+# So: make sure the block is present, then open and immediately close the
+# joystick menu at startup, which loads it and leaves the values live for the
+# session. The exit save then writes back what we loaded instead of defaults.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+JOY_CONFIG="$SCRIPT_DIR/lzdoom-joystick.ini"
+LZDOOM_INI="$HOME/.config/lzdoom/lzdoom.ini"
+
+# Restore-if-missing only, so axis tweaks made in-game (which land in the same
+# section) survive — this puts the block back after a wipe, it doesn't overwrite.
+ensure_joy_config() {
+  [ -f "$JOY_CONFIG" ] || return 0
+  [ -f "$LZDOOM_INI" ] || return 0   # no config yet; LZDoom writes one on first run
+  local section
+  section="$(head -1 "$JOY_CONFIG")"
+  grep -qF "$section" "$LZDOOM_INI" && return 0
+  echo "=== restoring $section in $LZDOOM_INI"
+  printf '\n' >> "$LZDOOM_INI"
+  cat "$JOY_CONFIG" >> "$LZDOOM_INI"
+}
+
+# The menu round-trip is GZDoom-family only; other ports would choke on the args.
+joy_menu_args() {
+  case "$(basename "$1")" in
+    lzdoom|gzdoom) echo "+openmenu JoystickOptions +closemenu" ;;
+  esac
+}
+
 # --- resolve the local port binary (LZDoom is the ARM/GLES2-friendly choice) ---
 # Override with DOOM_PORT_BIN. Search PATH first, then RetroPie's ports install.
 find_port() {
@@ -117,6 +152,10 @@ run_local() {
   # mouse, so the D-pad/stick can't navigate menus or gameplay).
   local args=(-iwad "$iwad" -fullscreen +set use_joystick 1)
   if [ -n "$pwad_name" ]; then args+=(-file "$DOOM_DIR/$pwad_name"); fi
+  ensure_joy_config
+  # shellcheck disable=SC2206 -- deliberate split: these are separate argv entries
+  local joyargs=($(joy_menu_args "$port"))
+  args+=("${joyargs[@]}")
   echo "=== running: $port ${args[*]}"
   # shellcheck disable=SC2046 -- word splitting is how env vars reach the port
   sudo openvt -c 1 -s -w -f -- sudo -u pi -H $(audio_env) "$port" "${args[@]}"
