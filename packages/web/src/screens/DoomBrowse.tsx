@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { api } from '../api/client'
 import type { IdgamesFile, IdgamesSearchType, IdgamesSortKey } from '../api/client'
 import { useGamepad } from '../hooks/useGamepad'
@@ -11,10 +11,29 @@ interface Props {
 
 const rateNum = (r?: number) => (r == null ? '—' : r.toFixed(2))
 
+// The archive sorts search results for us but not the latest-uploads list, so
+// the same chips re-order that list locally. Missing values sort last in either
+// direction rather than pretending to be zero.
+function sortFiles(files: IdgamesFile[], key: IdgamesSortKey, order: 'asc' | 'desc'): IdgamesFile[] {
+  const sign = order === 'asc' ? 1 : -1
+  const val = (f: IdgamesFile) => {
+    if (key === 'rating') return f.rating
+    if (key === 'size') return f.size
+    return key === 'date' ? f.date : f.filename
+  }
+  return [...files].sort((a, b) => {
+    const x = val(a); const y = val(b)
+    if (x == null && y == null) return 0
+    if (x == null) return 1
+    if (y == null) return -1
+    return sign * (typeof x === 'number' && typeof y === 'number' ? x - y : String(x).localeCompare(String(y)))
+  })
+}
+
 // idgames `search` knobs surfaced as cycle-able chips. Field = which record
-// field the query matches; Sort = ordering key; Order = direction. These only
-// affect search — the latest-uploads view ignores them (the API has no sort on
-// latestfiles), so cycling them just sets the pref for the next search.
+// field the query matches; Sort = ordering key; Order = direction. Field only
+// applies to a search; sort/order apply to both — the archive can't sort
+// latestfiles, so that view is re-ordered here instead (see sortFiles).
 const FIELDS: { key: IdgamesSearchType; label: string }[] = [
   { key: 'title', label: 'Title' },
   { key: 'author', label: 'Author' },
@@ -97,7 +116,15 @@ export function DoomBrowse({ onBack }: Props) {
     else toggleOrder()
   }, [cycleField, cycleSort, toggleOrder])
 
-  const current = focus > 0 ? files[focus - 1] : undefined
+  // What the list actually shows: search results come back pre-sorted from the
+  // archive, the latest-uploads list is sorted here so the sort/order chips do
+  // something in that view too.
+  const view = useMemo(
+    () => (lastQuery ? files : sortFiles(files, sort, order)),
+    [files, lastQuery, sort, order],
+  )
+
+  const current = focus > 0 ? view[focus - 1] : undefined
 
   // Lazy-fetch the full record (dir/date/size/credits) for the focused entry.
   // Debounced: d-pad scrolling flies through rows, and each fetch is a slow
@@ -146,7 +173,7 @@ export function DoomBrowse({ onBack }: Props) {
     if (searching) return
     if (action === 'back') { onBack(didDownload); return }
     if (action === 'up') setFocus(i => Math.max(0, i - 1))
-    if (action === 'down') setFocus(i => Math.min(files.length, i + 1))
+    if (action === 'down') setFocus(i => Math.min(view.length, i + 1))
     if (action === 'left' && focus === 0) setCtrl(i => Math.max(0, i - 1))
     if (action === 'right' && focus === 0) setCtrl(i => Math.min(CTRL_COUNT - 1, i + 1))
     if (action === 'confirm') {
@@ -221,12 +248,12 @@ export function DoomBrowse({ onBack }: Props) {
 
           {loading ? (
             <p className="text-idg-muted text-sm py-6 font-mono">loading…</p>
-          ) : error && files.length === 0 ? (
+          ) : error && view.length === 0 ? (
             <p className="text-red-400 text-sm py-6">{error}</p>
-          ) : files.length === 0 ? (
+          ) : view.length === 0 ? (
             <p className="text-idg-muted text-sm py-6 font-mono">no results.</p>
           ) : (
-            files.map((f, i) => {
+            view.map((f, i) => {
               const idx = i + 1
               const focused = focus === idx
               return (
