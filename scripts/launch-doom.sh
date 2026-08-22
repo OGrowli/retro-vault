@@ -39,6 +39,42 @@ restore_kiosk() {
 }
 trap restore_kiosk EXIT
 
+# --- audio output ------------------------------------------------------------
+# ALSA's `default` PCM here is card 0, the 3.5mm headphone jack, while the TV is
+# on HDMI (card vc4hdmi) — so LZDoom, which plays through OpenAL onto whatever
+# ALSA calls default, sends its sound into an unplugged socket and looks like it
+# has no audio at all. RetroArch sidesteps this with an explicit audio_device
+# per system; the ports need the equivalent steer, which ALSA_CARD provides
+# (alsa-lib reads it when resolving `default`).
+#
+# Override with DOOM_AUDIO_CARD=Headphones (any name from `aplay -l`), or
+# DOOM_AUDIO_CARD=- to leave the system default alone.
+pick_audio_card() {
+  if [ -n "$DOOM_AUDIO_CARD" ]; then
+    [ "$DOOM_AUDIO_CARD" = "-" ] || echo "$DOOM_AUDIO_CARD"
+    return
+  fi
+  # Only claim HDMI when a display is actually plugged in — 'HDMI Jack' reports
+  # the hotplug state, so a headless/jack-only setup keeps the system default.
+  local card
+  card="$(awk '/vc4hdmi/ { gsub(/[][ ]/, "", $2); print $2; exit }' /proc/asound/cards)"
+  [ -z "$card" ] && return
+  if amixer -c "$card" cget numid=1 2>/dev/null | grep -q "values=on"; then
+    echo "$card"
+  fi
+}
+AUDIO_CARD="$(pick_audio_card)"
+[ -n "$AUDIO_CARD" ] && echo "=== audio card: $AUDIO_CARD (ALSA_CARD)"
+
+# sudo scrubs the environment, so the card has to be handed over explicitly.
+# ALSOFT_DRIVERS pins OpenAL to ALSA rather than letting it probe for a
+# PulseAudio server that isn't installed.
+audio_env() {
+  if [ -n "$AUDIO_CARD" ]; then
+    echo "env ALSA_CARD=$AUDIO_CARD ALSOFT_DRIVERS=alsa"
+  fi
+}
+
 # --- resolve the local port binary (LZDoom is the ARM/GLES2-friendly choice) ---
 # Override with DOOM_PORT_BIN. Search PATH first, then RetroPie's ports install.
 find_port() {
@@ -82,7 +118,8 @@ run_local() {
   local args=(-iwad "$iwad" -fullscreen +set use_joystick 1)
   if [ -n "$pwad_name" ]; then args+=(-file "$DOOM_DIR/$pwad_name"); fi
   echo "=== running: $port ${args[*]}"
-  sudo openvt -c 1 -s -w -f -- sudo -u pi -H "$port" "${args[@]}"
+  # shellcheck disable=SC2046 -- word splitting is how env vars reach the port
+  sudo openvt -c 1 -s -w -f -- sudo -u pi -H $(audio_env) "$port" "${args[@]}"
   return $?
 }
 
@@ -95,8 +132,8 @@ run_online() {
     exit 1
   fi
   echo "=== running online: $DOOM_ONLINE_CMD"
-  # shellcheck disable=SC2086
-  sudo openvt -c 1 -s -w -f -- sudo -u pi -H bash -lc "$DOOM_ONLINE_CMD"
+  # shellcheck disable=SC2046,SC2086
+  sudo openvt -c 1 -s -w -f -- sudo -u pi -H $(audio_env) bash -lc "$DOOM_ONLINE_CMD"
   return $?
 }
 
@@ -125,7 +162,8 @@ run_retroarch() {
   if [ -z "$content" ]; then echo "ERROR: no IWAD/content in $DOOM_DIR"; exit 1; fi
   ra="$(command -v retroarch || echo /opt/retropie/emulators/retroarch/bin/retroarch)"
   echo "=== running (retroarch): $ra -L $core $content"
-  sudo openvt -c 1 -s -w -f -- sudo -u pi -H "$ra" -L "$core" "$content"
+  # shellcheck disable=SC2046
+  sudo openvt -c 1 -s -w -f -- sudo -u pi -H $(audio_env) "$ra" -L "$core" "$content"
   return $?
 }
 
@@ -137,7 +175,8 @@ run_gencfg() {
   port="$(find_port)"; iwad="$(find_iwad)"
   if [ -z "$port" ] || [ -z "$iwad" ]; then echo "gencfg: need port + IWAD"; exit 1; fi
   echo "=== gencfg: $port (enumerate joystick, +quit)"
-  sudo openvt -c 1 -s -w -f -- sudo -u pi -H "$port" -iwad "$iwad" +set use_joystick 1 +wait 70 +quit
+  # shellcheck disable=SC2046
+  sudo openvt -c 1 -s -w -f -- sudo -u pi -H $(audio_env) "$port" -iwad "$iwad" +set use_joystick 1 +wait 70 +quit
   return $?
 }
 
