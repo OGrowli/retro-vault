@@ -2,7 +2,7 @@ import { Fragment, useState, useEffect, useCallback, useRef } from 'react'
 import type { Game, GameWithRoms, Rom, User } from '@retro-vault/shared'
 import { api } from '../api/client'
 import { useGamepad } from '../hooks/useGamepad'
-import { Clock } from '../components/Clock'
+import { StatusBar } from '../components/StatusBar'
 import { AddToListModal } from '../components/AddToListModal'
 import { HacksPanel } from '../components/HacksPanel'
 import { Breadcrumb, Title, SectionHeader, Rule, HintBar, KindTag, RegionChip, rowClass } from '../components/ui'
@@ -231,7 +231,7 @@ export function GameDetail({ game: initialGame, user, onBack, fromRandom = false
     <div className="fixed inset-0 bg-vault-bg flex flex-col overflow-hidden px-[5%] pt-[2.5%] pb-[3%] font-sans">
       <div className="flex items-center justify-between flex-shrink-0">
         <Breadcrumb>home / all games / detail</Breadcrumb>
-        <Clock />
+        <StatusBar />
       </div>
 
       <div className="flex-1 flex gap-14 pt-6 min-h-0">

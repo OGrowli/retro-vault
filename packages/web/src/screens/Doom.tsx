@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { api } from '../api/client'
 import { useGamepad } from '../hooks/useGamepad'
-import { Clock } from '../components/Clock'
+import { StatusBar } from '../components/StatusBar'
 import { Breadcrumb, Title, SectionHeader, HintBar, Tag, rowClass, Caret } from '../components/ui'
 import { DoomBrowse } from './DoomBrowse'
 import { WadDetail } from './WadDetail'
@@ -142,7 +142,7 @@ export function Doom({ onBack }: Props) {
     <div className="fixed inset-0 bg-idg-bg text-idg-text flex flex-col px-[5%] py-[3%] font-sans">
       <div className="flex items-center justify-between flex-shrink-0">
         <Breadcrumb mode="idg">landing / idgames</Breadcrumb>
-        <Clock />
+        <StatusBar />
       </div>
 
       <div className="flex items-baseline gap-4 mt-4 flex-shrink-0">

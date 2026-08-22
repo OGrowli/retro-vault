@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useGamepad } from '../hooks/useGamepad'
-import { Clock } from '../components/Clock'
+import { StatusBar } from '../components/StatusBar'
 import { Breadcrumb, HintBar } from '../components/ui'
 
 type Choice = 'doom' | 'retrovault'
@@ -36,7 +36,7 @@ export function Landing({ onChoose }: Props) {
         <Breadcrumb>retrovault · pi 3b+ kiosk</Breadcrumb>
         <div className="flex items-center gap-8">
           <Breadcrumb>select mode</Breadcrumb>
-          <Clock />
+          <StatusBar />
         </div>
       </div>
 

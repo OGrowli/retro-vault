@@ -2,7 +2,7 @@ import { useState, useCallback, useRef, useEffect } from 'react'
 import type { HomePrefs } from '@retro-vault/shared'
 import { api } from '../api/client'
 import { useGamepad } from '../hooks/useGamepad'
-import { Clock } from '../components/Clock'
+import { StatusBar } from '../components/StatusBar'
 import { Breadcrumb, Title, HintBar, rowClass, Caret } from '../components/ui'
 
 // Streams scripts/deploy.sh output into a scrolling feed by polling the tail
@@ -284,7 +284,7 @@ export function Settings({ onBack, homePrefs, onHomePrefsChange, onOpenHome, onO
     <div className="fixed inset-0 bg-vault-bg flex flex-col px-[5%] py-[3%] font-sans">
       <div className="flex items-center justify-between flex-shrink-0">
         <Breadcrumb>retrovault / settings</Breadcrumb>
-        <Clock />
+        <StatusBar />
       </div>
 
       <div className="flex items-baseline gap-4 mt-4 flex-shrink-0">

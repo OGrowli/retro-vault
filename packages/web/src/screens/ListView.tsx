@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import type { Game, ListSource } from '@retro-vault/shared'
 import { api, bgVariant } from '../api/client'
 import { useGamepad } from '../hooks/useGamepad'
-import { Clock } from '../components/Clock'
+import { StatusBar } from '../components/StatusBar'
 import { Breadcrumb, Title, HintBar, rowClass, Caret } from '../components/ui'
 
 interface Props {
@@ -328,7 +328,7 @@ export function ListView({ sources, activeKey: initialKey, onBack, onGameSelect,
               {pendingCount === 0 ? 'all scraped' : `scrape list · ${pendingCount}`}
             </button>
           )}
-          <Clock />
+          <StatusBar />
         </div>
       </header>
 

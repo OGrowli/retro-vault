@@ -3,7 +3,7 @@ import type { WifiNetwork, WifiStatus } from '@retro-vault/shared'
 import { api } from '../api/client'
 import { useGamepad } from '../hooks/useGamepad'
 import { Glyph } from '../components/Glyph'
-import { Clock } from '../components/Clock'
+import { StatusBar } from '../components/StatusBar'
 import { VirtualKeyboard } from '../components/VirtualKeyboard'
 
 interface Props {
@@ -154,7 +154,7 @@ export function WifiSettings({ onBack }: Props) {
             <span className={status?.connected ? 'text-vault-accent' : ''}>{statusLine}</span>
           </p>
         </div>
-        <div className="ml-auto"><Clock /></div>
+        <div className="ml-auto"><StatusBar /></div>
       </header>
 
       <div className="flex-1 overflow-y-auto px-[5%] py-6" style={{ scrollbarWidth: 'none' }}>

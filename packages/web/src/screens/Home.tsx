@@ -8,8 +8,7 @@ import { FilterChips, buildChips } from '../components/FilterChips'
 import type { ActionChipId, ChipId } from '../components/FilterChips'
 import { AddResultsToListModal } from '../components/AddResultsToListModal'
 import { VirtualKeyboard } from '../components/VirtualKeyboard'
-import { Clock } from '../components/Clock'
-import { HealthIndicator } from '../components/HealthIndicator'
+import { StatusBar } from '../components/StatusBar'
 import { Breadcrumb, SectionHeader, HintBar, rowClass, Caret } from '../components/ui'
 import { listOrderOf, gameSortOf } from '../prefs'
 
@@ -265,8 +264,7 @@ export function Home({ user, systems, genres, filter, homePrefs, onFilterChange,
       <div className="flex items-center gap-4 flex-shrink-0">
         <Breadcrumb>retrovault / home</Breadcrumb>
         <span className="flex-1" />
-        <HealthIndicator />
-        <Clock />
+        <StatusBar />
         <button onClick={onSettings} className="font-mono text-[0.8rem] uppercase tracking-[0.12em] text-vault-muted hover:text-vault-accent" title="Settings (Share / S)">settings</button>
         <button onClick={onSwitchUser} className="flex items-center gap-2.5 px-2 py-1 hover:bg-vault-surface transition-colors" title="Switch profile">
           <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold" style={{ background: user.avatar_color }}>

@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { api } from '../api/client'
 import type { WadInfo, IdgamesReview } from '../api/client'
 import { useGamepad } from '../hooks/useGamepad'
-import { Clock } from '../components/Clock'
+import { StatusBar } from '../components/StatusBar'
 import { Breadcrumb, Title, Rule, HintBar, Tag } from '../components/ui'
 
 interface Props {
@@ -108,7 +108,7 @@ export function WadDetail({ name, defaultIwad, hasIwad, onBack, onDeleted }: Pro
     <div className="fixed inset-0 bg-idg-bg text-idg-text flex flex-col px-[5%] pt-[3.2%] pb-[2.5%] font-sans gap-6 overflow-hidden">
       <div className="flex items-center justify-between flex-shrink-0">
         <Breadcrumb mode="idg">idgames / {dirCrumb(meta?.dir)}</Breadcrumb>
-        <Clock />
+        <StatusBar />
       </div>
 
       {/* Title + meta row */}

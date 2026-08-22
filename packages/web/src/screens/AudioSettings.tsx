@@ -3,7 +3,7 @@ import type { AudioConfig } from '@retro-vault/shared'
 import { api } from '../api/client'
 import { useGamepad } from '../hooks/useGamepad'
 import { Glyph } from '../components/Glyph'
-import { Clock } from '../components/Clock'
+import { StatusBar } from '../components/StatusBar'
 
 interface Props {
   onBack: () => void
@@ -220,7 +220,7 @@ export function AudioSettings({ onBack }: Props) {
           </h1>
           <p className="text-vault-muted text-xs uppercase tracking-widest mt-0.5">Mirrors RetroArch audio config · applies on every launch</p>
         </div>
-        <div className="ml-auto"><Clock /></div>
+        <div className="ml-auto"><StatusBar /></div>
       </header>
 
       <div className="flex-1 overflow-y-auto px-[5%] py-6 space-y-2 max-w-2xl" style={{ scrollbarWidth: 'none' }}>

@@ -3,7 +3,7 @@ import type { AuditStatus, AuditSystemSummary, AuditSystemReport } from '@retro-
 import { api } from '../api/client'
 import { useGamepad } from '../hooks/useGamepad'
 import { Glyph } from '../components/Glyph'
-import { Clock } from '../components/Clock'
+import { StatusBar } from '../components/StatusBar'
 
 interface Props {
   onBack: () => void
@@ -118,7 +118,7 @@ export function RomAudit({ onBack, inputActive = true }: Props) {
                 {t === 'missing' ? `Missing ${detail.missingCount}` : `Unknown ${detail.unknownCount}`}
               </button>
             ))}
-            <Clock />
+            <StatusBar />
           </div>
         </header>
 
@@ -163,7 +163,7 @@ export function RomAudit({ onBack, inputActive = true }: Props) {
           <h1 className="text-white text-2xl font-bold tracking-tight">ROM Audit</h1>
           <p className="text-vault-muted text-xs uppercase tracking-widest mt-1">Check your collection against No-Intro</p>
         </div>
-        <div className="ml-auto"><Clock /></div>
+        <div className="ml-auto"><StatusBar /></div>
       </header>
 
       <div className="flex-1 overflow-y-auto px-[5%] py-8" style={{ scrollbarWidth: 'none' }}>

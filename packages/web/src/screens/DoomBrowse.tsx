@@ -3,6 +3,7 @@ import { api } from '../api/client'
 import type { IdgamesFile, IdgamesSearchType, IdgamesSortKey } from '../api/client'
 import { useGamepad } from '../hooks/useGamepad'
 import { VirtualKeyboard } from '../components/VirtualKeyboard'
+import { StatusBar } from '../components/StatusBar'
 import { Breadcrumb, Title, HintBar, Tag, rowClass, Caret } from '../components/ui'
 
 interface Props {
@@ -212,7 +213,10 @@ export function DoomBrowse({ onBack }: Props) {
 
   return (
     <div className="fixed inset-0 bg-idg-bg text-idg-text flex flex-col px-[4%] pt-[2.5%] pb-5 font-sans">
-      <Breadcrumb mode="idg">idgames / browse</Breadcrumb>
+      <div className="flex items-center justify-between flex-shrink-0">
+        <Breadcrumb mode="idg">idgames / browse</Breadcrumb>
+        <StatusBar />
+      </div>
 
       <div className="flex-1 min-h-0 flex gap-8 pt-4">
         {/* Left: control row + results list */}

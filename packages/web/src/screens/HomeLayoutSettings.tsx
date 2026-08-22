@@ -4,7 +4,7 @@ import { api } from '../api/client'
 import { useGamepad } from '../hooks/useGamepad'
 import { listOrderOf, gameSortOf } from '../prefs'
 import { Glyph } from '../components/Glyph'
-import { Clock } from '../components/Clock'
+import { StatusBar } from '../components/StatusBar'
 
 interface Props {
   user: User
@@ -160,7 +160,7 @@ export function HomeLayoutSettings({ user, prefs, onChange, onBack }: Props) {
           <h1 className="text-white text-2xl font-bold tracking-tight">Home Screen</h1>
           <p className="text-vault-muted text-xs uppercase tracking-widest mt-1">Sort order & which rails appear</p>
         </div>
-        <div className="ml-auto"><Clock /></div>
+        <div className="ml-auto"><StatusBar /></div>
       </header>
 
       <div className="flex-1 overflow-y-auto px-[5%] py-8" style={{ scrollbarWidth: 'none' }}>

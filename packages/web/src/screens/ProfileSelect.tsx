@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import type { User } from '@retro-vault/shared'
 import { api } from '../api/client'
 import { useGamepad } from '../hooks/useGamepad'
-import { Clock } from '../components/Clock'
+import { StatusBar } from '../components/StatusBar'
 import { VirtualKeyboard } from '../components/VirtualKeyboard'
 import { Breadcrumb, Title, Rule, HintBar, rowClass, Caret } from '../components/ui'
 
@@ -73,7 +73,7 @@ export function ProfileSelect({ onSelect }: Props) {
     <div className="fixed inset-0 bg-vault-bg flex flex-col px-[5%] py-[3.5%] font-sans">
       <div className="flex items-center justify-between">
         <Breadcrumb>retrovault / profile</Breadcrumb>
-        <Clock />
+        <StatusBar />
       </div>
 
       <Title className="text-7xl mt-6 mb-6">Who's playing?</Title>
