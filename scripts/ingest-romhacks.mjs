@@ -141,7 +141,11 @@ function extractPatches() {
       const chosen = patches[0]
       const ext = chosen.split('.').pop().toLowerCase()
       const id = it.rhdnId ?? path.basename(it.bundle).replace(/\.[^.]+$/, '')
-      const rel = path.join(it.systems[0], `${id}.${ext}`)
+      // RHDN numbers hacks and translations in separate id spaces, so a flat
+      // <system>/<id>.<ext> tree lets a translation overwrite an unrelated hack
+      // — 540 of them collided the first time this ran. Hacks keep the original
+      // layout (already deployed); every other category gets its own subtree.
+      const rel = path.join(CATEGORY === 'hacks' ? '' : CATEGORY, it.systems[0], `${id}.${ext}`)
       const dest = path.join(OUT, rel)
       fs.mkdirSync(path.dirname(dest), { recursive: true })
       fs.copyFileSync(path.join(tmp, chosen), dest)
