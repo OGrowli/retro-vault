@@ -95,11 +95,18 @@ gamesRouter.get('/:id', (c) => {
     WHERE ps.game_id = ?
   `).get(id) as { total_play_count: number; last_played: string | null }
 
+  // Counts every row the Hacks panel would list, so the number on the action
+  // row and the list behind it agree.
+  const { hack_count } = db.prepare(
+    'SELECT COUNT(*) AS hack_count FROM rom_hacks WHERE game_id = ?',
+  ).get(id) as { hack_count: number }
+
   return c.json({
     ...(game as Record<string, unknown>),
     roms,
     total_play_count: stats.total_play_count,
     last_played: stats.last_played,
+    hack_count,
   })
 })
 

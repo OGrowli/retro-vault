@@ -99,6 +99,7 @@ export function GameDetail({ game: initialGame, user, onBack, fromRandom = false
   }, [game.id, user.id])
 
   const roms = detail?.roms ?? []
+  const hackCount = detail?.hack_count ?? 0
   const singleRom = roms.length === 1
   // When a title has both official and non-official ROMs, split the list under
   // two subheaders. roms arrive official-first from the API, so the boundary is
@@ -359,6 +360,9 @@ export function GameDetail({ game: initialGame, user, onBack, fromRandom = false
                 : 'Back'
               const status = act === 'favorite' ? (isFavorite ? 'on' : 'off')
                 : act === 'scrape' ? (scraping ? 'scraping…' : scrapedDate ?? '')
+                // Blank until the detail fetch lands, and when a game has none —
+                // a bare "0" reads as an error next to an openable row.
+                : act === 'hacks' ? (hackCount ? String(hackCount) : '')
                 : ''
               return (
                 <div

@@ -251,6 +251,8 @@ export interface GameWithRoms extends Game {
   roms: Rom[]
   total_play_count: number
   last_played: string | null
+  /** Hacks + translations matched to this game — what the Hacks panel lists. */
+  hack_count: number
 }
 
 export interface HistoryEntry {
