@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Ingest the ROMhacking.net patch archive into a compact patch tree + index for
-// RetroVault. Run under WSL (needs unzip + 7z on PATH). The patch archive has no
+// RetroVault. Run under WSL (needs unzip + 7z + unrar on PATH). The archive has no
 // metadata, so we derive what we can from folder (system) + `[RHDN_id]Title.ext`
 // — which is only the patch's own title, not the game it targets.
 //
@@ -91,6 +91,33 @@ function buildIndex() {
   console.log('Per RHDN system:', Object.entries(bySys).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k}:${v}`).join(' '))
 }
 
+// Unpack one bundle (zip/rar/7z) flat into dir.
+//
+// 7z reads all three formats, but it can only *list* a lot of RHDN's older
+// .rar bundles — decompressing them fails with "Unsupported Method", and it
+// leaves a zero-byte file behind while exiting nonzero. That silently cost
+// ~1500 patches, Kaizo Mario World among them. unrar handles those, so fall
+// back to it whenever 7z produces no usable patch.
+function unpack(bundleAbs, dir) {
+  let sevenZipErr = null
+  try {
+    execFileSync('7z', ['e', '-y', `-o${dir}`, bundleAbs, '-r'], { stdio: 'ignore' })
+  } catch (e) { sevenZipErr = e }
+
+  const usable = () => fs.readdirSync(dir)
+    .some(f => /\.(ips|bps|ups|xdelta)$/i.test(f) && fs.statSync(path.join(dir, f)).size > 0)
+  if (usable()) return false
+
+  if (/\.rar$/i.test(bundleAbs)) {
+    // Clear the zero-byte corpses 7z may have left, or unrar will skip them.
+    for (const f of fs.readdirSync(dir)) fs.rmSync(path.join(dir, f), { force: true, recursive: true })
+    execFileSync('unrar', ['e', '-y', '-inul', bundleAbs, dir + path.sep], { stdio: 'ignore' })
+    return true
+  }
+  if (sevenZipErr) throw sevenZipErr
+  return false
+}
+
 // Little-endian uint32 CRC at a byte offset -> 8-char hex.
 function crcAt(buf, off) {
   return buf.readUInt32LE(off).toString(16).toUpperCase().padStart(8, '0')
@@ -120,7 +147,7 @@ function extractPatches() {
   } catch { /* unzip -n returns nonzero if nothing new to extract — fine */ }
 
   const tmp = path.join(WORK, '_patch_tmp')
-  let done = 0, ok = 0, bps = 0, fail = 0
+  let done = 0, ok = 0, bps = 0, fail = 0, viaUnrar = 0
   for (const it of idx.items) {
     done++
     if (it.patchPath && fs.existsSync(path.join(OUT, it.patchPath))) { ok++; continue } // resume
@@ -128,10 +155,13 @@ function extractPatches() {
     if (!fs.existsSync(bundleAbs)) { fail++; continue }
     try {
       fs.rmSync(tmp, { recursive: true, force: true }); fs.mkdirSync(tmp, { recursive: true })
-      // 7z handles zip/rar/7z uniformly; extract everything, then pick the patch
-      // by extension case-insensitively (catches uppercase .IPS + .xdelta).
-      execFileSync('7z', ['e', '-y', `-o${tmp}`, bundleAbs, '-r'], { stdio: 'ignore' })
-      const patches = fs.readdirSync(tmp).filter(f => /\.(ips|bps|ups|xdelta)$/i.test(f))
+      if (unpack(bundleAbs, tmp)) viaUnrar++
+      // Pick the patch by extension case-insensitively (catches uppercase .IPS
+      // and .xdelta). Zero-byte files mean the unpacker "succeeded" but wrote
+      // nothing — treat them as absent so a dead patch never reaches the tree.
+      const patches = fs.readdirSync(tmp)
+        .filter(f => /\.(ips|bps|ups|xdelta)$/i.test(f))
+        .filter(f => fs.statSync(path.join(tmp, f)).size > 0)
       if (!patches.length) { fail++; continue }
       // Prefer bps/ups (carry a source CRC), then xdelta, then ips; then largest.
       patches.sort((a, b) => {
@@ -162,7 +192,7 @@ function extractPatches() {
   }
   fs.rmSync(tmp, { recursive: true, force: true })
   fs.writeFileSync(OUT_INDEX, JSON.stringify(idx, null, 2))
-  console.log(`Extract done: ${ok} patches, ${bps} with source CRC, ${fail} failed. Index: ${OUT_INDEX}`)
+  console.log(`Extract done: ${ok} patches, ${bps} with source CRC, ${viaUnrar} via unrar fallback, ${fail} failed. Index: ${OUT_INDEX}`)
 }
 
 const mode = process.argv[2] || 'index'
