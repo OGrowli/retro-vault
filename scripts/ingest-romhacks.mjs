@@ -1,7 +1,13 @@
 #!/usr/bin/env node
-// Ingest the ROMhacking.net dump into a compact patch tree + index for
-// RetroVault. Run under WSL (needs unzip + 7z on PATH). The dump has no metadata
-// index, so we derive everything from folder (system) + `[RHDN_id]Title.ext`.
+// Ingest the ROMhacking.net patch archive into a compact patch tree + index for
+// RetroVault. Run under WSL (needs unzip + 7z on PATH). The patch archive has no
+// metadata, so we derive what we can from folder (system) + `[RHDN_id]Title.ext`
+// — which is only the patch's own title, not the game it targets.
+//
+// Run parse-rhdn-sql.mjs alongside this. It turns the separate romhacking.sql
+// database dump into rhdn-meta.json in the same output dir, keyed by the same
+// `[id]`, and that is what tells the matcher each patch's canonical game and its
+// base-ROM hashes. Without it the import is back to guessing from patch titles.
 //
 //   node ingest-romhacks.mjs index     # fast: build romhacks/index.json from the
 //                                      #   zip listing only (no extraction)

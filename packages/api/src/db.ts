@@ -341,6 +341,48 @@ if (!romCols.has('curated')) {
   db.exec(`ALTER TABLE roms ADD COLUMN curated INTEGER NOT NULL DEFAULT 0`)
 }
 
+// RHDN dump metadata, joined onto each hack by rhdn id at import time (see
+// scripts/parse-rhdn-sql.mjs). base_crcs/base_sha1s are the hashes of the base
+// ROM the patch expects — the dump publishes these for IPS too, which carries no
+// source checksum of its own, so they drive the exact tier for every format.
+const hackCols = new Set(
+  (db.prepare('PRAGMA table_info(rom_hacks)').all() as Array<{ name: string }>).map(r => r.name)
+)
+for (const [col, decl] of [
+  ['rhdn_game_key', 'INTEGER'],     // gamedata.gamekey — the canonical game
+  ['rhdn_game_title', 'TEXT'],
+  ['base_crcs', 'TEXT'],            // comma-joined uppercase hex, headered + stripped
+  ['base_sha1s', 'TEXT'],
+  ['patch_hint', 'TEXT'],           // 'No-Header (SNES)' | 'BIN Format (GEN)' | …
+  ['version', 'TEXT'],
+  ['released', 'TEXT'],
+  ['downloads', 'INTEGER'],
+  ['description', 'TEXT'],
+  ['language', 'TEXT'],             // translations only
+  ['license', 'TEXT'],
+  ['youtube', 'TEXT'],
+] as const) {
+  if (!hackCols.has(col)) db.exec(`ALTER TABLE rom_hacks ADD COLUMN ${col} ${decl}`)
+}
+
+// hack_key used to be the bare RHDN id, but hacks and translations are numbered
+// in separate id spaces — 'hack:1' and 'translation:1' are different patches for
+// different games. Left as-is, importing translations would silently overwrite
+// half the hacks. Qualify the existing (hacks-only) rows so manual assignments
+// survive the change.
+db.exec(`
+  UPDATE rom_hacks SET hack_key = COALESCE(kind, 'hack') || ':' || hack_key
+  WHERE rhdn_id IS NOT NULL AND hack_key NOT LIKE '%:%'
+`)
+
+// Bare-crc / bare-sha1 lookups: the hack matcher resolves a base-ROM hash to a
+// game without knowing which system's DAT it lives in, so the existing
+// (system, crc) index can't serve it.
+db.exec(`
+  CREATE INDEX IF NOT EXISTS idx_dat_entries_crc_only ON dat_entries(crc);
+  CREATE INDEX IF NOT EXISTS idx_dat_entries_sha1 ON dat_entries(sha1);
+`)
+
 if (schemaVersion < 2) {
   db.exec('PRAGMA user_version = 2')
 }
