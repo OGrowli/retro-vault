@@ -209,8 +209,14 @@ export function HacksPanel({ game, user, onClose }: Props) {
               as focus travels. Rendering a description per row would multiply
               the Pi's layout cost by the list length for text nobody reads. */}
           {!searching && !loading && hacks.length > 0 && (
-            <p className="h-[4.5rem] flex-none font-read text-[0.95rem] leading-[1.3] text-vault-ink/70 line-clamp-3 border-t border-vault-surface pt-3">
-              {focusedHack?.description ?? ''}
+            <p className={`h-[5.2rem] flex-none line-clamp-3 border-t border-vault-surface pt-3 ${
+              focusedHack?.description
+                ? 'font-read text-[1.05rem] leading-[1.4] text-[#eaf0f8]/70'
+                : 'font-mono text-[0.8rem] tracking-[0.06em] text-vault-muted'
+            }`}>
+              {/* vault-ink is the dark-text-on-cyan-fill token — invisible on the
+                  panel. Prose on a dark vault surface uses the GameDetail colour. */}
+              {focusedHack?.description ?? '—'}
             </p>
           )}
 
