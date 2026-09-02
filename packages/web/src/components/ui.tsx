@@ -1,10 +1,56 @@
 // Shared visual primitives for the "terminal-meets-PS5" design language.
 // Two palettes: `vault` (console — dark, cyan primary, magenta selection bar)
 // and `idg` (idGames/Doom — warm, orange primary, gold selection bar).
-import type { ReactNode } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 import type { RomKind } from '@retro-vault/shared'
 
 export type Mode = 'vault' | 'idg'
+
+// ---- Marquee title -------------------------------------------------------
+// List titles run past the width of their row and get clipped. On the focused
+// row, after a short dwell, slide the text so its tail is readable, then hold
+// and slide back. Only ever one row animates, and it animates transform only —
+// composited, no layout or paint per frame, which is what makes it affordable
+// on the Pi.
+//
+// Deliberately NOT gated on motion-reduce: the kiosk starts Chromium with
+// --force-prefers-reduced-motion (scripts/launch-chromium.sh), which is what
+// switches the app's decorative transitions off. This one isn't decoration —
+// it is the only way to read a clipped title on the device — so it has to run
+// even there.
+export function ScrollingTitle({
+  text, focused, className = 'text-xl', wrap = 'flex-1 min-w-0',
+}: { text: string; focused: boolean; className?: string; wrap?: string }) {
+  const ref = useRef<HTMLSpanElement>(null)
+  const [shift, setShift] = useState(0)
+
+  useEffect(() => {
+    setShift(0)
+    if (!focused) return
+    const el = ref.current
+    if (!el) return
+    const over = el.scrollWidth - el.clientWidth
+    if (over <= 4) return
+    const t = setTimeout(() => setShift(over), 700)
+    return () => clearTimeout(t)
+  }, [focused, text])
+
+  // ~55px/s of travel, with the keyframe holds folded in.
+  const duration = Math.round(shift * 18 + 1800)
+
+  return (
+    <span className={`${wrap} overflow-hidden`}>
+      <span
+        ref={ref}
+        className={`block ${className} ${shift ? 'whitespace-nowrap animate-marquee' : 'truncate'}`}
+        style={shift ? ({ '--mq-shift': `-${shift}px`, animationDuration: `${duration}ms` } as CSSProperties) : undefined}
+      >
+        {text}
+      </span>
+    </span>
+  )
+}
 
 // ---- Flat selectable row -------------------------------------------------
 // Selected = accent fill + dark ink text + a thick coloured left bar. Unselected

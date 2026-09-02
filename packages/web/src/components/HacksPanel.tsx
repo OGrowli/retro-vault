@@ -1,10 +1,9 @@
 import { useState, useEffect, useRef, useCallback, useMemo, useReducer } from 'react'
-import type { CSSProperties } from 'react'
 import type { Game, User, RomHack } from '@retro-vault/shared'
 import { api } from '../api/client'
 import { useGamepad } from '../hooks/useGamepad'
 import { VirtualKeyboard } from './VirtualKeyboard'
-import { Title, HintBar, rowClass, Caret } from './ui'
+import { Title, HintBar, rowClass, Caret, ScrollingTitle } from './ui'
 
 interface Props {
   game: Game
@@ -14,45 +13,6 @@ interface Props {
 
 // A search row only earns its place once the list is long enough to scroll past.
 const SEARCH_THRESHOLD = 10
-
-// Hack titles run long ("... Redux Hard Mode (v1.3 English)") and the row
-// truncates them. On the focused row, after a short dwell, slide the text so the
-// tail is readable. Cheap on the Pi: one transform-only animation on one element
-// at a time — composited, no layout or paint per frame.
-function ScrollingTitle({ text, focused }: { text: string; focused: boolean }) {
-  const ref = useRef<HTMLSpanElement>(null)
-  const [shift, setShift] = useState(0)
-
-  useEffect(() => {
-    setShift(0)
-    if (!focused) return
-    const el = ref.current
-    if (!el) return
-    const over = el.scrollWidth - el.clientWidth
-    if (over <= 4) return
-    const t = setTimeout(() => setShift(over), 700)
-    return () => clearTimeout(t)
-  }, [focused, text])
-
-  // ~55px/s of travel, with the keyframe holds folded in.
-  const duration = Math.round(shift * 18 + 1800)
-
-  return (
-    <span className="flex-1 min-w-0 overflow-hidden">
-      <span
-        ref={ref}
-        className={
-          shift
-            ? 'block whitespace-nowrap text-xl animate-marquee motion-reduce:animate-none'
-            : 'block truncate text-xl'
-        }
-        style={shift ? ({ '--mq-shift': `-${shift}px`, animationDuration: `${duration}ms` } as CSSProperties) : undefined}
-      >
-        {text}
-      </span>
-    </span>
-  )
-}
 
 // Browse the ROM hacks matched to this game, then compile a patch onto a base
 // ROM and play it. Matching + patches come from the RHDN ingest; this panel is

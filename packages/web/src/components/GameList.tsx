@@ -1,6 +1,6 @@
 import { useEffect, useRef, useMemo } from 'react'
 import type { Game } from '@retro-vault/shared'
-import { rowClass, Caret, Tag } from './ui'
+import { rowClass, Caret, Tag, ScrollingTitle } from './ui'
 
 // Flat, image-free virtualized list for "All Games" — the perf win over the old
 // cover-art grid. Only a window of text rows is mounted; the parent's sparse
@@ -76,7 +76,7 @@ export function GameList({ total, getGame, onNeedRange, loading, focusedIndex, i
         {game ? (
           <div onClick={() => onSelect?.(game)} className={`${rowClass(focused)} h-full`}>
             <Caret selected={focused} />
-            <span className="min-w-0 truncate text-lg">{game.name}</span>
+            <ScrollingTitle text={game.name} focused={focused} className="text-lg" wrap="min-w-0" />
             <Tag dark={focused}>{game.system}</Tag>
             <span className="flex-1" />
           </div>

@@ -5,7 +5,7 @@ import { useGamepad } from '../hooks/useGamepad'
 import { StatusBar } from '../components/StatusBar'
 import { AddToListModal } from '../components/AddToListModal'
 import { HacksPanel } from '../components/HacksPanel'
-import { Breadcrumb, Title, SectionHeader, Rule, HintBar, KindTag, RegionChip, rowClass } from '../components/ui'
+import { Breadcrumb, Title, SectionHeader, Rule, HintBar, KindTag, RegionChip, rowClass, ScrollingTitle } from '../components/ui'
 
 interface Props {
   game: Game
@@ -49,7 +49,7 @@ function RomRow({
       className={rowClass(focused)}
     >
       <RegionChip region={rom.region} dark={focused} />
-      <span className="min-w-0 truncate text-xl">{rom.full_name}</span>
+      <ScrollingTitle text={rom.full_name} focused={focused} wrap="min-w-0" />
       <KindTag kind={rom.kind} dark={focused} />
       <span className="flex-1" />
       <span className={`font-mono text-[0.85rem] tracking-[0.06em] ${focused ? 'text-vault-ink/70' : 'text-vault-muted'}`}>

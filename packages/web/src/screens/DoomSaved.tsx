@@ -3,7 +3,7 @@ import { api } from '../api/client'
 import type { DoomFavorite, IdgamesFile } from '../api/client'
 import { useGamepad } from '../hooks/useGamepad'
 import { StatusBar } from '../components/StatusBar'
-import { Breadcrumb, Title, HintBar, Tag, rowClass, Caret } from '../components/ui'
+import { Breadcrumb, Title, HintBar, Tag, rowClass, Caret, ScrollingTitle } from '../components/ui'
 
 interface Props {
   /** `changed` is true when a download or delete means the hub's WAD list is stale. */
@@ -140,7 +140,7 @@ export function DoomSaved({ onBack }: Props) {
                   className={rowClass(focused, 'idg')}
                 >
                   <Caret selected={focused} mode="idg" />
-                  <span className="flex-1 min-w-0 text-lg truncate">{label(f)}</span>
+                  <ScrollingTitle text={label(f)} focused={focused} className="text-lg" />
                   <Tag mode="idg" dark={focused}>{f.downloaded ? 'on disk' : 'not downloaded'}</Tag>
                 </div>
               )

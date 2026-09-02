@@ -4,7 +4,7 @@ import type { IdgamesFile, IdgamesSearchType, IdgamesSortKey } from '../api/clie
 import { useGamepad } from '../hooks/useGamepad'
 import { VirtualKeyboard } from '../components/VirtualKeyboard'
 import { StatusBar } from '../components/StatusBar'
-import { Breadcrumb, Title, HintBar, Tag, rowClass, Caret } from '../components/ui'
+import { Breadcrumb, Title, HintBar, Tag, rowClass, Caret, ScrollingTitle } from '../components/ui'
 
 interface Props {
   onBack: (didDownload: boolean) => void
@@ -298,7 +298,7 @@ export function DoomBrowse({ onBack }: Props) {
                   className={rowClass(focused, 'idg')}
                 >
                   <Caret selected={focused} mode="idg" />
-                  <span className="flex-1 min-w-0 text-lg truncate">{f.title || f.filename}</span>
+                  <ScrollingTitle text={f.title || f.filename || ''} focused={focused} className="text-lg" />
                   {saved.has(f.id) && <Tag mode="idg" dark={focused}>saved</Tag>}
                   {downloaded[f.id] && <Tag mode="idg" dark={focused}>downloaded</Tag>}
                 </div>

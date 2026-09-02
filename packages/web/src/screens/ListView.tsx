@@ -3,7 +3,7 @@ import type { Game, ListSource } from '@retro-vault/shared'
 import { api, bgVariant } from '../api/client'
 import { useGamepad } from '../hooks/useGamepad'
 import { StatusBar } from '../components/StatusBar'
-import { Breadcrumb, Title, HintBar, rowClass, Caret } from '../components/ui'
+import { Breadcrumb, Title, HintBar, rowClass, Caret, ScrollingTitle } from '../components/ui'
 
 interface Props {
   sources: ListSource[]
@@ -62,7 +62,7 @@ function GameListRow({
       className={rowClass(focused)}
     >
       <Caret selected={focused} />
-      <span className="flex-1 min-w-0 text-lg truncate">{game.name}</span>
+      <ScrollingTitle text={game.name} focused={focused} className="text-lg" />
       <span
         className={[
           'flex-shrink-0 font-mono text-[0.8rem] uppercase tracking-[0.1em]',
