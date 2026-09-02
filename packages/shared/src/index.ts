@@ -68,7 +68,14 @@ export interface RomHack {
   patch_path: string | null
   source_crc: string | null
   game_id: number | null
-  match_confidence: 'exact' | 'fuzzy' | 'manual' | null
+  match_confidence: 'exact' | 'canonical' | 'fuzzy' | 'manual' | null
+  // From the RHDN database dump. description is pre-flattened and truncated by
+  // the API (tags stripped, whitespace collapsed) — display text, not source.
+  version?: string | null
+  released?: string | null
+  downloads?: number
+  language?: string | null
+  description?: string | null
 }
 
 export interface PlaySession {

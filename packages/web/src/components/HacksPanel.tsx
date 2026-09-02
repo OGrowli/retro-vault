@@ -83,6 +83,9 @@ export function HacksPanel({ game, user, onClose }: Props) {
       h.title.toLowerCase().includes(q) || (h.author ?? '').toLowerCase().includes(q))
   }, [hacks, query])
 
+  // The one row whose description is on screen (the search row has none).
+  const focusedHack = filtered[focus - off]
+
   // Filtering shrinks the list under the cursor; keep focus in range.
   useEffect(() => {
     setFocus(f => Math.min(f, Math.max(0, filtered.length + off - 1)))
@@ -200,6 +203,16 @@ export function HacksPanel({ game, user, onClose }: Props) {
           <div className="flex flex-col overflow-y-auto max-h-[420px]" style={{ scrollbarWidth: 'none' }}>
             {rows}
           </div>
+
+          {/* The focused hack's blurb, and only its blurb: one text node swapped
+              on each move, inside a fixed-height box so the panel never reflows
+              as focus travels. Rendering a description per row would multiply
+              the Pi's layout cost by the list length for text nobody reads. */}
+          {!searching && !loading && hacks.length > 0 && (
+            <p className="h-[4.5rem] flex-none font-read text-[0.95rem] leading-[1.3] text-vault-ink/70 line-clamp-3 border-t border-vault-surface pt-3">
+              {focusedHack?.description ?? ''}
+            </p>
+          )}
 
           {/* Compile progress is plain streamed text, not an animated bar. */}
           {status && <p className={`font-mono text-sm text-center tracking-[0.04em] ${status.includes('fail') || status.includes('not') ? 'text-red-400' : 'text-vault-accent'}`}>{status}</p>}

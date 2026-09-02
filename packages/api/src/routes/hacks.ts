@@ -461,17 +461,41 @@ hacksRouter.post('/import', (c) => {
   })
 })
 
-// Hacks matched to a game (for the GameDetail Hacks tab).
+// RHDN descriptions are raw forum prose — HTML tags left in by the dump parser,
+// hard-wrapped, and occasionally several screens long. Flatten them here, once
+// per request, so the Pi's browser never parses markup or lays out text it will
+// clamp away anyway. The cap is generous enough for the 3-line panel blurb.
+const BLURB_MAX = 400
+function blurb(s: string | null | undefined): string | null {
+  if (!s) return null
+  const t = s
+    .replace(/<br\s*\/?>|<\/p>/gi, ' ')
+    .replace(/<[^>]*>/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+  if (!t) return null
+  if (t.length <= BLURB_MAX) return t
+  return t.slice(0, BLURB_MAX).replace(/\s+\S*$/, '') + '…'
+}
+
+// Hacks matched to a game (for the GameDetail Hacks tab). Columns are listed
+// explicitly rather than SELECT *: the row carries base_crcs/base_sha1s/patch
+// paths the client never reads, and a heavily-hacked game (SMW ships 1k+ rows)
+// turns that dead weight into a multi-MB response over the Pi's wifi.
+const forGameStmt = db.prepare(`
+  SELECT id, hack_key, rhdn_id, kind, system, title, author, patch_format,
+         game_id, match_confidence, version, released, downloads, language, description
+  FROM rom_hacks WHERE game_id = ?
+  -- Explicit tier order — alphabetical on match_confidence would rank
+  -- 'canonical' above 'exact' and 'fuzzy' above 'manual'.
+  ORDER BY CASE match_confidence
+    WHEN 'manual' THEN 0 WHEN 'exact' THEN 1 WHEN 'canonical' THEN 2 WHEN 'fuzzy' THEN 3 ELSE 4 END,
+    title COLLATE NOCASE
+`)
 hacksRouter.get('/for-game/:id', (c) => {
   const id = parseInt(c.req.param('id'), 10)
-  // Explicit tier order — alphabetical on match_confidence would rank
-  // 'canonical' above 'exact' and 'fuzzy' above 'manual'.
-  const rows = db.prepare(`
-    SELECT * FROM rom_hacks WHERE game_id = ?
-    ORDER BY CASE match_confidence
-      WHEN 'manual' THEN 0 WHEN 'exact' THEN 1 WHEN 'canonical' THEN 2 WHEN 'fuzzy' THEN 3 ELSE 4 END,
-      title COLLATE NOCASE
-  `).all(id)
+  const rows = forGameStmt.all(id) as Array<{ description: string | null }>
+  for (const r of rows) r.description = blurb(r.description)
   return c.json({ hacks: rows })
 })
 
