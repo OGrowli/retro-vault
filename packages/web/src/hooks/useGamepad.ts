@@ -3,6 +3,7 @@ import { useEffect, useRef, useCallback } from 'react'
 export type GamepadAction =
   | 'up' | 'down' | 'left' | 'right'
   | 'confirm' | 'back' | 'favorite' | 'filter' | 'settings'
+  | 'page-up' | 'page-down'
 
 const BTN = {
   CROSS: 0,
@@ -34,6 +35,8 @@ const KEY_MAP: Record<string, GamepadAction> = {
   f: 'favorite',
   Tab: 'filter',
   s: 'settings',
+  PageUp: 'page-up',
+  PageDown: 'page-down',
 }
 
 interface PressState {
@@ -45,7 +48,10 @@ interface PressState {
   swallowed?: boolean
 }
 
-const ALL_ACTIONS: GamepadAction[] = ['up', 'down', 'left', 'right', 'confirm', 'back', 'favorite', 'filter', 'settings']
+const ALL_ACTIONS: GamepadAction[] = [
+  'up', 'down', 'left', 'right', 'confirm', 'back', 'favorite', 'filter', 'settings',
+  'page-up', 'page-down',
+]
 
 export function useGamepad(
   onAction: (action: GamepadAction) => void,
@@ -82,6 +88,10 @@ export function useGamepad(
       if (pad.buttons[BTN.SQUARE]?.pressed) active.set('favorite', true)
       if (pad.buttons[BTN.SHARE]?.pressed) active.set('settings', true)
       if (pad.buttons[BTN.OPTIONS]?.pressed) active.set('filter', true)
+      // Shoulders page through overflowing text (the hacks panel's blurb). Held
+      // repeat comes free from the press-state loop below.
+      if (pad.buttons[BTN.L1]?.pressed) active.set('page-up', true)
+      if (pad.buttons[BTN.R1]?.pressed) active.set('page-down', true)
 
       const ax = pad.axes[0] ?? 0
       const ay = pad.axes[1] ?? 0

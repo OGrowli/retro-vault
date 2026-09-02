@@ -337,6 +337,8 @@ export const api = {
 
   hacks: {
     forGame: (gameId: number) => get<{ hacks: RomHack[] }>(`/hacks/for-game/${gameId}`),
+    // Full text for one hack; the list payload only carries a 400-char blurb.
+    description: (id: number) => get<{ description: string | null }>(`/hacks/${id}/description`),
     import: () => post<{ total: number; exact: number; fuzzy: number; unmatched: number; matched: number }>('/hacks/import'),
     unmatched: (system?: string, limit = 100, offset = 0) =>
       get<{ total: number; items: RomHack[] }>(`/hacks/unmatched?limit=${limit}&offset=${offset}${system ? `&system=${system}` : ''}`),

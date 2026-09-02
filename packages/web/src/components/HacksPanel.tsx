@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo, useReducer } from 'react'
 import type { CSSProperties } from 'react'
 import type { Game, User, RomHack } from '@retro-vault/shared'
 import { api } from '../api/client'
@@ -66,6 +66,13 @@ export function HacksPanel({ game, user, onClose }: Props) {
   const [query, setQuery] = useState('')
   const [searching, setSearching] = useState(false) // keyboard overlay open
   const rowRefs = useRef<(HTMLDivElement | null)[]>([])
+  const blurbRef = useRef<HTMLParagraphElement>(null)
+  // Full descriptions fetched on demand, keyed by hack id. A ref (not state) so
+  // the list isn't re-rendered by a cache write for a row nobody is looking at;
+  // bumpFull() forces the one render that matters. inFlight dedupes a held R1.
+  const fullCache = useRef(new Map<number, string>())
+  const inFlight = useRef(new Set<number>())
+  const [, bumpFull] = useReducer((n: number) => n + 1, 0)
 
   useEffect(() => {
     api.hacks.forGame(game.id)
@@ -85,6 +92,26 @@ export function HacksPanel({ game, user, onClose }: Props) {
 
   // The one row whose description is on screen (the search row has none).
   const focusedHack = filtered[focus - off]
+  // Blurb by default; the full text once it has been fetched for this row.
+  const blurbText = focusedHack
+    ? fullCache.current.get(focusedHack.id) ?? focusedHack.description ?? null
+    : null
+
+  // A trailing ellipsis is the API's own marker that it cut the text at 400
+  // chars — the only signal we need to know a fetch would return more.
+  const loadFull = useCallback(() => {
+    const h = focusedHack
+    if (!h || !h.description?.endsWith('…')) return
+    if (fullCache.current.has(h.id) || inFlight.current.has(h.id)) return
+    inFlight.current.add(h.id)
+    api.hacks.description(h.id)
+      .then(r => { if (r.description) { fullCache.current.set(h.id, r.description); bumpFull() } })
+      .catch(() => { /* keep the blurb */ })
+      .finally(() => inFlight.current.delete(h.id))
+  }, [focusedHack])
+
+  // Moving the cursor starts the next description at the top.
+  useEffect(() => { if (blurbRef.current) blurbRef.current.scrollTop = 0 }, [focusedHack?.id])
 
   // Filtering shrinks the list under the cursor; keep focus in range.
   useEffect(() => {
@@ -112,6 +139,16 @@ export function HacksPanel({ game, user, onClose }: Props) {
     if (busy) return
     if (action === 'back') { onClose(); return }
     if (action === 'favorite' && searchable) { setSearching(true); return }
+    // L1/R1 page the description box. Scrolling one element's scrollTop leaves
+    // the list untouched, so a long read costs nothing extra on the Pi. The
+    // first R1 also pulls the untruncated text down.
+    if (action === 'page-up' || action === 'page-down') {
+      const el = blurbRef.current
+      if (!el) return
+      if (action === 'page-down') loadFull()
+      el.scrollTop += (action === 'page-down' ? 1 : -1) * Math.max(24, el.clientHeight * 0.7)
+      return
+    }
     if (action === 'up') setFocus(i => Math.max(0, i - 1))
     if (action === 'down') setFocus(i => Math.min(filtered.length + off - 1, i + 1))
     if (action === 'confirm') {
@@ -209,14 +246,20 @@ export function HacksPanel({ game, user, onClose }: Props) {
               as focus travels. Rendering a description per row would multiply
               the Pi's layout cost by the list length for text nobody reads. */}
           {!searching && !loading && hacks.length > 0 && (
-            <p className={`h-[5.2rem] flex-none line-clamp-3 border-t border-vault-surface pt-3 ${
-              focusedHack?.description
-                ? 'font-read text-[1.05rem] leading-[1.4] text-[#eaf0f8]/70'
-                : 'font-mono text-[0.8rem] tracking-[0.06em] text-vault-muted'
-            }`}>
+            <p
+              ref={blurbRef}
+              className={`h-[5.2rem] flex-none overflow-y-auto border-t border-vault-surface pt-3 ${
+                blurbText
+                  ? 'font-read text-[1.05rem] leading-[1.4] text-[#eaf0f8]/70'
+                  : 'font-mono text-[0.8rem] tracking-[0.06em] text-vault-muted'
+              }`}
+              style={{ scrollbarWidth: 'none' }}
+            >
               {/* vault-ink is the dark-text-on-cyan-fill token — invisible on the
-                  panel. Prose on a dark vault surface uses the GameDetail colour. */}
-              {focusedHack?.description ?? '—'}
+                  panel. Prose on a dark vault surface uses the GameDetail colour.
+                  The box height is fixed: text scrolls inside it, so paging a long
+                  description never reflows the list above. */}
+              {blurbText ?? '—'}
             </p>
           )}
 
@@ -225,7 +268,8 @@ export function HacksPanel({ game, user, onClose }: Props) {
 
           <HintBar hints={searching
             ? ['d-pad move', 'a type', 'square backspace', 'b done']
-            : ['d-pad move', 'a compile & play', ...(searchable ? ['square search'] : []), 'b close']}
+            : ['d-pad move', 'a compile & play', ...(blurbText ? ['l1/r1 scroll text'] : []),
+               ...(searchable ? ['square search'] : []), 'b close']}
           />
         </div>
       </div>

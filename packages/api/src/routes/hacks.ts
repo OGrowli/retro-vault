@@ -466,7 +466,7 @@ hacksRouter.post('/import', (c) => {
 // per request, so the Pi's browser never parses markup or lays out text it will
 // clamp away anyway. The cap is generous enough for the 3-line panel blurb.
 const BLURB_MAX = 400
-function blurb(s: string | null | undefined): string | null {
+function blurb(s: string | null | undefined, max = BLURB_MAX): string | null {
   if (!s) return null
   const t = s
     .replace(/<br\s*\/?>|<\/p>/gi, ' ')
@@ -474,8 +474,8 @@ function blurb(s: string | null | undefined): string | null {
     .replace(/\s+/g, ' ')
     .trim()
   if (!t) return null
-  if (t.length <= BLURB_MAX) return t
-  return t.slice(0, BLURB_MAX).replace(/\s+\S*$/, '') + '…'
+  if (t.length <= max) return t
+  return t.slice(0, max).replace(/\s+\S*$/, '') + '…'
 }
 
 // Hacks matched to a game (for the GameDetail Hacks tab). Columns are listed
@@ -497,6 +497,19 @@ hacksRouter.get('/for-game/:id', (c) => {
   const rows = forGameStmt.all(id) as Array<{ description: string | null }>
   for (const r of rows) r.description = blurb(r.description)
   return c.json({ hacks: rows })
+})
+
+// The full description for one hack, flattened the same way. The list payload
+// carries only the 400-char blurb: dumps run to 15k characters, and shipping
+// that for every row of a 600-hack game would cost megabytes for text the user
+// reads one row at a time. The panel asks for this only when someone actually
+// scrolls a truncated blurb.
+hacksRouter.get('/:id/description', (c) => {
+  const id = parseInt(c.req.param('id'), 10)
+  const row = db.prepare('SELECT description FROM rom_hacks WHERE id = ?').get(id) as
+    | { description: string | null } | undefined
+  if (!row) return c.json({ error: 'hack not found' }, 404)
+  return c.json({ description: blurb(row.description, Infinity) })
 })
 
 // Unmatched bucket, optionally filtered by system, for manual assignment.
