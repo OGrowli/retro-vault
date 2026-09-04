@@ -69,7 +69,10 @@ export const SYSTEMS: Record<string, SystemConfig> = {
   },
   arcade: {
     displayName: 'Arcade',
-    corePath: `${CORES_ROOT}/lr-mame2003-plus/mame2003_plus_libretro.so`,
+    // The arcade set is a modern (FBNeo-era) romset: mame2003-plus expects
+    // MAME 0.78 rom filenames and aborts with "Required files are missing"
+    // on roughly a third of it. lr-fbneo loads the whole set.
+    corePath: `${CORES_ROOT}/lr-fbneo/fbneo_libretro.so`,
     extensions: ['.zip'],
   },
   fba: {
